@@ -69,7 +69,7 @@ documentation besides the examples in the *test* directories. The *makefile*
 produces the binary *obj/sp* which can load and execute programs by giving
 them as command line argument, e.g.
 
-    obj/sp tests/other/qsortvec.sp
+    obj/sp tests/statpascal/qsortvec.sp
 
 A collection of regression tests can be executed with
 
