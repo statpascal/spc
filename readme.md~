@@ -5,7 +5,7 @@ with vector extensions commonly used in statistical computing.  It is
 designed as an embeddable system providing fast Pascal type scripting to
 host applications by generating X64 and ARM64 assembly code.  It uses the
 Linux calling conventions on these architectures so the generated code does
-*not* work under Windows oder MacOS.
+*not* work under Linux oder MacOS.
 
 A typical Statpascal implementation of the QuickSort algorithm looks like:
 
