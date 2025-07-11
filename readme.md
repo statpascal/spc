@@ -3,7 +3,7 @@
 StatPascal is a Pascal based language (similar to pre-object Turbo Pascal)
 with vector extensions commonly used in statistical computing.  It is
 designed as an embeddable system providing fast Pascal type scripting to
-host applications by generating X64 and ARM64 assembly code.  It used the
+host applications by generating X64 and ARM64 assembly code.  It uses the
 Linux calling conventions on these architectures so the generated code does
 *not* work under Linux oder MacOS.
 
@@ -66,7 +66,7 @@ heavy-tailed distribution:
 
 The system is still in an early alpha state and there is not much
 documentation besides the examples in the *test* directories. The *makefile*
-produces the binary *bin/sp* which can load and execute programs by giving
+produces the binary *obj/sp* which can load and execute programs by giving
 them as command line argument, e.g.
 
     obj/sp tests/other/qsortvec.sp
