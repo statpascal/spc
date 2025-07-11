@@ -1,0 +1,594 @@
+#include "predefined.hpp"
+#include "codegenerator.hpp"
+
+#include <iostream>
+#include <map>
+#include <unordered_map>
+
+namespace statpascal {
+
+class TResetRewriteRoutine: public TRuntimeRoutine {
+using inherited = TRuntimeRoutine;
+public:
+    TResetRewriteRoutine (TBlock &, bool isReset, std::vector<TExpressionBase *> &);
+    
+private:
+    void checkArguments (TBlock &, bool isReset, std::vector<TExpressionBase *> &);
+};
+
+class TStrRoutine: public TRuntimeRoutine {
+using inherited = TRuntimeRoutine;
+public:
+    TStrRoutine (TBlock &, std::vector<TPredefinedExpression::TArgument> &);
+    
+private:
+    void checkArguments (TBlock &, std::vector<TPredefinedExpression::TArgument> &);
+};
+
+class TWriteRoutine: public TRuntimeRoutine {
+using inherited = TRuntimeRoutine;
+public:
+    TWriteRoutine (TBlock &, std::vector<TPredefinedExpression::TArgument> &, bool linefeed);
+    
+private:
+    void checkArguments (TBlock &, std::vector<TPredefinedExpression::TArgument> &, bool linefeed);
+};
+
+class TReadRoutine: public TRuntimeRoutine {
+using inherited = TRuntimeRoutine;
+public:
+    TReadRoutine (TBlock &, std::vector<TExpressionBase> &&, bool linefeed);
+    
+private:
+    void checkArguments (TBlock &, std::vector<TExpressionBase *> &&, bool linefeed);
+};
+
+class TValRoutine: public TRuntimeRoutine {
+using inherited = TRuntimeRoutine;
+public:
+    TValRoutine (TBlock &, std::vector<TExpressionBase *> &&);
+    
+private:
+    void checkArguments (TBlock &, std::vector<TExpressionBase *> &&);
+};
+
+
+
+
+TRuntimeRoutine::TRuntimeRoutine (TBlock &declarations, TType *returnType):
+  inherited (declarations), declarations (declarations) {
+    setType (returnType);
+}
+
+TRuntimeRoutine::TRuntimeRoutine (TBlock &declarations, TType *returnType, const std::string &runtimeName, std::vector<TExpressionBase *> &&args, bool checkParameter):
+  inherited (declarations), declarations (declarations) {
+    setType (returnType);
+    appendRuntimeCall (runtimeName, args, checkParameter);
+}
+
+void TRuntimeRoutine::acceptCodeGenerator (TCodeGenerator &codeGenerator) {
+    codeGenerator.generateCode (*this);
+}
+
+std::vector<TSyntaxTreeNode *> TRuntimeRoutine::getTransformedNodes () {
+    return transformedNodes;
+}
+
+void TRuntimeRoutine::appendTransformedNode (TSyntaxTreeNode *node) {
+    transformedNodes.push_back (node);
+}
+
+void TRuntimeRoutine::appendRuntimeCall (const std::string &runtimeName, std::vector<TExpressionBase *> &&args, bool checkParameter) {
+    TCompilerImpl &compiler = declarations.getCompiler ();
+    appendTransformedNode (compiler.createMemoryPoolObject<TFunctionCall> (
+        compiler.createMemoryPoolObject<TRoutineValue> (runtimeName, declarations), std::move (args), declarations, checkParameter));
+}
+
+void TRuntimeRoutine::checkFormatArguments (TPredefinedExpression::TArgument &argument, const TType *outputtype, TBlock &declarations) {
+    TCompilerImpl &compiler = declarations.getCompiler ();
+    if (argument.length)
+        performTypeConversion (compiler.type (Int64), argument.length, declarations);
+    else
+        argument.length = compiler.createMemoryPoolObject<TConstantValue> (
+            compiler.createMemoryPoolObject<TSimpleConstant> (std::int64_t (-1), compiler.type (Int64)), declarations);
+        
+    if (argument.precision)
+        if (outputtype == compiler.type (Real))
+            performTypeConversion (compiler.type (Int64), argument.precision, declarations);
+        else
+            compiler.errorMessage (TCompilerImpl::InvalidType, "Decimal precision in format specifier only allowed for real types");
+    else
+        argument.precision = compiler.createMemoryPoolObject<TConstantValue> (
+            compiler.createMemoryPoolObject<TSimpleConstant> (std::int64_t (-1), compiler.type (Int64)), declarations);
+}            
+
+void TRuntimeRoutine::addDefaultFile (std::vector<TPredefinedExpression::TArgument> &arguments, const std::string &filename, TBlock &declarations) {
+    if (arguments.empty () || !(arguments.front ().expression->getType ()->isFile ())) 
+        arguments.insert (arguments.begin (), TPredefinedExpression::TArgument {createVariableAccess (filename, declarations), nullptr, nullptr});
+}
+
+TResetRewriteRoutine::TResetRewriteRoutine (TBlock &declarations, bool isReset, std::vector<TPredefinedExpression::TArgument> &arguments):
+  inherited (declarations, declarations.getCompiler ().type (Void)) {
+    checkArguments (declarations, isReset, arguments);
+}
+
+void TResetRewriteRoutine::checkArguments (TBlock &declarations, bool isReset, std::vector<TPredefinedExpression::TArgument> &arguments) {
+    TCompilerImpl &compiler = declarations.getCompiler ();
+    const TFileType *type = static_cast<TFileType *> (arguments.front ().expression->getType ());
+    const TType *baseType = type->getBaseType ();
+    const bool isTextType = type == compiler.type (Text);
+    if (arguments.size () == 2) {
+        if (isTextType || baseType)
+            compiler.errorMessage (TCompilerImpl::InvalidType, "Record size can only be used with untyped files");
+    } else if (!isTextType) {
+        std::int64_t recordSize = baseType ? baseType->getSize () : 128;
+        arguments.push_back ({compiler.createMemoryPoolObject<TConstantValue> (
+            compiler.createMemoryPoolObject<TSimpleConstant> (recordSize, compiler.type (Int64)), declarations), nullptr, nullptr});
+    }
+    arguments.push_back ({TExpressionBase::createVariableAccess (TConfig::globalRuntimeDataPtr, declarations), nullptr, nullptr});
+    const char *runtimeName [2][2] = {{"__rewrite_bin", "__rewrite_text"}, {"__reset_bin", "__reset_text"}};
+    appendRuntimeCall (runtimeName [isReset][isTextType], arguments);
+}
+
+
+TStrRoutine::TStrRoutine (TBlock &declarations, std::vector<TPredefinedExpression::TArgument> &arguments):
+  inherited (declarations, declarations.getCompiler ().type (Void)) {
+    checkArguments (declarations, arguments);
+}
+
+void TStrRoutine::checkArguments (TBlock &declarations, std::vector<TPredefinedExpression::TFormatArguments> &arguments) {
+    TCompilerImpl &compiler = declarations.getCompiler ();
+    TPredefinedExpression::TFormatArguments &valArgument = arguments.front ();
+    const TType *type = convertBaseType (valArgument.expression, declarations);
+    checkFormatArguments (valArgument, type, declarations);
+    const std::string runtimeRoutine = (type == compiler.type (Int64)) ? "__str_int64" : "__str_dbl";
+
+    std::vector<TPredefinedExpression::TArgument> callArguments {
+        TPredefinedExpression::TArgument {valArgument.expression},
+        TPredefinedExpression::TArgument {valArgument.length},
+        TPredefinedExpression::TArgument {valArgument.precision},
+        TPredefinedExpression::TArgument {arguments [1].expression}};
+
+    appendRuntimeCall (runtimeRoutine, callArguments);
+}
+
+TWriteRoutine::TWriteRoutine (TBlock &declarations, std::vector<TPredefinedExpression::TFormatArguments> &arguments, bool linefeed):
+  inherited (declarations, declarations.getCompiler ().type (Void)) {
+    addDefaultFile (arguments, "output", declarations);
+    checkArguments (declarations, arguments, linefeed);
+}
+
+void TWriteRoutine::checkArguments (TBlock &declarations, std::vector<TPredefinedExpression::TFormatArguments> &arguments, bool linefeed) {
+    TCompilerImpl &compiler = declarations.getCompiler ();
+    static const std::map<std::pair<TType *, bool>, std::string> outputFunctionName = {
+        {{compiler.type(Int64), false}, "__write_int64"},
+        {{compiler.type(Char), false}, "__write_char"},
+        {{compiler.type(Boolean), false}, "__write_boolean"},
+        {{compiler.type(Real), false}, "__write_dbl"},
+        {{compiler.type(String), false}, "__write_string"},
+        
+        {{compiler.type(Int64), true}, "__write_vint64"},
+        {{compiler.type(Char), true}, "__write_vchar"},
+        {{compiler.type(Boolean), true}, "__write_vboolean"},
+        {{compiler.type(Real), true}, "__write_vdbl"},
+        {{compiler.type(String), true}, "__write_vstring"}
+    };
+
+    bool first = true;
+    for (TPredefinedExpression::TArgument &argument: arguments) 
+        if (first)
+            first = false;
+        else {
+            TType *basetype = argument.expression->getType ();
+            bool isVector = basetype->isVector ();
+            if (isVector)
+                basetype = getVectorBaseType (argument.expression, declarations);
+            else
+                basetype = convertBaseType (argument.expression, declarations);
+            bool typeOk = basetype == compiler.type (Real) || basetype == compiler.type (String) || basetype == compiler.type (Char) || basetype == compiler.type (Int64) || basetype == compiler.type (Boolean);
+            if (!typeOk) 
+                compiler.errorMessage (TCompilerImpl::InvalidType, "Cannot output value of type " + basetype->getName ());
+            else {                
+                checkFormatArguments (argument, basetype, declarations);
+                std::vector<TExpressionBase *> args = {arguments.front ().expression, argument.expression, argument.length, argument.precision, TExpressionBase::createVariableAccess (TConfig::globalRuntimeDataPtr, declarations)};
+                TExpressionBase *outputFunction = compiler.createMemoryPoolObject<TRoutineValue> (outputFunctionName.at (std::make_pair (basetype, isVector)), declarations);
+                appendTransformedNode (compiler.createMemoryPoolObject<TFunctionCall> (outputFunction, std::move (args), declarations, true));
+            }
+        }
+        
+    if (linefeed)
+        appendRuntimeCall ("__write_lf", {arguments.front (), {TExpressionBase::createVariableAccess (TConfig::globalRuntimeDataPtr, declarations)}});
+}
+
+//
+
+TReadRoutine::TReadRoutine (TBlock &declarations, std::vector<TExpressionBase *> &&args, bool linefeed):
+  inherited (declarations, declarations.getCompiler ().type (Void)) {
+    addDefaultFile (arguments, "input", declarations);
+    checkArguments (declarations, args, linefeed);
+}
+
+void TReadRoutine::checkArguments (TBlock &declarations, std::vector<TExpressionBase *> &&args, bool linefeed) {
+    TCompilerImpl &compiler = declarations.getCompiler ();
+    static const std::map<TType *, std::string> inputFunctionName = {
+        {compiler.type(Int64), "__read_int64"},
+        {compiler.type(Char), "__read_char"},
+        {compiler.type(Real), "__read_dbl"},
+        {compiler.type(String), "__read_string"}
+    };
+    bool first = true;
+    
+    TExpressionBase *textfile;
+    for (TExpressionBase *arg: args)
+        if (first) {
+            textfile = arg;
+            first = false;
+        } else {
+            if (!arg->isLValueDereference ()) {
+                compiler.errorMessage (TCompilerImpl::VariableExpected, "L-value required as argument of 'read(ln)'");
+                return;
+            }
+            TType *type = arg->getType (), *basetype = type;
+            if (type->isSubrange ())
+                basetype = type->getBaseType ();
+            std::map<TType *, std::string>::const_iterator it = inputFunctionName.find (basetype);
+            if (it != inputFunctionName.end ()) {
+                TExpressionBase *inputFunctionCall = compiler.createMemoryPoolObject<TFunctionCall> (
+                    compiler.createMemoryPoolObject<TRoutineValue> (it->second, declarations),
+                    std::vector<TExpressionBase*> {textfile.expression, TExpressionBase::createVariableAccess (TConfig::globalRuntimeDataPtr, declarations)},
+                    declarations, true
+                );                
+                // generate assignment
+                appendTransformedNode (compiler.createMemoryPoolObject<TSimpleStatement> (static_cast<TLValueDereference *> (argument.expression)->getLValue (), inputFunctionCall));
+            } else {
+                compiler.errorMessage (TCompilerImpl::InvalidType, "Cannod read value of type '" + type->getName () + "'");
+                return;
+            }
+       }
+    if (linefeed)
+        appendRuntimeCall ("__read_lf", {textfile, TExpressionBase::createVariableAccess (TConfig::globalRuntimeDataPtr, declarations)});
+}
+
+//
+
+TValRoutine::TValRoutine (TBlock &declarations, std::vector<TExpressionBase *> &&args):
+  inherited (declarations, declarations.getCompiler ().type (Void)) {
+    checkArguments (declarations, args);
+}
+
+void TValRoutine::checkArguments (TBlock &declarations, std::vector<TExpressionBase *> &&args) {
+    TCompilerImpl &compiler = declarations.getCompiler ();
+    const TType *type = args [1]->getType ();
+    if (type->isSubrange ())
+        type = type->getBaseType ();
+    std::string rtName;    
+    if (type->isReal () || type->isSingle ())
+        rtName = "__val_dbl";
+    else if (type == compiler.type (Int64))
+        rtName = "__val_int";
+    else {
+        compiler.errorMessage (TCompilerImpl::InvalidType, "Cannot apply 'val' to value of type '" + arguments [1].expression->getType ()->getName () + "'");
+        return;
+    }
+    TExpressionBase *valFunctionCall = compiler.createMemoryPoolObject<TFunctionCall> (
+                    compiler.createMemoryPoolObject<TRoutineValue> (rtName, declarations),
+                    std::vector<TExpressionBase*> {args [0], args [2]},
+                    declarations, true
+                );
+    // generate assignment
+    appendTransformedNode (compiler.createMemoryPoolObject<TSimpleStatement> (args [1], valFunctionCall));
+}
+
+//
+
+TCombineRoutine::TCombineRoutine (TBlock &declarations, std::vector<TExpressionBase *> &&args, TType *resultType):
+  inherited (declarations) {
+    checkArguments (declarations, args, resultType);
+}
+
+void TCombineRoutine::checkArguments (TBlock &declarations, std::vector<TExpressionBase *> &args, TType *resultType) {
+    bool resultTypeForced = !!resultType;
+    if (!resultType) {
+        resultType = args [0]->getType ();
+        if (!resultType->isVector ())
+            resultType = declarations.getCompiler ().createMemoryPoolObject<TVectorType> (resultType);
+    }
+    TType *baseType = resultType->getBaseType ();
+    setType (resultType);
+
+//    TODO: avoid copy
+    for (std::size_t i = 0; i < args.size (); ++i)
+        if (resultTypeForced ||
+            checkTypeConversion (baseType, args [i], declarations) ||
+            checkTypeConversion (resultType, args [i], declarations))
+            arguments.push_back (args [i]);
+        else
+            declarations.getCompiler ().errorMessage (TCompilerImpl::InvalidType, "Cannot convert " + args [i].expression->getType ()->getName () + " to " + resultType->getName ());
+}
+
+void TCombineRoutine::acceptCodeGenerator (TCodeGenerator &codeGenerator) {
+    codeGenerator.generateCode (*this);
+}
+
+const std::vector<TExpressionBase *> &TCombineRoutine::getArguments () const {
+    return arguments;
+}
+
+//
+
+TPredefinedRoutine::TPredefinedRoutine (TRoutine routine, TType *returnType, std::vector<TExpressionBase> &&args, TBlock &declarations):
+  inherited (declarations), 
+  routine (routine),
+  arguments (std::move (args)) {
+    setType (returnType);
+}
+
+TPredefinedRoutine::TRoutine TPredefinedRoutine::getRoutine () const {
+    return routine;
+}
+
+const std::vector<TExpressionBase *> &TPredefinedRoutine::getArguments () const {
+    return arguments;
+}
+
+void TPredefinedRoutine::acceptCodeGenerator (TCodeGenerator &codeGenerator) {
+    codeGenerator.generateCode (*this);
+}
+
+// ---
+
+TExpressionBase *TPredefinedExpression::parse (const std::string &identifier, TBlock &declarations) {
+    TCompilerImpl &compiler = declarations.getCompiler ();
+    TLexer &lexer = declarations.getLexer ();
+    
+        using TParameterDescription = std::uint32_t;
+        const TParameterDescription 
+            Int_8 = 1,
+            Int_16 = 1 << 18,	// TODO rearrange flsgs
+            Int_64 = 1 << 1,
+            Dbl = 1 << 2,
+            Str = 1 << 3,
+            Chr = 1 << 4,
+            Bool = 1 << 5,
+            ScalarTypes = Int_8 | Int_64 | Dbl | Str | Chr | Bool,
+            // LValue can be combined with vector or pointer
+            Generic = 1 << 6,
+            LValueRequired = 1 << 7,	
+            Pointer = 1 << 8,
+            File = 1 << 9,
+            Vector = 1 << 10,
+            FormatSpec = 1 << 11,
+            TextFile = 1 << 13,
+            UntypedFile = 1 << 14,
+            TypedFile = 1 << 15,
+            Enumerated = 1 << 16,
+            DerefLValueRequired = 1 << 17;	// usual convention for routine calls
+        
+        static std::map<TParameterDescription, TType *> typemap = {
+            {Int_8, compiler.type (Uint8)}, {Int_16, compiler.type (Uint16)}, {Int_64, compiler.type (Int64)}, {Dbl, compiler.type (Real)}, {Str, compiler.type (String)},
+            {Chr, compiler.type (Char)}, {Bool, compiler.type (Boolean)}, {TextFile, compiler.type (Text)}
+        };
+
+        enum {SpecialParser = 1, AppendGlobalRuntimeDataPtr = 2};
+        struct TRoutineDescription {
+            const TPredefinedRoutine::TRoutine routine;
+            TType *const returnType;
+            const std::vector<TParameterDescription> parameterDescription;
+            const std::string runtimeName;
+            const std::uint8_t flags;
+        };
+        using TPredefinedRoutineDescription = std::unordered_map<std::string, std::vector<TRoutineDescription>>;
+        
+        static const TPredefinedRoutineDescription predefinedRoutineDescriptions = {
+            {"chr", {{TPredefinedRoutine::Chr, compiler.type (Char), {Int_8}}}},
+            {"ord", {{TPredefinedRoutine::Ord, compiler.type (Int64), {Enumerated}}}},
+            
+            {"new", {{TPredefinedRoutine::New, compiler.type (Void), {Pointer | LValueRequired}},
+                     {TPredefinedRoutine::New, compiler.type (Void), {Pointer | LValueRequired, Int_64}}}},
+            {"dispose", {{TPredefinedRoutine::Dispose, compiler.type (Void), {Pointer}}}},
+            
+            {"break", {{TPredefinedRoutine::Break, compiler.type (Void), {}}}},
+            {"halt", {{TPredefinedRoutine::Halt, compiler.type (Void), {}},
+                      {TPredefinedRoutine::Halt, compiler.type (Void), {Int_64}}}},
+            
+            {"resize", {{TPredefinedRoutine::ReserveVector, compiler.type (Void), {Vector | LValueRequired, Int_64}}}},
+            {"size", {{TPredefinedRoutine::SizeVector, compiler.type (Int64), {Vector}}}},
+            // Routines requiring special treatment
+            {"rev", {{TPredefinedRoutine::RevVector, compiler.type (Void), {Vector}}}},
+            
+            {"assign", {{TPredefinedRoutine::RuntimeCall, compiler.type (Void), {File | DerefLValueRequired, Str}, "__assign"}}},
+            {"reset", {{TPredefinedRoutine::Reset, compiler.type (Void), {File | DerefLValueRequired}},
+                       {TPredefinedRoutine::Reset, compiler.type (Void), {File | DerefLValueRequired, Int_64}}}},
+            {"rewrite", {{TPredefinedRoutine::Rewrite, compiler.type (Void), {File | DerefLValueRequired}},
+                         {TPredefinedRoutine::Rewrite, compiler.type (Void), {File | DerefLValueRequired, Int_64}}}},
+            {"blockwrite", {{TPredefinedRoutine::RuntimeCall, compiler.type (Void), {UntypedFile | DerefLValueRequired, Generic | DerefLValueRequired, Int64}, "__write_bin_ign"},
+                            {TPredefinedRoutine::RuntimeCall, compiler.type (Void), {UntypedFile | DerefLValueRequired, Generic | DerefLValueRequired, Int64, Int64 | DerefLValueRequired}, "__write_bin", AppendGlobalRuntimeDataPtr}}},
+            {"blockread", {{TPredefinedRoutine::RuntimeCall, compiler.type (Void), {UntypedFile | DerefLValueRequired, Generic | DerefLValueRequired, Int64}, "__read_bin_ign"},
+                           {TPredefinedRoutine::RuntimeCall, compiler.type (Void), {UntypedFile | DerefLValueRequired, Generic | DerefLValueRequired, Int64, Int64 | DerefLValueRequired}, "__read_bin", AppendGlobalRuntimeDataPtr}}},
+            {"seek", {{TPredefinedRoutine::RuntimeCall, compiler.type (Void), {UntypedFile | DerefLValueRequired, Int_64}, "__seek_bin", AppendGlobalRuntimeDataPtr},
+                      {TPredefinedRoutine::RuntimeCall, compiler.type (Void), {TypedFile | DerefLValueRequired, Int_64}, "__seek_bin", AppendGlobalRuntimeDataPtr}}},
+            {"filesize", {{TPredefinedRoutine::RuntimeCall, compiler.type (Int64), {UntypedFile | DerefLValueRequired}, "__filesize_bin", AppendGlobalRuntimeDataPtr},
+                          {TPredefinedRoutine::RuntimeCall, compiler.type (Int64), {TypedFile | DerefLValueRequired}, "__filesize_bin", AppendGlobalRuntimeDataPtr}}},
+            {"filepos", {{TPredefinedRoutine::RuntimeCall, compiler.type (Int64), {UntypedFile | DerefLValueRequired}, "__filepos_bin", AppendGlobalRuntimeDataPtr},
+                         {TPredefinedRoutine::RuntimeCall, compiler.type (Int64), {TypedFile | DerefLValueRequired}, "__filepos_bin", AppendGlobalRuntimeDataPtr}}},
+            {"flush", {{TPredefinedRoutine::RuntimeCall, compiler.type (Void), {File | DerefLValueRequired}, "__flush", AppendGlobalRuntimeDataPtr}}},
+            {"erase", {{TPredefinedRoutine::RuntimeCall, compiler.type (Void), {File | DerefLValueRequired}, "__erase"}}},
+            {"close", {{TPredefinedRoutine::RuntimeCall, compiler.type (Void), {File | DerefLValueRequired}, "__close", AppendGlobalRuntimeDataPtr}}},
+            {"eof", {{TPredefinedRoutine::RuntimeCall, compiler.type (Boolean), {}, "__eof_input"},
+                     {TPredefinedRoutine::RuntimeCall, compiler.type (Boolean), {File | DerefLValueRequired}, "__eof", AppendGlobalRuntimeDataPtr}}},
+            
+            {"val", {{TPredefinedRoutine::Val, compiler.type (Void), {Str, LValueRequired, Int16}}}},
+            {"addr", {{TPredefinedRoutine::Addr, compiler.type (GenericPointer), {LValueRequired}}}},
+            {"odd", {{TPredefinedRoutine::Odd, compiler.type (Boolean), {Int_64}}}}, 
+            {"succ", {{TPredefinedRoutine::Succ, compiler.type (Void), {Enumerated}}}},
+            {"pred", {{TPredefinedRoutine::Pred, compiler.type (Void), {Enumerated}}}},
+            {"inc", {{TPredefinedRoutine::Inc, compiler.type (Void), {Enumerated | LValueRequired}},
+                     {TPredefinedRoutine::Inc, compiler.type (Void), {Enumerated | LValueRequired, Int64}},
+                     {TPredefinedRoutine::Inc, compiler.type (Void), {Pointer | LValueRequired}},
+                     {TPredefinedRoutine::Inc, compiler.type (Void), {Pointer | LValueRequired, Int64}}}},
+            {"dec", {{TPredefinedRoutine::Dec, compiler.type (Void), {Enumerated | LValueRequired}},
+                     {TPredefinedRoutine::Dec, compiler.type (Void), {Enumerated | LValueRequired, Int64}},
+                     {TPredefinedRoutine::Dec, compiler.type (Void), {Pointer | LValueRequired}},
+                     {TPredefinedRoutine::Dec, compiler.type (Void), {Pointer | LValueRequired, Int64}}
+                     }},
+                     
+            {"str", {{TPredefinedRoutine::Str, compiler.type (Void), {Int_64 | FormatSpec, Str | LValueRequired}},
+                     {TPredefinedRoutine::Str, compiler.type (Void), {Dbl | FormatSpec, Str | LValueRequired}}}},
+            {"write", {{TPredefinedRoutine::Write, compiler.type (Void), {TypedFile | DerefLValueRequired, Generic | DerefLValueRequired}, "__write_bin_typed"}}},
+            {"writeln", {{TPredefinedRoutine::Writeln, compiler.type (Void), {}, "", SpecialParser}}},
+            {"read", {{TPredefinedRoutine::Read, compiler.type (Void), {TypedFile | DerefLValueRequired, Generic | DerefLValueRequired}, "__read_bin_typed"}}},
+            {"readln", {{TPredefinedRoutine::Readln, compiler.type (Void), {}, "", SpecialParser}}},
+            {"combine", {{TPredefinedRoutine::Combine, compiler.type (Void), {}, "", SpecialParser}}},
+            {"exit", {{TPredefinedRoutine::Exit, compiler.type (Void), {}}}}
+        };
+        
+    TPredefinedRoutineDescription::const_iterator it = predefinedRoutineDescriptions.find (identifier);
+    if (it == predefinedRoutineDescriptions.end ()) {
+        compiler.errorMessage (TCompilerImpl::IdentifierExpected, "'" + identifier + "' is undefined");
+        return nullptr;
+    }
+    const std::vector<TRoutineDescription> &routineDescriptions = it->second;
+
+    bool success = true;
+    std::vector<TPredefinedExpression::TFormatArguments> formatArgumentss;
+    std::vector<TExpressionBase *> args;
+    if (lexer.checkToken (TToken::BracketOpen)) {
+        do {
+            TExpressionBase *expression = TExpression::parse (declarations);
+            if (expression && expression->getType ()) {
+                formatArguments.push_back ({expression, nullptr, nullptr});
+                if (lexer.checkToken (TToken::Colon))
+                    formatArguments.back ().length = TExpression::parse (declarations);
+                if (lexer.checkToken (TToken::Colon))
+                    formatArguments.back ().precision = TExpression::parse (declarations);
+            } else
+                success = false;
+        } while (lexer.checkToken (TToken::Comma));
+        if (!lexer.checkToken (TToken::BracketClose))
+            compiler.errorMessage (TCompilerImpl::SyntaxError, "Missing ')' in call to subroutine '" + identifier + "'");
+    }
+    if (!success)
+        return nullptr;
+    args.resize (formatArguments.size ());
+    
+    struct TErrorMessage {
+        TCompilerImpl::TErrorType errorType;
+        std::string errorMsg;
+    } errorMessage;
+
+    for (const TRoutineDescription &routineDescription: routineDescriptions) {
+        if (formatArguments.size () == routineDescription.parameterDescription.size () && !(routineDescription.flags & SpecialParser)) {
+            bool success = true;
+            for (std::size_t i = 0; success && i < routineDescription.parameterDescription.size (); ++i) {
+                args [i] = formatArguments [i].expression;
+                const TParameterDescription parameterDescription = routineDescription.parameterDescription [i];
+                const TType *type = convertedArguments [i].expression->getType ();
+                
+                if (parameterDescription & (LValueRequired | DerefLValueRequired)) {
+                    if (!args [i]->isLValueDereference ()) {
+                        errorMessage = {TCompilerImpl::VariableExpected, "L-value required as argument of " + identifier};
+                        success = false;
+                    } else if (parameterDescription & LValueRequired)
+                        args [i] = static_cast<TLValueDereference *> (args [i])->getLValue ();
+                }
+                if (!(parameterDescription & FormatSpec) && formatArguments [i].length) {
+                    success = false;
+                    errorMessage = {TCompilerImpl::InvalidUseOfSymbol, "Format specifiers are not allowed as argument of " + identifier};
+                }
+                if (parameterDescription & TextFile) {
+                    if (type != compiler.type (Text)) {
+                        errorMessage = {TCompilerImpl::InvalidType, "Text file type required as argument of " + identifier};
+                        success = false;
+                    }
+                } else if (parameterDescription & File) {
+                    if (!type->isFile ()) {
+                        errorMessage = {TCompilerImpl::InvalidType, "File type required as argument of " + identifier};
+                        success = false;
+                    }
+                } else if (parameterDescription & TypedFile) {
+                    if (!type->isFile () || !type->getBaseType ())
+                        success = false;
+                } else if (parameterDescription & UntypedFile) {
+                    if (!type->isFile () || type->getBaseType ())
+                        success = false;
+                } else if (parameterDescription & Enumerated) {
+                    if (!type->isEnumerated ()) {
+                        errorMessage = {TCompilerImpl::InvalidType, "Enumerated type required as argument of " + identifier};
+                        success = false;
+                    }
+                } else if (parameterDescription & Pointer) {
+                    if (!type->isPointer ()) {
+                        errorMessage  = {TCompilerImpl::InvalidType, "Pointer type required as argument of " + identifier};
+                        success = false;
+                    }
+                } else if (parameterDescription & Vector) {
+                    if (!type->isVector ()) {
+                        errorMessage = {TCompilerImpl::InvalidType, "Vector type required as argument of " + identifier};
+                        success = false;
+                    }
+                    if (parameterDescription & ScalarTypes)
+                        success = checkTypeConversionVector (compiler.createMemoryPoolObject<TVectorType> (typemap [parameterDescription & ScalarTypes]), args [i], declarations);
+                } else
+                    success = checkTypeConversion (typemap [parameterDescription & ScalarTypes], args [i], declarations);
+            }
+            if (success) {
+                TType *returnType = routineDescription.returnType;
+                switch (routineDescription.routine) {
+                    case TPredefinedRoutine::Str:
+                        return compiler.createMemoryPoolObject<TStrRoutine> (declarations, formatArguments);
+                    case TPredefinedRoutine::Val:
+                        return compiler.createMemoryPoolObject<TValRoutine> (declarations, std::move (args));
+                    case TPredefinedRoutine::Pred: 
+                    case TPredefinedRoutine::Succ: 
+                    case TPredefinedRoutine::RevVector:
+                        returnType = convertedArguments [0].expression->getType ();
+                        break;
+                    case TPredefinedRoutine::Reset:
+                    case TPredefinedRoutine::Rewrite:
+                        return compiler.createMemoryPoolObject<TResetRewriteRoutine> (declarations, routineDescription.routine == TPredefinedRoutine::Reset, std::move (args));
+                    case TPredefinedRoutine::Addr:
+                        if (convertedArguments [0].expression->isSymbol ())
+                            static_cast<TVariable *> (args [0])->getSymbol ()->setAliased ();
+                        break;
+                    default:
+                        break;
+                }
+                
+                if (routineDescription.flags & AppendGlobalRuntimeDataPtr)
+                    convertedArguments.push_back ({TExpressionBase::createVariableAccess (TConfig::globalRuntimeDataPtr, declarations)});
+                    
+                if ((routineDescription.routine == TPredefinedRoutine::Pred || routineDescription.routine == TPredefinedRoutine::Succ) && returnType->isEnumerated () && convertedArguments [0].expression->isConstant ()) 
+                    return compiler.createMemoryPoolObject<TConstantValue> (
+                        compiler.createMemoryPoolObject<TSimpleConstant> (static_cast<TConstantValue *> (convertedArguments [0].expression)->getConstant ()->getInteger () + (routineDescription.routine == TPredefinedRoutine::Succ ? 1 : - 1), returnType), declarations);
+                else if (!routineDescription.runtimeName.empty ())
+                    return compiler.createMemoryPoolObject<TRuntimeRoutine> (declarations, returnType, routineDescription.runtimeName, convertedArguments);
+                else
+                    return compiler.createMemoryPoolObject<TPredefinedRoutine> (routineDescription.routine, returnType, convertedArguments, declarations);
+            }
+        }
+    }
+
+    switch (routineDescriptions.front ().routine) {
+        case TPredefinedRoutine::Write:
+             return compiler.createMemoryPoolObject<TWriteRoutine> (declarations, formatArguments, false);
+        case TPredefinedRoutine::Writeln:
+             return compiler.createMemoryPoolObject<TWriteRoutine> (declarations, formatArguments, true);
+        case TPredefinedRoutine::Read:
+            return compiler.createMemoryPoolObject<TReadRoutine> (declarations, std::move (args), false);
+        case TPredefinedRoutine::Readln: 
+            return compiler.createMemoryPoolObject<TReadRoutine> (declarations, std::move (args), true);
+        case TPredefinedRoutine::Combine:
+            if (!arguments.empty ())
+                return compiler.createMemoryPoolObject<TCombineRoutine> (declarations, std::move (args));
+        default:
+            break;
+    }
+    
+    if (!errorMessage.errorMsg.empty ())
+        compiler.errorMessage (errorMessage.errorType, errorMessage.errorMsg);
+    else
+        compiler.errorMessage (TCompilerImpl::IdentifierExpected, "'" + identifier + "' is called with wrong arguments");
+    return nullptr;
+}
+
+}

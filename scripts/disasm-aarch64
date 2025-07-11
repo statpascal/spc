@@ -1,0 +1,1 @@
+objdump -b binary -m aarch64 -D out.bin
