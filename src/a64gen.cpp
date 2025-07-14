@@ -1396,7 +1396,7 @@ void TA64Generator::generateCode (TConstantValue &constant) {
 void TA64Generator::generateCode (TRoutineValue &routineValue) {
     TA64Reg reg = getSaveReg (intScratchReg1);
     TSymbol *s = routineValue.getSymbol ();
-    if (s->checkSymbolFlag (TSymbol::External) || s->checkSymbolFlag (TSymbol::ExternalFFI))
+    if (s->checkSymbolFlag (TSymbol::External))
         loadLabelAddress (s->getExtSymbolName (), reg);
     else
         loadLabelAddress (s->getOverloadName (), reg);
@@ -2497,7 +2497,7 @@ void TA64Generator::generateBlock (TBlock &block, std::vector<TUnit *> units) {
     
     for (TSymbol *s: blockSymbols) 
         if (s->checkSymbolFlag (TSymbol::Routine)) {
-            if (s->checkSymbolFlag (TSymbol::External) || s->checkSymbolFlag (TSymbol::ExternalFFI)) 
+            if (s->checkSymbolFlag (TSymbol::External)) 
                 externalRoutine (*s);
             else 
                 visit (s->getBlock ());

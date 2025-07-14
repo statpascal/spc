@@ -1474,7 +1474,7 @@ void TX64Generator::generateCode (TConstantValue &constant) {
 void TX64Generator::generateCode (TRoutineValue &routineValue) {
     TX64Reg reg = getSaveReg (intScratchReg1);
     TSymbol *s = routineValue.getSymbol ();
-    if (s->checkSymbolFlag (TSymbol::External) || s->checkSymbolFlag (TSymbol::ExternalFFI))
+    if (s->checkSymbolFlag (TSymbol::External))
         outputCode (TX64Operation (TX64Op::mov, reg, s->getExtSymbolName ()));
     else
         outputCode (TX64Operation (TX64Op::lea, reg, TX64Operand (s->getOverloadName (), true)));
@@ -2539,7 +2539,7 @@ void TX64Generator::generateBlock (TBlock &block) {
     
     for (TSymbol *s: blockSymbols) 
         if (s->checkSymbolFlag (TSymbol::Routine)) {
-            if (s->checkSymbolFlag (TSymbol::External) || s->checkSymbolFlag (TSymbol::ExternalFFI)) 
+            if (s->checkSymbolFlag (TSymbol::External)) 
                 externalRoutine (*s);
             else 
                 visit (s->getBlock ());

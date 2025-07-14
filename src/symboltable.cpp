@@ -26,10 +26,10 @@ TSymbol *TSymbol::getAlias () const {
     return alias;
 }
 
-void TSymbol::setExternal (const std::string &lib, const std::string &sym, bool useFFI) {
+void TSymbol::setExternal (const std::string &lib, const std::string &sym) {
     libName = lib;
     extSymbolName = sym;
-    addSymbolFlags (useFFI ? ExternalFFI : External);
+    addSymbolFlags (External);
 }
 
 std::string TSymbol::getExtLibName () const {

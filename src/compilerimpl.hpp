@@ -58,7 +58,7 @@ private:
     const TSimpleConstant *parseConstTerm ();
     
     void parseDeclarationList (std::vector<std::string> &identifiers, TType *&type, bool allowGenericVar);
-    void parseExternalDeclaration (std::string &libName, std::string &symbolName, bool &useFFI);
+    void parseExternalDeclaration (std::string &libName, std::string &symbolName);
     bool checkSymbolName (std::string &symbolName);
 
     TType *parseEnumerationType ();

@@ -289,16 +289,13 @@ void TBlock::parseDeclarationList (std::vector<std::string> &identifiers, TType 
     }
 }
 
-void TBlock::parseExternalDeclaration (std::string &libName, std::string &symbolName, bool &useFFI) {
-    if (lexer.getToken () == TToken::Identifier && lexer.getIdentifier () == "argblock") {
-        lexer.getNextToken ();
-        useFFI = false;
-    }
+void TBlock::parseExternalDeclaration (std::string &libName, std::string &symbolName) {
     if (lexer.getToken () != TToken::Semicolon) {
         if (!checkSymbolName (symbolName)) {
             const TSimpleConstant *lib = parseConstExpression ();
             if (lib->getType () == &stdType.String)
                 libName = lib->getString ();
+            // TODO: error if not string
             checkSymbolName (symbolName);
         }
     }
@@ -830,7 +827,7 @@ void TBlock::parseSubroutine (bool isFunction) {
     TRoutineType *routineType = static_cast<TRoutineType *> (parseRoutineType (isFunction));
     compiler.checkAndSynchronize (TToken::Semicolon, "';' expected at end of subroutine header");
     
-    bool isForward = false, isExport = false, isExternal = false, useFFI = true;
+    bool isForward = false, isExport = false, isExternal = false;
     if (lexer.checkToken (TToken::CDecl))
         compiler.checkToken (TToken::Semicolon, "';' expected after 'cdecl' declaration");
     if (lexer.checkToken (TToken::Overload))
@@ -841,7 +838,7 @@ void TBlock::parseSubroutine (bool isFunction) {
         isExport = true;
     else if (lexer.checkToken (TToken::External)) {
         isExternal = true;
-        parseExternalDeclaration (libName, symbolName, useFFI);
+        parseExternalDeclaration (libName, symbolName);
     }
     if (isForward || isExport || isExternal)
         compiler.checkToken (TToken::Semicolon, "';' expected at end of subroutine header");
@@ -885,7 +882,7 @@ void TBlock::parseSubroutine (bool isFunction) {
     
     if (isExternal) {
         symbol->removeSymbolFlags (TSymbol::Forward);
-        symbol->setExternal (libName, symbolName, useFFI);
+        symbol->setExternal (libName, symbolName);
     } else if (isUnitInterface) {
         symbol->addSymbolFlags (TSymbol::Forward);
         if (isForward) 

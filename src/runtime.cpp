@@ -1,5 +1,5 @@
 #include "runtime.hpp"
-#include "runtimeerr.hpp"
+#include <stdexcept>
 
 #include <cstring>
 
@@ -72,7 +72,8 @@ void TRuntimeData::releaseMemory (void *p) {
 TFileHandler &TRuntimeData::getFileHandler (std::size_t index) {
     if (index < fileHandler.size () && fileHandler [index])
         return *fileHandler [index];
-    throw TRuntimeError (TRuntimeResult::TCode::IOError, "File is not open");
+    // This will not propagate through the Pascal code and probably crash.
+    throw std::runtime_error ("File is not open");
 }
 
 TTextFileBaseHandler &TRuntimeData::getTextFileBaseHandler (std::size_t index) {
@@ -98,7 +99,7 @@ void TRuntimeData::closeFileHandler (std::size_t index) {
         delete fileHandler [index];
         fileHandler [index] = nullptr;
     } else
-        throw TRuntimeError (TRuntimeResult::TCode::IOError, "File is not open");
+        throw std::runtime_error ("File is not open");
 }
 
 void TRuntimeData::setPCodeMemory (TPCodeMemory *p) {

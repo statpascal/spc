@@ -23,13 +23,12 @@ public:
         Parameter = 8,
         Forward = 16,
         External = 32,
-        ExternalFFI = 64,
-        Export = 128,
-        Alias = 256, 
-        Label = 512,
-        NamedType = 1024,
-        Routine = 2048,
-        AllSymbols = 4096 - 1
+        Export = 64,
+        Alias = 128, 
+        Label = 256,
+        NamedType = 512,
+        Routine = 1024,
+        AllSymbols = 2048 - 1
     };
     
     TSymbol (const std::string &name, TType *type, std::size_t level, TFlags flags, TSymbol *alias);
@@ -39,7 +38,7 @@ public:
     std::string getName () const;
     TSymbol *getAlias () const;
     
-    void setExternal (const std::string &libName, const std::string &symbolName, bool useFFI);
+    void setExternal (const std::string &libName, const std::string &symbolName);
     std::string getExtLibName () const;
     std::string getExtSymbolName () const;
     
