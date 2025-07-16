@@ -1713,10 +1713,10 @@ void TA64Generator::generateCode (TPointerDereference &pointerDereference) {
     }
 }
 
-void TA64Generator::generateCode (TRuntimeRoutine &transformedRoutine) {
-    for (TSyntaxTreeNode *node: transformedRoutine.getTransformedNodes ())
-        visit (node);
-}
+//void TA64Generator::generateCode (TRuntimeRoutine &transformedRoutine) {
+//    for (TSyntaxTreeNode *node: transformedRoutine.getTransformedNodes ())
+//        visit (node);
+//}
 
 void TA64Generator::codeIncDec (TPredefinedRoutine &predefinedRoutine) {
     bool isIncOp = predefinedRoutine.getRoutine () == TPredefinedRoutine::Inc;
@@ -1774,11 +1774,6 @@ void TA64Generator::generateCode (TPredefinedRoutine &predefinedRoutine) {
         bool isIncOp = false;    
         TA64Reg reg;
         switch (predefinedRoutine.getRoutine ()) {
-            case TPredefinedRoutine::Chr:
-            case TPredefinedRoutine::Ord:
-            case TPredefinedRoutine::Addr:
-                // nothing to do
-                break;
             case TPredefinedRoutine::Odd:
                 reg = fetchReg (intScratchReg1);
                 outputCode (TA64Op::and_, {reg, reg, 1});
@@ -1793,27 +1788,8 @@ void TA64Generator::generateCode (TPredefinedRoutine &predefinedRoutine) {
                 saveReg (reg);
                 // TODO : range check
                 break;
-            case TPredefinedRoutine::New: {
-                TType *basetype = arguments [0]->getType ()->getBaseType ();
-                TTypeAnyManager typeAnyManager = lookupAnyManager (basetype);        
-                if (arguments.size () == 1)
-                    outputCode (TA64Op::mov, {TA64Reg::x0, 1});
-                else
-                    loadReg (TA64Reg::x0);
-                codeRuntimeCall ("rt_alloc_mem", TA64Reg::x3, {{TA64Reg::x1, basetype->getSize ()}, {TA64Reg::x2, typeAnyManager.runtimeIndex}});
-                loadReg (intScratchReg1);	// address of pointer var
-                outputCode (TA64Op::str, {TA64Reg::x0, TA64Operand (intScratchReg1, TA64Reg::none, 0)});
-                break; }
-            case TPredefinedRoutine::Dispose:
-                loadReg (TA64Reg::x0);
-                codeRuntimeCall ("rt_free_mem", TA64Reg::x1, {});
-                break;
             case TPredefinedRoutine::Exit:
                 outputCode (TA64Op::b, {endOfRoutineLabel});
-                break;
-            // TODO:
-            case TPredefinedRoutine::Break:
-            case TPredefinedRoutine::Halt:
                 break;
             default:
                 break;

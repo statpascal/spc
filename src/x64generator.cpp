@@ -1812,10 +1812,10 @@ void TX64Generator::generateCode (TPointerDereference &pointerDereference) {
     }
 }
 
-void TX64Generator::generateCode (TRuntimeRoutine &transformedRoutine) {
-    for (TSyntaxTreeNode *node: transformedRoutine.getTransformedNodes ())
-        visit (node);
-}
+//void TX64Generator::generateCode (TRuntimeRoutine &transformedRoutine) {
+//    for (TSyntaxTreeNode *node: transformedRoutine.getTransformedNodes ())
+//        visit (node);
+//}
 
 void TX64Generator::codeIncDec (TPredefinedRoutine &predefinedRoutine) {
     bool isIncOp = predefinedRoutine.getRoutine () == TPredefinedRoutine::Inc;
@@ -1849,7 +1849,7 @@ void TX64Generator::codeIncDec (TPredefinedRoutine &predefinedRoutine) {
         value = n;
 
     if (!isSet)            
-        varAddr = TX64Operand (fetchReg (intScratchReg1), 0, opSize);
+        varAddr = TX64Operand (fetchReg (intScratchReg2), 0, opSize);
           
     if (value.isValid ())
         outputCode (isIncOp ? TX64Op::add : TX64Op::sub, varAddr, value);
@@ -1871,12 +1871,9 @@ void TX64Generator::generateCode (TPredefinedRoutine &predefinedRoutine) {
         bool isIncOp = false;    
         TX64Reg reg;
         switch (predefinedRoutine.getRoutine ()) {
-            case TPredefinedRoutine::Chr:
-            case TPredefinedRoutine::Ord:
-            case TPredefinedRoutine::Addr:
             case TPredefinedRoutine::Inc:
             case TPredefinedRoutine::Dec:
-                // nothing to do or alreay handled
+                // alreay handled
                 break;
             case TPredefinedRoutine::Odd:
                 reg = fetchReg (intScratchReg1);
@@ -1892,32 +1889,8 @@ void TX64Generator::generateCode (TPredefinedRoutine &predefinedRoutine) {
                 saveReg (reg);
                 // TODO : range check
                 break;
-            case TPredefinedRoutine::New: {
-                TType *basetype = arguments [0]->getType ()->getBaseType ();
-                TTypeAnyManager typeAnyManager = lookupAnyManager (basetype);        
-                if (arguments.size () == 1)
-                    outputCode (TX64Op::mov, TX64Reg::rdi, 1);
-                else
-                    loadReg (TX64Reg::rdi);
-                loadReg (TX64Reg::rbx);	// address of pointer var
-                codeRuntimeCall ("rt_alloc_mem", TX64Reg::rcx, {{TX64Reg::rsi, basetype->getSize ()}, {TX64Reg::rdx, typeAnyManager.runtimeIndex}});
-                outputCode (TX64Op::mov, TX64Operand (TX64Reg::rbx, 0), TX64Reg::rax);	// store result
-                break; }
-            case TPredefinedRoutine::Dispose:
-                loadReg (TX64Reg::rdi);
-                codeRuntimeCall ("rt_free_mem", TX64Reg::rsi, {});
-                break;
             case TPredefinedRoutine::Exit:
                 outputCode (TX64Op::jmp, endOfRoutineLabel);
-                break;
-            // TODO:
-            case TPredefinedRoutine::Break:
-            case TPredefinedRoutine::Halt:
-                if (arguments.empty ())
-                    outputCode (TX64Op::mov, TX64Reg::rbx, 0);
-                else
-                    loadReg (TX64Reg::rbx);
-                codeRuntimeCall ("rt_halt", TX64Reg::rdi, {});
                 break;
         }
     }

@@ -211,7 +211,7 @@ TAnyManager *TBaseGenerator::buildAnyManager (const TType *type) {
     return nullptr;
 }
 
-void TBaseGenerator::visit (TSyntaxTreeNode *node) {
+void TCodeGenerator::visit (TSyntaxTreeNode *node) {
     if (node)
         node->acceptCodeGenerator (*this);
 }
@@ -331,7 +331,5 @@ std::string TBaseGenerator::getNextLocalLabel () {
 std::string TBaseGenerator::getNextCaseLabel () {
     return ".c" + std::to_string (labelCount++) + '$';
 }
-
-
 
 }

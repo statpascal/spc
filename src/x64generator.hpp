@@ -34,7 +34,7 @@ public:
     virtual void generateCode (TRecordComponent &) override;
     virtual void generateCode (TPointerDereference &) override;
     
-    virtual void generateCode (TRuntimeRoutine &) override;
+//    virtual void generateCode (TRuntimeRoutine &) override;
     virtual void generateCode (TPredefinedRoutine &) override;
     
     virtual void generateCode (TSimpleStatement &) override;

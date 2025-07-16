@@ -139,8 +139,9 @@ extern "C" void rt_copy_mem (void *dst, const void *src, std::size_t size, std::
     anyManager->copy (src, dst);
 }
 
-extern "C" void *rt_alloc_mem (std::size_t count, std::size_t size, std::size_t anyManagerIndex, TRuntimeData *runtimeData) {
-    return runtimeData->allocateMemory (count, size, anyManagerIndex);
+extern "C" void rt_alloc_mem (void **p, std::size_t count, std::size_t size, std::size_t anyManagerIndex, TRuntimeData *runtimeData) {
+//    printf ("%p %ld %ld %ld %p\n", p,count, size, anyManagerIndex, runtimeData);
+    *p = runtimeData->allocateMemory (count, size, anyManagerIndex);
 }
 
 extern "C" void rt_free_mem (void *p, TRuntimeData *runtimeData) {
@@ -170,10 +171,6 @@ extern "C" std::int64_t rt_argc (TRuntimeData *runtimeData) {
 
 extern "C" void rt_argv (std::int64_t n, TRuntimeData *runtimeData, statpascal::TAnyValue *s) {
     *s = runtimeData->getArgv (n);
-}
-
-extern "C" void rt_halt (std::int64_t n, TRuntimeData *) {
-    exit (n);
 }
 
 }

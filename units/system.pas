@@ -83,6 +83,9 @@ function min (a, b: real): real; external name 'rt_min_dbl';
 function max (a, b: int64): int64; external name 'rt_max_int';
 function max (a, b: real): real; external name 'rt_max_dbl';
 
+procedure halt;
+procedure halt (status: integer);
+
 (* Vector handling *)
 
 type 
@@ -186,6 +189,11 @@ procedure __flush (var f; runtimeData: pointer); external name 'rt_flush';
 procedure __erase (var f); external name 'rt_erase';
 procedure __close (var f; runtimeData: pointer); external name 'rt_close';
 
+procedure __new (var p: pointer; count, size, anymanagerindex: int64; runtimeData: pointer); external name 'rt_alloc_mem';
+procedure __dispose (p: pointer; runtimeData: pointer); external name 'rt_free_mem';
+
+procedure __exit (status: int32); external name 'exit';
+
 function __eof_input: boolean;
 function __eof (var f; runtimeData: pointer): boolean; external name 'rt_eof';
 function __text_eoln (var f: text; runtimeData: pointer): boolean; external name 'rt_text_eoln';
@@ -257,7 +265,6 @@ function __alloc_mem (count, size, anyManagerIndex: int64; runtimeData: pointer)
 procedure __free_mem (p, runtimeData: pointer); external name 'rt_free_mem';
 procedure __init_mem (p: pointer; anyManagerIndex: int64; runtimeData: pointer); external name 'rt_init_mem';
 procedure __destroy_mem (p: pointer; anyManagerIndex: int64; runtimeData: pointer); external name 'rt_destroy_mem';
-procedure __halt (n: int64; runtimeData: pointer); external name 'rt_halt';
 
 (* String handling *)
 
@@ -338,6 +345,16 @@ function ParamStr (n: int64): string;
     begin
         __argv (n, __GlobalRuntimeData, s);
         ParamStr := s
+    end;
+    
+procedure halt;
+    begin
+        __exit (0)
+    end;
+    
+procedure halt (status: integer);
+    begin
+        __exit (status)
     end;
 
 begin

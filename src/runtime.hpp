@@ -68,7 +68,7 @@ private:
 extern "C" {
 
 void rt_copy_mem (void *dst, const void *src, std::size_t size, std::size_t anyManagerIndex, bool deleteDst, TRuntimeData *);
-void *rt_alloc_mem (std::size_t count, std::size_t size, std::size_t anyManagerIndex, TRuntimeData *);
+//void *rt_alloc_mem (std::size_t count, std::size_t size, std::size_t anyManagerIndex, TRuntimeData *);
 void rt_free_mem (void *, TRuntimeData *);
 void rt_destroy_mem (void *, std::size_t anyManagerIndex, TRuntimeData *);
 

@@ -7,62 +7,33 @@
 
 namespace statpascal {
 
-class TResetRewriteRoutine: public TRuntimeRoutine {
-using inherited = TRuntimeRoutine;
+class TRuntimeRoutine: public TExpressionBase {
+using inherited = TExpressionBase;
 public:
-    TResetRewriteRoutine (TBlock &, bool isReset, std::vector<TExpressionBase *> &&);
+    TRuntimeRoutine (TType *returnType);
+     
+    virtual void acceptCodeGenerator (TCodeGenerator &) override;
+   
+    struct TFormatArguments {
+        TExpressionBase *expression, *length, *precision;
+    };
+protected:
+    void appendTransformedNode (TSyntaxTreeNode *);
+    void checkFormatArguments (TFormatArguments &argument, const TType *outputtype, TBlock &);
+    TExpressionBase *createAnyManagerIndex (const TType *type, TBlock &);
     
 private:
-    void checkArguments (TBlock &, bool isReset, std::vector<TExpressionBase *> &&);
+    std::vector<TSyntaxTreeNode *> transformedNodes;
 };
-
-class TStrRoutine: public TRuntimeRoutine {
-using inherited = TRuntimeRoutine;
-public:
-    TStrRoutine (TBlock &, std::vector<TRuntimeRoutine::TFormatArguments> &);
-    
-private:
-    void checkArguments (TBlock &, std::vector<TRuntimeRoutine::TFormatArguments> &);
-};
-
-class TWriteRoutine: public TRuntimeRoutine {
-using inherited = TRuntimeRoutine;
-public:
-    TWriteRoutine (TBlock &, std::vector<TRuntimeRoutine::TFormatArguments> &, bool linefeed);
-    
-private:
-    void checkArguments (TBlock &, std::vector<TRuntimeRoutine::TFormatArguments> &, bool linefeed);
-};
-
-class TReadRoutine: public TRuntimeRoutine {
-using inherited = TRuntimeRoutine;
-public:
-    TReadRoutine (TBlock &, std::vector<TExpressionBase *> &&, bool linefeed);
-    
-private:
-    void checkArguments (TBlock &, std::vector<TExpressionBase *> &&, bool linefeed);
-};
-
-class TValRoutine: public TRuntimeRoutine {
-using inherited = TRuntimeRoutine;
-public:
-    TValRoutine (TBlock &, std::vector<TExpressionBase *> &&);
-    
-private:
-    void checkArguments (TBlock &, std::vector<TExpressionBase *> &&);
-};
-
 
 TRuntimeRoutine::TRuntimeRoutine (TType *returnType) {
     setType (returnType);
 }
 
 void TRuntimeRoutine::acceptCodeGenerator (TCodeGenerator &codeGenerator) {
-    codeGenerator.generateCode (*this);
-}
-
-std::vector<TSyntaxTreeNode *> TRuntimeRoutine::getTransformedNodes () {
-    return transformedNodes;
+    for (TSyntaxTreeNode *node: transformedNodes)
+        codeGenerator.visit (node);
+//    codeGenerator.generateCode (*this);
 }
 
 void TRuntimeRoutine::appendTransformedNode (TSyntaxTreeNode *node) {
@@ -85,6 +56,90 @@ void TRuntimeRoutine::checkFormatArguments (TFormatArguments &argument, const TT
         argument.precision = createInt64Constant (-1, block);
 }            
 
+TExpressionBase *TRuntimeRoutine::createAnyManagerIndex (const TType *type, TBlock &block) {
+    return createInt64Constant (static_cast<TBaseGenerator &> (block.getCompiler ().getCodeGenerator ()).lookupAnyManager (type).runtimeIndex, block);
+}
+
+
+class TCombineRoutine: public TRuntimeRoutine {
+using inherited = TRuntimeRoutine;
+public:
+    TCombineRoutine (TBlock &, std::vector<TExpressionBase *> &&);
+    
+private:
+    TFunctionCall *createCombineCall (TBlock &, TType *resultType, std::vector<TExpressionBase *> &&args);
+};
+
+TCombineRoutine::TCombineRoutine (TBlock &block, std::vector<TExpressionBase *> &&args):
+  inherited (nullptr) {
+    TType *resultType = args [0]->getType ();
+    if (!resultType->isVector ())
+        resultType = block.getCompiler ().createMemoryPoolObject<TVectorType> (resultType);
+    setType (resultType);
+
+    for (std::size_t i = 0; i < args.size (); ++i)
+        if (!checkTypeConversion (resultType, args [i], block))
+            block.getCompiler ().errorMessage (TCompilerImpl::InvalidType, "Cannot convert " + args [i]->getType ()->getName () + " to " + resultType->getName ());
+
+    appendTransformedNode (createCombineCall (block, resultType, std::move (args)));
+}
+
+TFunctionCall *TCombineRoutine::createCombineCall (TBlock &block, TType *resultType, std::vector<TExpressionBase *> &&args) {
+    static const std::array<std::string, 5> fn = {"", "", "__combine_vec_2", "__combine_vec_3", "__combine_vec_4"};
+    if (args.size () <= 4)
+        return createRuntimeCall (fn [args.size ()], resultType, std::move (args), block, false);
+    std::size_t split = args.size () / 2;
+    return createCombineCall (block, resultType,
+         {createCombineCall (block, resultType, std::vector<TExpressionBase *> (args.begin (), args.begin () + split)),
+          createCombineCall (block, resultType, std::vector<TExpressionBase *> (args.begin () + split, args.end ()))});
+}
+
+
+class TResizeRoutine: public TRuntimeRoutine {
+using inherited = TRuntimeRoutine;
+public:
+    TResizeRoutine (TBlock &, std::vector<TExpressionBase *> &&);
+};
+
+TResizeRoutine::TResizeRoutine (TBlock &block, std::vector<TExpressionBase *> &&args):
+  inherited (&stdType.Void) {
+    const TType *type = args [0]->getType ();
+    appendTransformedNode (createRuntimeCall ("__resize_vec", &stdType.Void, {
+        createAnyManagerIndex (type, block),
+        createVariableAccess (TConfig::globalRuntimeDataPtr, block), 
+        createInt64Constant (type->getSize (), block), args [0], args [1]},
+        block, false));
+}
+
+
+class TNewRoutine: public TRuntimeRoutine {
+using inherited = TRuntimeRoutine;
+public:
+    TNewRoutine (TBlock &, std::vector<TExpressionBase *> &&);
+};
+
+TNewRoutine::TNewRoutine (TBlock &block, std::vector<TExpressionBase *> &&args):
+  inherited (&stdType.Void) {
+      const TType *type = args [0]->getType ()->getBaseType ();
+      appendTransformedNode (createRuntimeCall ("__new", &stdType.Void, {
+          static_cast<TLValueDereference *> (args [0])->getLValue (),
+          args.size () == 2 ? args [1] : createInt64Constant (1, block),
+          createInt64Constant (type->getSize (), block),
+          createAnyManagerIndex (type, block),
+          createVariableAccess (TConfig::globalRuntimeDataPtr, block)},
+         block, false));
+}
+
+
+class TResetRewriteRoutine: public TRuntimeRoutine {
+using inherited = TRuntimeRoutine;
+public:
+    TResetRewriteRoutine (TBlock &, bool isReset, std::vector<TExpressionBase *> &&);
+    
+private:
+    void checkArguments (TBlock &, bool isReset, std::vector<TExpressionBase *> &&);
+};
+
 TResetRewriteRoutine::TResetRewriteRoutine (TBlock &block, bool isReset, std::vector<TExpressionBase *> &&arguments):
   inherited (&stdType.Void) {
     checkArguments (block, isReset, std::move (arguments));
@@ -106,6 +161,15 @@ void TResetRewriteRoutine::checkArguments (TBlock &block, bool isReset, std::vec
 }
 
 
+class TStrRoutine: public TRuntimeRoutine {
+using inherited = TRuntimeRoutine;
+public:
+    TStrRoutine (TBlock &, std::vector<TRuntimeRoutine::TFormatArguments> &);
+    
+private:
+    void checkArguments (TBlock &, std::vector<TRuntimeRoutine::TFormatArguments> &);
+};
+
 TStrRoutine::TStrRoutine (TBlock &block, std::vector<TRuntimeRoutine::TFormatArguments> &arguments):
   inherited (&stdType.Void) {
     checkArguments (block, arguments);
@@ -121,6 +185,15 @@ void TStrRoutine::checkArguments (TBlock &block, std::vector<TRuntimeRoutine::TF
         valArgument.expression, valArgument.length, valArgument.precision, arguments [1].expression};
     appendTransformedNode (createRuntimeCall (runtimeRoutine, nullptr, std::move (callArguments), block, true));
 }
+
+class TWriteRoutine: public TRuntimeRoutine {
+using inherited = TRuntimeRoutine;
+public:
+    TWriteRoutine (TBlock &, std::vector<TRuntimeRoutine::TFormatArguments> &, bool linefeed);
+    
+private:
+    void checkArguments (TBlock &, std::vector<TRuntimeRoutine::TFormatArguments> &, bool linefeed);
+};
 
 TWriteRoutine::TWriteRoutine (TBlock &block, std::vector<TRuntimeRoutine::TFormatArguments> &arguments, bool linefeed):
   inherited (&stdType.Void) {
@@ -170,7 +243,15 @@ void TWriteRoutine::checkArguments (TBlock &block, std::vector<TRuntimeRoutine::
         appendTransformedNode (createRuntimeCall ("__write_lf", nullptr, {textfile, createVariableAccess (TConfig::globalRuntimeDataPtr, block)}, block, true));
 }
 
-//
+
+class TReadRoutine: public TRuntimeRoutine {
+using inherited = TRuntimeRoutine;
+public:
+    TReadRoutine (TBlock &, std::vector<TExpressionBase *> &&, bool linefeed);
+    
+private:
+    void checkArguments (TBlock &, std::vector<TExpressionBase *> &&, bool linefeed);
+};
 
 TReadRoutine::TReadRoutine (TBlock &block, std::vector<TExpressionBase *> &&args, bool linefeed):
   inherited (&stdType.Void) {
@@ -213,7 +294,15 @@ void TReadRoutine::checkArguments (TBlock &block, std::vector<TExpressionBase *>
         appendTransformedNode (createRuntimeCall ("__read_lf", nullptr, {textfile, createVariableAccess (TConfig::globalRuntimeDataPtr, block)}, block, true));
 }
 
-//
+
+class TValRoutine: public TRuntimeRoutine {
+using inherited = TRuntimeRoutine;
+public:
+    TValRoutine (TBlock &, std::vector<TExpressionBase *> &&);
+    
+private:
+    void checkArguments (TBlock &, std::vector<TExpressionBase *> &&);
+};
 
 TValRoutine::TValRoutine (TBlock &block, std::vector<TExpressionBase *> &&args):
   inherited (&stdType.Void) {
@@ -238,43 +327,6 @@ void TValRoutine::checkArguments (TBlock &block, std::vector<TExpressionBase *> 
             createRuntimeCall (rtName, nullptr, {args [0], args [2]}, block, true)));
 }
 
-//
-
-TCombineRoutine::TCombineRoutine (TBlock &block, std::vector<TExpressionBase *> &&args):
-  inherited (nullptr) {
-    TType *resultType = args [0]->getType ();
-    if (!resultType->isVector ())
-        resultType = block.getCompiler ().createMemoryPoolObject<TVectorType> (resultType);
-    setType (resultType);
-
-    for (std::size_t i = 0; i < args.size (); ++i)
-        if (!checkTypeConversion (resultType, args [i], block))
-            block.getCompiler ().errorMessage (TCompilerImpl::InvalidType, "Cannot convert " + args [i]->getType ()->getName () + " to " + resultType->getName ());
-
-    appendTransformedNode (createCombineCall (block, resultType, std::move (args)));
-}
-
-
-TResizeRoutine::TResizeRoutine (TBlock &block, std::vector<TExpressionBase *> &&args):
-  inherited (&stdType.Void) {
-    const TType *type = args [0]->getType ();
-    appendTransformedNode (createRuntimeCall ("__resize_vec", &stdType.Void, {
-        createInt64Constant (static_cast<TBaseGenerator &> (block.getCompiler ().getCodeGenerator ()).lookupAnyManager (type).runtimeIndex, block),
-        createVariableAccess (TConfig::globalRuntimeDataPtr, block), 
-        createInt64Constant (type->getSize (), block), args [0], args [1]},
-        block, false));
-}
-
-
-TFunctionCall *TCombineRoutine::createCombineCall (TBlock &block, TType *resultType, std::vector<TExpressionBase *> &&args) {
-    static const std::array<std::string, 5> fn = {"", "", "__combine_vec_2", "__combine_vec_3", "__combine_vec_4"};
-    if (args.size () <= 4)
-        return createRuntimeCall (fn [args.size ()], resultType, std::move (args), block, false);
-    std::size_t split = args.size () / 2;
-    return createCombineCall (block, resultType,
-         {createCombineCall (block, resultType, std::vector<TExpressionBase *> (args.begin (), args.begin () + split)),
-          createCombineCall (block, resultType, std::vector<TExpressionBase *> (args.begin () + split, args.end ()))});
-}
 
 namespace RoutineDescription {
 
@@ -333,13 +385,9 @@ const TRoutineMap routineMap = {
     
     {"new", 	   {{New, Void, {Pointer | LValueRequired}},
                     {New, Void, {Pointer | LValueRequired, Int_64}}}},
-    {"dispose",    {{Dispose, Void, {Pointer}}}},
+    {"dispose",    {{RuntimeCall, Void, {Pointer}, "__dispose", AppendGlobalRuntimeDataPtr}}},
     
-    {"break", 	   {{Break, Void, {}}}},
-    {"halt", 	   {{Halt, Void, {}},
-                    {Halt, Void, {Int_64}}}},
-    
-    {"resize", 	   {{Resize, Void, {Vector | LValueRequired, Int_64}, "", RuntimeNoParaCheck}}},
+    {"resize", 	   {{Resize, Void, {Vector | LValueRequired, Int_64}, ""}}},
     {"size",	   {{RuntimeCall, Int_64, {Vector}, "__size_vec", RuntimeNoParaCheck}}},
     {"rev", 	   {{RuntimeCall, Vector, {Vector}, "__rev_vec", RuntimeNoParaCheck | KeepType}}},
     
@@ -389,19 +437,12 @@ const TRoutineMap routineMap = {
 };
 
 const std::map<RoutineDescription::TName, TPredefinedRoutine::TRoutine> predefinedMap = {
-    {RoutineDescription::Chr, 		TPredefinedRoutine::Chr},
-    {RoutineDescription::Addr, 		TPredefinedRoutine::Addr},
-    {RoutineDescription::Ord, 		TPredefinedRoutine::Ord},
     {RoutineDescription::Odd, 		TPredefinedRoutine::Odd},
     {RoutineDescription::Succ, 		TPredefinedRoutine::Succ},
     {RoutineDescription::Pred, 		TPredefinedRoutine::Pred},
     {RoutineDescription::Inc, 		TPredefinedRoutine::Inc},
     {RoutineDescription::Dec,		TPredefinedRoutine::Dec},
-    {RoutineDescription::New, 		TPredefinedRoutine::New},
-    {RoutineDescription::Dispose,	TPredefinedRoutine::Dispose},
-    {RoutineDescription::Exit, 		TPredefinedRoutine::Exit},
-    {RoutineDescription::Break, 	TPredefinedRoutine::Break},
-    {RoutineDescription::Halt, 		TPredefinedRoutine::Halt}
+    {RoutineDescription::Exit, 		TPredefinedRoutine::Exit}
 };
 
 const std::map<TParameter, TType *> typeMap = {
@@ -533,6 +574,7 @@ TExpressionBase *TPredefinedRoutine::parse (const std::string &identifier, TBloc
             }
             if (success) {
                 TType *returnType = RoutineDescription::getType (routineDescription.returnType, compiler);
+                bool createCast = false;
                 switch (routineDescription.name) {
                     case RoutineDescription::Str:
                         return compiler.createMemoryPoolObject<TStrRoutine> (block, formatArguments);
@@ -544,9 +586,14 @@ TExpressionBase *TPredefinedRoutine::parse (const std::string &identifier, TBloc
                     case RoutineDescription::Addr:
                         if (args [0]->isSymbol ())
                             static_cast<TVariable *> (args [0])->getSymbol ()->setAliased ();
+                    case RoutineDescription::Ord:
+                    case RoutineDescription::Chr:
+                        createCast = true;
                         break;
                     case RoutineDescription::Resize:
                         return compiler.createMemoryPoolObject<TResizeRoutine> (block, std::move (args));
+                    case RoutineDescription::New:
+                        return compiler.createMemoryPoolObject<TNewRoutine> (block, std::move (args));
                     default:
                         break;
                 }
@@ -565,8 +612,11 @@ TExpressionBase *TPredefinedRoutine::parse (const std::string &identifier, TBloc
                     for (std::size_t i = 0; i < args.size (); ++i)
                         if (args [i]->isLValueDereference () && (routineDescription.parameterDescription [i] & RoutineDescription::LValueRequired))
                             args [i] = static_cast<TLValueDereference *> (args [i])->getLValue ();
-                    return compiler.createMemoryPoolObject<TPredefinedRoutine> (
-                        static_cast<TPredefinedRoutine::TRoutine> (RoutineDescription::predefinedMap.at (routineDescription.name)), returnType, std::move (args));
+                    if (createCast)
+                        return compiler.createMemoryPoolObject<TTypeCast> (returnType, args [0]);
+                    else
+                        return compiler.createMemoryPoolObject<TPredefinedRoutine> (
+                            static_cast<TPredefinedRoutine::TRoutine> (RoutineDescription::predefinedMap.at (routineDescription.name)), returnType, std::move (args));
                 }
             }
         }

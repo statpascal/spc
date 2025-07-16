@@ -36,7 +36,7 @@ public:
     virtual void generateCode (TRecordComponent &) = 0;
     virtual void generateCode (TPointerDereference &) = 0;
     
-    virtual void generateCode (TRuntimeRoutine &) = 0;
+//    virtual void generateCode (TRuntimeRoutine &) = 0;
     virtual void generateCode (TPredefinedRoutine &) = 0;
     
     virtual void generateCode (TSimpleStatement &) = 0;
@@ -64,6 +64,10 @@ public:
     
     /** return true if ABI uses reference to copy made by caller */
     virtual bool isReferenceCallerCopy (const TType *type) = 0;
+
+    void visit (TSyntaxTreeNode *);
+    
+
 };
 
 class TBaseGenerator: public TCodeGenerator {
@@ -93,8 +97,6 @@ protected:
     void alignRecordFields (TRecordType::TRecordFields &, std::size_t &size, std::size_t &alignment);
     void addRecordFieldOffset (TRecordType::TRecordFields &, std::size_t offset);
 
-    void visit (TSyntaxTreeNode *);
-    
     using TTypeAnyManagerMap = std::map<const TType *, TTypeAnyManager>;
     
     
