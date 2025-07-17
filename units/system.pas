@@ -22,7 +22,6 @@ type
     
     double = real;
     PChar = ^char;
-    rt_string = PChar;
     
 var
     input, output: text;
@@ -75,8 +74,8 @@ procedure fillchar (var x; count: int64; value: char); external name 'rt_fillcha
 procedure move (var source, dest; count: int64); external name 'rt_move';
 function comparebyte (var buf1, buf2; count: int64): int64; external name 'rt_compare_byte';
 
-function __val_int (s: rt_string; var code: uint16): int64; external name 'rt_val_int';
-function __val_dbl (s: rt_string; var code: uint16): real; external name 'rt_val_dbl';
+function __val_int (s: string; var code: uint16): int64; external name 'rt_val_int';
+function __val_dbl (s: string; var code: uint16): real; external name 'rt_val_dbl';
 
 function min (a, b: int64): int64; external name 'rt_min_int';
 function min (a, b: real): real; external name 'rt_min_dbl';
@@ -165,8 +164,8 @@ procedure append (var f: text);
 function eoln: boolean;
 function eoln (var f: text): boolean; 
 
-function fileexists (filename: rt_string): boolean; external name 'rt_file_exists';
-function deletefile (filename: rt_string): boolean; external name 'rt_file_delete';
+function fileexists (filename: string): boolean; external name 'rt_file_exists';
+function deletefile (filename: string): boolean; external name 'rt_file_delete';
 function extractFilePath (filename: string): string; external name 'rt_file_path';
 function extractFileName (filename: string): string; external name 'rt_file_name';
 
@@ -210,7 +209,7 @@ procedure __read_lf (var f: text; runtimeData: pointer); external name 'rt_read_
 
 procedure __write_int64 (var f: text; n, length, precision: int64; runtimeData: pointer); external name 'rt_write_int';
 procedure __write_char (var f: text; ch: char; length, precision: int64; runtimeData: pointer); external name 'rt_write_char';
-procedure __write_string (var f: text; s: ^char; length, precision: int64; runtimeData: pointer); external name 'rt_write_string';
+procedure __write_string (var f: text; s: string; length, precision: int64; runtimeData: pointer); external name 'rt_write_string';
 procedure __write_boolean (var f: text; b: boolean; length, precision: int64; runtimeData: pointer); external name 'rt_write_bool';
 procedure __write_dbl (var f: text; a: real; length, precision: int64; runtimeData: pointer); external name 'rt_write_dbl';
 
@@ -271,7 +270,7 @@ procedure __destroy_mem (p: pointer; anyManagerIndex: int64; runtimeData: pointe
 procedure insert (s: string; var t: string; pos: int64); external name 'rt_str_insert';
 function length (s: string): int64;  external name 'rt_str_length';
 function pos (needle, haystack: string): int64; external name 'rt_str_pos';
-function copy (s: rt_string; pos, length: int64): string; external  name 'rt_str_copy';
+function copy (s: string; pos, length: int64): string; external  name 'rt_str_copy';
 procedure delete (var s: string; pos, length: int64); external name 'rt_str_delete';
 function stringofchar (ch: char; count: int64): string; external  name 'rt_str_of_char';
 

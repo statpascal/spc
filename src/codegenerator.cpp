@@ -205,7 +205,7 @@ TAnyManager *TBaseGenerator::buildAnyManager (const TType *type) {
     if (type->isRecord ())
         return buildAnyManagerRecord (static_cast<const TRecordType *> (type));
     if (type->isString () || type->isVector ())
-        return new TAnySimpleValueManager;
+        return new TAnySingleValueManager;
     return nullptr;
 }
 

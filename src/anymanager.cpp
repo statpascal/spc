@@ -4,49 +4,18 @@
 
 namespace statpascal {
 
-/*
-
-TAnyCopyManager::TAnyCopyManager (std::size_t size):
-  size (size) {
-}
-
-void TAnyCopyManager::destroy (void *) {
-}
-
-void TAnyCopyManager::copy (const void *source, void *dest, bool) {
-    std::memcpy (dest, source, size);
-}
-
-*/
-
-void TAnySimpleValueManager::init (void *base) {
+void TAnySingleValueManager::init (void *base) {
     memset (base, 0, sizeof (void *));
 }
 
-void TAnySimpleValueManager::destroy (void *base) {
-//    printf ("~Simple: %p\n", base);
+void TAnySingleValueManager::destroy (void *base) {
     static_cast<TAnyValue *> (base)->~TAnyValue ();
 }
 
-void TAnySimpleValueManager::copy (const void *source, void *dest) {
+void TAnySingleValueManager::copy (const void *source, void *dest) {
     new (dest) TAnyValue (*static_cast<const TAnyValue *> (source));
-//    *static_cast<TAnyValue *> (dest) = *static_cast<const TAnyValue *> (source);
 }
 
-/*
-void TAnyVectorManager::init (void *base) {
-    memset (base, 0, sizeof (void *));
-}
-
-void TAnyVectorManager::destroy (void *base) {
-//    printf ("~Vector: %p\n", base);
-    static_cast<TVectorDataPtr *> (base)->releaseRef ();
-}
-
-void TAnyVectorManager::copy (const void *source, void *dest) {
-    new (dest) TVectorDataPtr (*static_cast<const TVectorDataPtr *> (source));
-}
-*/
 
 TAnyArrayManager::TAnyArrayManager (TAnyManager *anyType, std::size_t count, std::size_t size):
   anyType (anyType), count (count), size (size) {
@@ -90,7 +59,6 @@ void TAnyRecordManager::init (void * base) {
 }
 
 void TAnyRecordManager::destroy (void * base) {
-//    printf ("~Record: %p\n", base);
     for (TComponent &c: components)
         c.anyType->destroy (static_cast<unsigned char*> (base) + c.offset);
 }

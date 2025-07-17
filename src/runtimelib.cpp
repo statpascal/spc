@@ -40,23 +40,13 @@ using sp_bool = bool;
 namespace {
 
 const std::string &getString (statpascal::TAnyValue &p) {
-    static std::string empty;
+    const static std::string empty;
     if (p.hasValue ())
         return p.get<std::string> ();
     else
         return empty;
 }
     
-statpascal::TAnyValue handle_str_copy (const char *s, std::int64_t pos, std::int64_t length) {
-    const std::string t (s);
-    if (pos <= 0)
-        pos = 1;
-    if (static_cast<std::size_t> (pos) <= t.length () && length > 0) 
-        return t.substr (pos - 1, length);
-    else
-        return std::string ();
-}
-
 template<typename T> class bit_shl {
 public:
     constexpr T operator () (const T &lhs, const T &rhs) const {
@@ -89,8 +79,14 @@ extern "C" statpascal::TAnyValue rt_str_char (std::uint8_t a) {
     return std::string (1, static_cast<std::string::value_type> (a));
 }
 
-extern "C" statpascal::TAnyValue rt_str_copy (const char *s, std::int64_t pos, std::int64_t length) {
-    return handle_str_copy (s, pos, length);
+extern "C" statpascal::TAnyValue rt_str_copy (statpascal::TAnyValue a, std::int64_t pos, std::int64_t length) {
+    const std::string &t = getString (a);
+    if (pos <= 0)
+        pos = 1;
+    if (static_cast<std::size_t> (pos) <= t.length () && length > 0) 
+        return t.substr (pos - 1, length);
+    else
+        return std::string ();
 }
 
 extern "C" statpascal::TAnyValue rt_file_path (statpascal::TAnyValue t) {
@@ -113,7 +109,7 @@ extern "C" statpascal::TAnyValue rt_str_upcase (statpascal::TAnyValue a) {
     const std::string &t = getString (a);
     std::string s (t.length (), 0);
     std::transform (t.begin (), t.end (), s.begin (), ::toupper);
-    return s;
+    return std::move (s);
 }
 
 extern "C" sp_bool rt_str_equal (statpascal::TAnyValue a, statpascal::TAnyValue b) {
@@ -272,8 +268,9 @@ extern "C" std::int64_t rt_compare_byte (void *src, void *dst, std::int64_t size
     return std::memcmp (dst, src, size);
 }
 
-extern "C" std::int64_t rt_val_int (const char *s, std::uint16_t *code) {
+extern "C" std::int64_t rt_val_int (statpascal::TAnyValue a, std::uint16_t *code) {
     char *endptr;
+    const char *s = getString (a).c_str ();
     std::int64_t result = std::strtoll (s, &endptr, 10);
     if (*endptr) {
         result = 0;
@@ -283,8 +280,9 @@ extern "C" std::int64_t rt_val_int (const char *s, std::uint16_t *code) {
     return result;
 }
 
-extern "C" double rt_val_dbl (const char *s, std::uint16_t *code) {
+extern "C" double rt_val_dbl (statpascal::TAnyValue a, std::uint16_t *code) {
     char *endptr;
+    const char *s = getString (a).c_str ();
     double result = std::strtod (s, &endptr);
     if (*endptr) {
         result = 0.0;
@@ -908,7 +906,7 @@ namespace {
 
 void openTextFile (TFileStruct *f, void (statpascal::TFileHandler::*op) (), statpascal::TRuntimeData *runtimeData) {
     f->binary = false;
-    const std::string s = f->fn.get<std::string> ();
+    const std::string s = getString (f->fn);
     statpascal::TTextFileBaseHandler *fh;
     if (s.empty ())
         fh = new statpascal::TStdioHandler ();
@@ -922,7 +920,7 @@ void openTextFile (TFileStruct *f, void (statpascal::TFileHandler::*op) (), stat
 void openBinFile (TFileStruct *f, std::size_t recordSize, void (statpascal::TFileHandler::*op) (), statpascal::TRuntimeData *runtimeData) {
     f->binary = true;
     f->blksize = recordSize;
-    const std::string s = f->fn.get<std::string> ();
+    const std::string s = getString (f->fn);
     statpascal::TBinaryFileHandler *fh;
     fh = new statpascal::TBinaryFileHandler (s);
     f->idx = runtimeData->registerFileHandler (fh);
@@ -961,7 +959,7 @@ extern "C" void rt_bin_seek (TFileStruct *f, std::int64_t pos, statpascal::TRunt
 
 extern "C" std::int64_t rt_bin_filesize (TFileStruct *f, statpascal::TRuntimeData *runtimeData) {
     runtimeData->getFileHandler (f->idx).flush ();
-    return std::filesystem::file_size (f->fn.get<std::string> ()) / f->blksize;
+    return std::filesystem::file_size (getString (f->fn)) / f->blksize;
 }
 
 extern "C" std::int64_t rt_bin_filepos (TFileStruct *f, statpascal::TRuntimeData *runtimeData) {
@@ -974,7 +972,7 @@ extern "C" void rt_close (TFileStruct *f, statpascal::TRuntimeData *runtimeData)
 }
 
 extern "C" void rt_erase (TFileStruct *f) {
-    const std::string fn = f->fn.get<std::string> ();
+    const std::string fn = getString (f->fn);
     if (!fn.empty ())
         // TODO: Runtime error if file is open !!!!
         std::filesystem::remove (fn);
@@ -988,12 +986,12 @@ extern "C" sp_bool rt_text_eoln (TFileStruct *f, statpascal::TRuntimeData *runti
     return runtimeData->getTextFileBaseHandler (f->idx).eoln ();
 }
 
-extern "C" sp_bool rt_file_exists (const char *fn) {
-    return std::filesystem::exists (fn);
+extern "C" sp_bool rt_file_exists (statpascal::TAnyValue a) {
+    return std::filesystem::exists (getString (a));
 }
 
-extern "C" sp_bool rt_file_delete (const char *fn) {
-    return std::filesystem::remove (fn);
+extern "C" sp_bool rt_file_delete (statpascal::TAnyValue a) {
+    return std::filesystem::remove (getString (a));
 }
 
 extern "C" void rt_bin_write (TFileStruct *f, void *buf, std::int64_t blocks, std::int64_t *blocksWritten, statpascal::TRuntimeData *runtimeData) {
@@ -1014,60 +1012,6 @@ extern "C" void rt_read_lf (TFileStruct *f, statpascal::TRuntimeData *runtimeDat
     runtimeData->getTextFileBaseHandler (f->idx).skipLine ();
 }
 
-extern "C" void rt_write_int (TFileStruct *f, std::int64_t n, std::int64_t length, std::int64_t prec, statpascal::TRuntimeData *runtimeData) {
-    std::ostream &os = runtimeData->getTextFileBaseHandler (f->idx).getOutputStream ();
-    if (length >= 0)
-        os << std::setw (length);
-    os << n;
-}
-
-extern "C" void rt_write_char (TFileStruct *f, char ch, std::int64_t length, std::int64_t prec, statpascal::TRuntimeData *runtimeData) {
-    std::ostream &os = runtimeData->getTextFileBaseHandler (f->idx).getOutputStream ();
-    if (length >= 0)
-        os << std::setw (length);
-    os << ch;
-}
-
-extern "C" void rt_write_string (TFileStruct *f, const char *s, std::int64_t length, std::int64_t prec, statpascal::TRuntimeData *runtimeData) {
-    std::ostream &os = runtimeData->getTextFileBaseHandler (f->idx).getOutputStream ();
-    if (length >= 0)
-        os << std::setw (length);
-    os << std::string (s);
-}
-
-extern "C" void rt_write_bool (TFileStruct *f, bool b, std::int64_t length, std::int64_t prec, statpascal::TRuntimeData *runtimeData) {
-    std::ostream &os = runtimeData->getTextFileBaseHandler (f->idx).getOutputStream ();
-    if (length >= 0)
-        os << std::setw (length);
-    os << (b ? "TRUE" : "FALSE");
-}
-
-extern "C" void rt_write_dbl (TFileStruct *f, double a, std::int64_t length, std::int64_t precision, statpascal::TRuntimeData *runtimeData) {
-    std::ostream &os = runtimeData->getTextFileBaseHandler (f->idx).getOutputStream ();
-    std::streamsize prec = os.precision ();
-    if (length >= 0)
-        os << std::setw (length);
-    if (precision >= 0)
-        os << std::fixed << std::setprecision (precision);
-    os << a << std::setprecision (prec);
-}
-
-extern "C" std::int64_t rt_read_int (TFileStruct *f, statpascal::TRuntimeData *runtimeData) {
-    return runtimeData->getTextFileBaseHandler (f->idx).getInteger ();
-}
-
-extern "C" char rt_read_char (TFileStruct *f, statpascal::TRuntimeData *runtimeData) {
-    return runtimeData->getTextFileBaseHandler (f->idx).getChar ();
-}
-
-extern "C" statpascal::TAnyValue rt_read_string (TFileStruct *f, statpascal::TRuntimeData *runtimeData) {
-    return runtimeData->getTextFileBaseHandler (f->idx).getString ();
-}
-
-extern "C" double rt_read_dbl (TFileStruct *f, statpascal::TRuntimeData *runtimeData) {
-    return runtimeData->getTextFileBaseHandler (f->idx).getDouble ();
-}
-
 namespace {
 
 enum class mybool: std::uint8_t { FALSE, TRUE };
@@ -1075,6 +1019,16 @@ enum class mybool: std::uint8_t { FALSE, TRUE };
 std::ostream &operator << (std::ostream &os, mybool f) {
     os << (f == mybool::TRUE ? "TRUE" : "FALSE");
     return os;
+}
+
+template<typename T> void rt_write_val (TFileStruct *f, T v, std::int64_t length, std::int64_t precision, statpascal::TRuntimeData *runtimeData) {
+    std::ostream &os = runtimeData->getTextFileBaseHandler (f->idx).getOutputStream ();
+    std::streamsize prec = os.precision ();
+    if (length >= 0)
+        os << std::setw (length);
+    if (precision >= 0)
+        os << std::fixed << std::setprecision (precision);
+    os << v << std::setprecision (prec);
 }
 
 template<typename T> void rt_write_vector (TFileStruct *f, statpascal::TAnyValue v, std::int64_t length, std::int64_t precision, statpascal::TRuntimeData *runtimeData) {
@@ -1092,6 +1046,26 @@ template<typename T> void rt_write_vector (TFileStruct *f, statpascal::TAnyValue
     os << std::setprecision (prec);
 }
 
+}
+
+extern "C" void rt_write_int (TFileStruct *f, std::int64_t n, std::int64_t length, std::int64_t precision, statpascal::TRuntimeData *runtimeData) {
+    rt_write_val<std::int64_t> (f, n, length, precision, runtimeData);
+}
+
+extern "C" void rt_write_char (TFileStruct *f, char ch, std::int64_t length, std::int64_t precision, statpascal::TRuntimeData *runtimeData) {
+    rt_write_val<unsigned char> (f, ch, length, precision, runtimeData);
+}
+
+extern "C" void rt_write_string (TFileStruct *f, statpascal::TAnyValue s, std::int64_t length, std::int64_t precision, statpascal::TRuntimeData *runtimeData) {
+    rt_write_val<std::string> (f, getString (s), length, precision, runtimeData);
+}
+
+extern "C" void rt_write_bool (TFileStruct *f, bool b, std::int64_t length, std::int64_t precision, statpascal::TRuntimeData *runtimeData) {
+    rt_write_val<mybool> (f, static_cast<mybool> (b), length, precision, runtimeData);
+}
+
+extern "C" void rt_write_dbl (TFileStruct *f, double a, std::int64_t length, std::int64_t precision, statpascal::TRuntimeData *runtimeData) {
+    rt_write_val<double> (f, a, length, precision, runtimeData);
 }
 
 extern "C" void rt_write_vint (TFileStruct *f, statpascal::TAnyValue v, std::int64_t length, std::int64_t precision, statpascal::TRuntimeData *runtimeData) {
@@ -1112,6 +1086,22 @@ extern "C" void rt_write_vbool (TFileStruct *f, statpascal::TAnyValue v, std::in
 
 extern "C" void rt_write_vdbl (TFileStruct *f, statpascal::TAnyValue v, std::int64_t length, std::int64_t precision, statpascal::TRuntimeData *runtimeData) {
     rt_write_vector<double> (f, v, length, precision, runtimeData);
+}
+
+extern "C" std::int64_t rt_read_int (TFileStruct *f, statpascal::TRuntimeData *runtimeData) {
+    return runtimeData->getTextFileBaseHandler (f->idx).getInteger ();
+}
+
+extern "C" char rt_read_char (TFileStruct *f, statpascal::TRuntimeData *runtimeData) {
+    return runtimeData->getTextFileBaseHandler (f->idx).getChar ();
+}
+
+extern "C" statpascal::TAnyValue rt_read_string (TFileStruct *f, statpascal::TRuntimeData *runtimeData) {
+    return runtimeData->getTextFileBaseHandler (f->idx).getString ();
+}
+
+extern "C" double rt_read_dbl (TFileStruct *f, statpascal::TRuntimeData *runtimeData) {
+    return runtimeData->getTextFileBaseHandler (f->idx).getDouble ();
 }
 
 extern "C" void rt_str_int (std::int64_t n, std::int64_t length, std::int64_t precision, statpascal::TAnyValue *res) {
@@ -1219,8 +1209,6 @@ extern "C" sp_bool rt_set_sub_not_equal (TSet *s, TSet *t) {
 extern "C" sp_bool rt_set_super_not_equal (TSet *s, TSet *t) {
     return set_super (s, t) && !set_equal (s, t);
 }
-
-
 
 // threading
 

@@ -30,14 +30,8 @@ public:
     /** returns true if a value has been stored. */
     bool hasValue () const;
     
-    /** returns true if value has only a single reference and object returned by get can safely be moved. */
-    bool canMove () const;
-    
     template<typename T> T &get ();
     template<typename T> const T &get () const;
-    
-    void *makeRef () const;
-    void releaseRef ();
     
 private:
     class TValue {
@@ -84,7 +78,8 @@ inline TAnyValue::TAnyValue (void *p):
 }
 
 inline TAnyValue::~TAnyValue () {
-    releaseRef ();
+    if (value && !--value->refcount)
+        delete value;
 }
 
 inline TAnyValue::TAnyValue (const TAnyValue &other):
@@ -120,17 +115,6 @@ template<typename T> inline const T &TAnyValue::get () const {
     return static_cast<const TConcreteValue<T> *> (value)->concreteValue;
 }
 
-inline void *TAnyValue::makeRef () const {
-    if (value) 
-        ++value->refcount;
-    return value;
-}
-
-inline void TAnyValue::releaseRef () {
-    if (value && !--value->refcount)
-        delete value;
-}
-
 inline void TAnyValue::copyOnWrite () {
     if (value && value->refcount > 1) {
         --value->refcount;
@@ -140,10 +124,6 @@ inline void TAnyValue::copyOnWrite () {
 
 inline bool TAnyValue::hasValue () const {
     return !!value;
-}
-
-inline bool TAnyValue::canMove () const {
-    return value && value->refcount == 1;
 }
 
 }

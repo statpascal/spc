@@ -16,36 +16,12 @@ public:
     virtual void copy (const void *source, void *dest) = 0;
 };
 
-/*
-
-class TAnyCopyManager: public TAnyManager {
-public:
-    TAnyCopyManager (std::size_t size);
-
-    virtual void destroy (void *base) override;
-    virtual void copy (const void *source, void *dest) override;
-    
-private:
-    std::size_t size;
-};
-
-*/
-
-class TAnySimpleValueManager: public TAnyManager {
+class TAnySingleValueManager: public TAnyManager {
 public:
     virtual void init (void *base) override;
     virtual void destroy (void *base) override;
     virtual void copy (const void *source, void *dest) override;
 };
-
-/*
-class TAnyVectorManager: public TAnyManager {
-public:
-    virtual void init (void *base) override;
-    virtual void destroy (void *base) override;
-    virtual void copy (const void *source, void *dest) override;
-};
-*/
 
 class TAnyArrayManager: public TAnyManager {
 public:
