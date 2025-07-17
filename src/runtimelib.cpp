@@ -329,100 +329,104 @@ extern "C" double rt_max_dbl (double a, double b) {
 
 namespace {
 
-inline void initOutVector (statpascal::TVectorDataPtr &out, std::size_t size, std::size_t count) {
-    if (!out.hasValue () || out->getRefCount () > 1 || out->getElementSize () != size || out->getElementCount () != count)
-        out = statpascal::TVectorDataPtr (size, count, nullptr, false);
-}
-
-template<typename TEl, typename TRes> TRes vecsum (statpascal::TVectorDataPtr &in) {
+template<typename TEl, typename TRes> TRes vecsum (statpascal::TAnyValue &in) {
     if (in.hasValue ())  {
-        TEl *p = &(in->template get<TEl> (0));
-        return std::accumulate (p, p + in->getElementCount (), TRes ());
+        TEl *p = &(in.get<statpascal::TVectorData> ().template get<TEl> (0));
+        return std::accumulate (p, p + in.get<statpascal::TVectorData> ().getElementCount (), TRes ());
     } else
         return TRes ();
 }
 
-template<typename T> statpascal::TVectorDataPtr veccumsum (const statpascal::TVectorDataPtr &a) {
-    statpascal::TVectorDataPtr out (a->getElementSize (), a->getElementCount ());
+template<typename T> statpascal::TAnyValue veccumsum (const statpascal::TAnyValue &a) {
+    const statpascal::TVectorData &in = a.get<statpascal::TVectorData> ();
+    statpascal::TVectorData out (in.getElementSize (), in.getElementCount ());
     
-    T *x = &(a->template get<T> (0)),
-      *y = &(out->template get<T> (0));
-    std::partial_sum (x, x + a->getElementCount (), y);
+    const T *x = &(in.template get<T> (0));
+    T *y = &(out.template get<T> (0));
+    std::partial_sum (x, x + in.getElementCount (), y);
     
-    return out;
+    return std::move (out);
 }
 
-template<typename T> statpascal::TVectorDataPtr vecsort (statpascal::TVectorDataPtr &a) {
-    const std::size_t size = a->getElementSize (), count = a->getElementCount ();
-    statpascal::TVectorDataPtr out (size, count);
+template<typename T> statpascal::TAnyValue vecsort (statpascal::TAnyValue &a) {
+    const statpascal::TVectorData &in = a.get<statpascal::TVectorData> ();
+    const std::size_t size = in.getElementSize (), count = in.getElementCount ();
+    statpascal::TVectorData out (size, count);
     
-    T *x = &(a->template get<T> (0)),
-      *y = &(out->template get<T> (0));
+    const T *x = &(in.template get<T> (0));
+    T *y = &(out.template get<T> (0));
     std::memcpy (y, x, size * count);
     std::sort (y, y + count);
     
-    return out;
+    return std::move (out);
 }
 
-statpascal::TVectorDataPtr vecfunc (std::function<double (double)> fn, statpascal::TVectorDataPtr &in) {
-    statpascal::TVectorDataPtr out;
-    initOutVector (out, in->getElementSize (), in->getElementCount ());
-    double *x = &(in->template get<double> (0)),
-           *y = &(out->template get<double> (0));
-    for (std::size_t i = 0, ei = in->getElementCount (); i < ei; ++i)
+statpascal::TAnyValue vecfunc (std::function<double (double)> fn, const statpascal::TAnyValue &a) {
+    const statpascal::TVectorData &in = a.get<statpascal::TVectorData> ();
+    statpascal::TVectorData out (in.getElementSize (), in.getElementCount ());
+    const double *x = &(in.get<double> (0));
+    double *y = &(out.get<double> (0));
+    for (std::size_t i = 0, ei = in.getElementCount (); i < ei; ++i)
         y [i] = fn (x [i]);
-    return out;
+    return std::move (out);
 }
 
 } // namespace
 
-extern "C" statpascal::TVectorDataPtr rt_vdbl_sqr (statpascal::TVectorDataPtr in) {
+extern "C" statpascal::TAnyValue rt_vdbl_sqr (statpascal::TAnyValue in) {
     return vecfunc ([] (double x) {return x * x; }, in);
 }
 
-extern "C" statpascal::TVectorDataPtr rt_vdbl_sqrt (statpascal::TVectorDataPtr in) {
+extern "C" statpascal::TAnyValue rt_vdbl_sqrt (statpascal::TAnyValue in) {
     return vecfunc ([] (double x) {return std::sqrt (x); }, in);
 }
 
-extern "C" statpascal::TVectorDataPtr rt_vdbl_sin (statpascal::TVectorDataPtr in) {
+extern "C" statpascal::TAnyValue rt_vdbl_sin (statpascal::TAnyValue in) {
     return vecfunc ([] (double x) {return std::sin (x); }, in);
 }
 
-extern "C" statpascal::TVectorDataPtr rt_vdbl_cos (statpascal::TVectorDataPtr in, statpascal::TVectorDataPtr *out) {
+extern "C" statpascal::TAnyValue rt_vdbl_cos (statpascal::TAnyValue in) {
     return vecfunc ([] (double x) {return std::cos (x); }, in);
 }
 
-extern "C" statpascal::TVectorDataPtr rt_vdbl_log (statpascal::TVectorDataPtr in, statpascal::TVectorDataPtr *out) {
+extern "C" statpascal::TAnyValue rt_vdbl_log (statpascal::TAnyValue in) {
     return vecfunc ([] (double x) {return std::log (x); }, in);
 }
 
-extern "C" statpascal::TVectorDataPtr rt_vdbl_pow (statpascal::TVectorDataPtr in, double e) {
+extern "C" statpascal::TAnyValue rt_vdbl_pow (statpascal::TAnyValue in, double e) {
     return vecfunc ([e] (double x) {return std::pow (x, e); }, in);
 }
 
-extern "C" void *rt_vec_index_int (statpascal::TVectorDataPtr in, std::int64_t index) {
-    // TODO: range check
-    return &in->get<char> (index - 1);
+extern "C" void *rt_vec_index_int (statpascal::TAnyValue in, std::int64_t index) {
+    // TODO: range check, COW?
+    return &in.get<statpascal::TVectorData> ().get<char> (index - 1);
 }
 
-extern "C" statpascal::TVectorDataPtr rt_vec_index_vint (statpascal::TVectorDataPtr a, statpascal::TVectorDataPtr index) {
+extern "C" statpascal::TAnyValue rt_vec_index_vint (statpascal::TAnyValue a, statpascal::TAnyValue index) {
     // TODO: range check
     std::int64_t ival = 0;
-    statpascal::TVectorDataPtr out (a->getElementSize (), index->getElementCount (), a->getElementAnyManager (), false);
-    for (std::size_t i = 0; i < index->getElementCount (); ++i) {
-        memcpy (&ival, &index->get<char> (i), index->getElementSize ());
-        out->setElement (i, &a->get<unsigned char> (ival - 1));
+    const statpascal::TVectorData 
+        &src = a.get<statpascal::TVectorData> (),
+        &ind = index.get<statpascal::TVectorData> ();
+    
+    statpascal::TVectorData out (src.getElementSize (), ind.getElementCount (), src.getElementAnyManager (), false);
+    for (std::size_t i = 0; i < ind.getElementCount (); ++i) {
+        memcpy (&ival, &ind.get<char> (i), ind.getElementSize ());
+        out.setElement (i, &src.get<unsigned char> (ival - 1));
     }
-    return out;
+    return std::move (out);
 }
 
-extern "C" statpascal::TVectorDataPtr rt_vec_index_vbool (statpascal::TVectorDataPtr a, statpascal::TVectorDataPtr index) {
+extern "C" statpascal::TAnyValue rt_vec_index_vbool (statpascal::TAnyValue a, statpascal::TAnyValue index) {
     // TODO: range check
+    const statpascal::TVectorData 
+        &src = a.get<statpascal::TVectorData> (),
+        &ind = index.get<statpascal::TVectorData> ();
     
     // count number of true 8 bytes in parallel
-    const std::size_t indexCount = index->getElementCount ();
-    const bool *const indexData = &index->get<bool> (0);
-    const std::uint64_t *const indexInt = &index->get<std::uint64_t> (0);
+    const std::size_t indexCount = ind.getElementCount ();
+    const bool *const indexData = &ind.get<bool> (0);
+    const std::uint64_t *const indexInt = &ind.get<std::uint64_t> (0);
     std::uint64_t count = 0;
     std::size_t i, j = 0;
     if (indexCount >= 16) {
@@ -441,208 +445,210 @@ extern "C" statpascal::TVectorDataPtr rt_vec_index_vbool (statpascal::TVectorDat
     for (i = j * 8; i < indexCount; ++i)
         count += indexData [i];
         
-    statpascal::TVectorDataPtr out (a->getElementSize (), count, a->getElementAnyManager (), false);
+    statpascal::TVectorData out (src.getElementSize (), count, src.getElementAnyManager (), false);
     if (count)
         for (std::size_t i = 0, dst = 0; dst < count; ++i) 
             if (indexData [i])
-                out->setElement (dst++, &a->get<unsigned char> (i));
-    return out;
+                out.setElement (dst++, &src.get<unsigned char> (i));
+    return std::move (out);
 }
 
-extern "C" statpascal::TVectorDataPtr rt_intvec (std::int64_t a, std::int64_t b) {
-    statpascal::TVectorDataPtr out;
-    initOutVector (out, sizeof (std::int64_t), std::max<std::int64_t> (0, b - a + 1));
+extern "C" statpascal::TAnyValue rt_intvec (std::int64_t a, std::int64_t b) {
+    statpascal::TVectorData out (sizeof (std::int64_t), std::max<std::int64_t> (0, b - a + 1));
     if (b >= a) {
-        std::int64_t *p = &(out)->get<std::int64_t> (0);
+        std::int64_t *p = &out.get<std::int64_t> (0);
         std::iota (p, p + (b - a + 1), a);
     }
-    return out;
+    return std::move (out);
 }
 
-extern "C" statpascal::TVectorDataPtr rt_realvec (double a, double b, double step) {
-    statpascal::TVectorDataPtr out;
+extern "C" statpascal::TAnyValue rt_realvec (double a, double b, double step) {
     if ((step > 0.0 && b >= a) || (step < 0.0 && b <= a)) {
         const std::size_t count = std::floor (1 + (b - a) / step + 0.5);
-        initOutVector (out, sizeof (double), count);
-        double *p = &(out)->get<double> (0);
+        statpascal::TVectorData out (sizeof (double), count);
+        double *p = &out.get<double> (0);
         for (std::size_t i = 0; i < count; ++i)
             *p++ = static_cast<double> (count - 1 - i) / (count - 1) * a + static_cast<double> (i) / (count - 1) * b;
+        return std::move (out);
     } else
-        initOutVector (out, sizeof (double), 0);
-    return out;
+        return statpascal::TVectorData (sizeof (double), 0);
 }
 
-extern "C" statpascal::TVectorDataPtr rt_makevec_int (std::int64_t size, std::int64_t val) {
-    statpascal::TVectorDataPtr out (size, 1);
-    out->setElement (0, &val);
-    return out;
+extern "C" statpascal::TAnyValue rt_makevec_int (std::int64_t size, std::int64_t val) {
+    statpascal::TVectorData out (size, 1);
+    out.setElement (0, &val);
+    return std::move (out);
 }
 
-extern "C" statpascal::TVectorDataPtr rt_makevec_dbl (std::int64_t size, double val) {
-    statpascal::TVectorDataPtr out (size, 1);
+extern "C" statpascal::TAnyValue rt_makevec_dbl (std::int64_t size, double val) {
+    statpascal::TVectorData out (size, 1);
     if (size == sizeof (double))
-        out->setElement (0, &val);
+        out.setElement (0, &val);
     else {
         float val1 = val;
-        out->setElement (0, &val1);
+        out.setElement (0, &val1);
     }
-    return out;
+    return std::move (out);
 }
 
-extern "C" statpascal::TVectorDataPtr rt_makevec_str (std::int64_t anyManagerIndex, statpascal::TRuntimeData *runtimeData, statpascal::TAnyValue a) {
-    statpascal::TVectorDataPtr out (sizeof (void *), 1, runtimeData->getAnyManager (anyManagerIndex));
-    out->setElement (0, &a);
-    return out;
+// TODO: unify!
+
+extern "C" statpascal::TAnyValue rt_makevec_str (std::int64_t anyManagerIndex, statpascal::TRuntimeData *runtimeData, statpascal::TAnyValue a) {
+    statpascal::TVectorData out (sizeof (void *), 1, runtimeData->getAnyManager (anyManagerIndex));
+    out.setElement (0, &a);
+    return std::move (out);
 }
 
-extern "C" statpascal::TVectorDataPtr rt_makevec_vec (std::int64_t anyManagerIndex, statpascal::TRuntimeData *runtimeData, statpascal::TVectorDataPtr a) {
-    statpascal::TVectorDataPtr out (sizeof (void *), 1, runtimeData->getAnyManager (anyManagerIndex));
-    out->setElement (0, &a);
-    return out;
+extern "C" statpascal::TAnyValue rt_makevec_vec (std::int64_t anyManagerIndex, statpascal::TRuntimeData *runtimeData, statpascal::TAnyValue a) {
+    statpascal::TVectorData out (sizeof (void *), 1, runtimeData->getAnyManager (anyManagerIndex));
+    out.setElement (0, &a);
+    return std::move (out);
 }
 
-extern "C" statpascal::TVectorDataPtr rt_combinevec_4 (statpascal::TVectorDataPtr a, statpascal::TVectorDataPtr b, statpascal::TVectorDataPtr c, statpascal::TVectorDataPtr d) {
+extern "C" statpascal::TAnyValue rt_combinevec_4 (statpascal::TAnyValue a, statpascal::TAnyValue b, statpascal::TAnyValue c, statpascal::TAnyValue d) {
     const std::size_t n = 4;
-    std::array<statpascal::TVectorDataPtr, n> in {a, b, c, d};
+    std::array<statpascal::TAnyValue, n> in {a, b, c, d};
     std::int64_t count = 0, elsize = 0;
     statpascal::TAnyManager *anyManager = nullptr;
     for (std::size_t i = 0; i < n; ++i)
         if (in [i].hasValue ()) {
-            count += in [i]->getElementCount ();
-            elsize = in [i]->getElementSize ();
-            anyManager = in [i]->getElementAnyManager ();
+            const statpascal::TVectorData &vectorData = in [i].get<statpascal::TVectorData> ();
+            count += vectorData.getElementCount ();
+            elsize = vectorData.getElementSize ();
+            anyManager = vectorData.getElementAnyManager ();
         }
-    statpascal::TVectorDataPtr out (elsize, count, anyManager, false);
+    statpascal::TVectorData out (elsize, count, anyManager, false);
     std::int64_t index = 0;
     for (std::size_t i = 0; i < n; ++i)
-        if (in [i].hasValue ())
-            for (std::size_t j = 0; j < in [i]->getElementCount (); ++j)
-                out->setElement (index++, in [i]->getElement (j));
-    return out;
+        if (in [i].hasValue ()) {
+            const statpascal::TVectorData &vectorData = in [i].get<statpascal::TVectorData> ();
+            for (std::size_t j = 0; j < vectorData.getElementCount (); ++j)
+                out.setElement (index++, vectorData.getElement (j));
+        }
+    return std::move (out);
 }
 
-extern "C" statpascal::TVectorDataPtr rt_combinevec_3 (statpascal::TVectorDataPtr a, statpascal::TVectorDataPtr b, statpascal::TVectorDataPtr c) {
-    return rt_combinevec_4 (a, b, c, statpascal::TVectorDataPtr ());
+extern "C" statpascal::TAnyValue rt_combinevec_3 (statpascal::TAnyValue a, statpascal::TAnyValue b, statpascal::TAnyValue c) {
+    return rt_combinevec_4 (a, b, c, statpascal::TAnyValue ());
 }
 
-extern "C" statpascal::TVectorDataPtr rt_combinevec_2 (statpascal::TVectorDataPtr a, statpascal::TVectorDataPtr b) {
-    return rt_combinevec_4 (a, b,  statpascal::TVectorDataPtr (),  statpascal::TVectorDataPtr ());
+extern "C" statpascal::TAnyValue rt_combinevec_2 (statpascal::TAnyValue a, statpascal::TAnyValue b) {
+    return rt_combinevec_4 (a, b,  statpascal::TAnyValue (),  statpascal::TAnyValue ());
 }
 
-extern "C" std::int64_t rt_sizevec (statpascal::TVectorDataPtr a) {
-    return a->getElementCount ();
+extern "C" std::int64_t rt_sizevec (statpascal::TAnyValue a) {
+    return a.get<statpascal::TVectorData> ().getElementCount ();
 }
 
-extern "C" void rt_resizevec (std::int64_t anyManagerIndex, statpascal::TRuntimeData *runtimeData, std::int64_t elsize, statpascal::TVectorDataPtr &a, std::int64_t n) {
-    statpascal::TVectorDataPtr out (elsize, n, runtimeData->getAnyManager (anyManagerIndex));
+extern "C" void rt_resizevec (std::int64_t anyManagerIndex, statpascal::TRuntimeData *runtimeData, std::int64_t elsize, statpascal::TAnyValue &a, std::int64_t n) {
+    statpascal::TVectorData out (elsize, n, runtimeData->getAnyManager (anyManagerIndex));
     if (a.hasValue ()) {
-        const std::size_t copyCount = std::min<std::size_t> (a->getElementCount (), n);
-        if (a->getElementAnyManager ())
+        const std::size_t copyCount = std::min<std::size_t> (a.get<statpascal::TVectorData> ().getElementCount (), n);
+        if (out.getElementAnyManager ())
             for (std::size_t j = 0; j < copyCount; ++j)
-                out->setElement (j, a->getElement (j));
+                out.setElement (j, a.get<statpascal::TVectorData> ().getElement (j));
         else
-            std::memcpy (out->getElement (0), a->getElement (0), copyCount * a->getElementSize ());
+            std::memcpy (out.getElement (0), a.get<statpascal::TVectorData> ().getElement (0), copyCount * elsize);
     }
     a = out;
 }
 
-extern "C" statpascal::TVectorDataPtr rt_revvec (statpascal::TVectorDataPtr a) {
-    const std::size_t n = a->getElementCount ();
-    statpascal::TVectorDataPtr out (a->getElementSize (), n, a->getElementAnyManager ());
+extern "C" statpascal::TAnyValue rt_revvec (statpascal::TAnyValue a) {
+    statpascal::TVectorData &vectorData = a.get<statpascal::TVectorData> ();
+    const std::size_t n = vectorData.getElementCount ();
+    statpascal::TVectorData out (vectorData.getElementSize (), n, vectorData.getElementAnyManager ());
     for (std::size_t i = 0; i < n; ++i)
-        out->setElement (i, a->getElement (n - 1 - i));
-    return out;
+        out.setElement (i, vectorData.getElement (n - 1 - i));
+    return std::move (out);
 }
 
-extern "C" statpascal::TVectorDataPtr rt_vint_randomperm (std::int64_t n) {
-    statpascal::TVectorDataPtr out;
-    initOutVector (out, sizeof (std::int64_t), std::max<std::int64_t> (n, 0));
+extern "C" statpascal::TAnyValue rt_vint_randomperm (std::int64_t n) {
+    statpascal::TVectorData out (sizeof (std::int64_t), std::max<std::int64_t> (n, 0));
     if (n >= 1) {
-        std::int64_t *p = &(out)->get<std::int64_t> (0);
+        std::int64_t *p = &out.get<std::int64_t> (0);
         std::iota (p, p + n, 1);
         for (std::int64_t i = n - 1; i > 0; --i)
             std::swap (p [i], p [statpascal::TRNG::val (0, i)]);
     }
-    return out;
+    return std::move (out);
 }
 
-extern "C" statpascal::TVectorDataPtr rt_vdbl_random (std::int64_t n) {
-    statpascal::TVectorDataPtr out;
-    initOutVector (out, sizeof (double), std::max<std::int64_t> (n, 0));
+extern "C" statpascal::TAnyValue rt_vdbl_random (std::int64_t n) {
+    statpascal::TVectorData out (sizeof (double), std::max<std::int64_t> (n, 0));
     if (n >= 1) {
-        double *p = &(out)->get<double> (0);
+        double *p = &out.get<double> (0);
         for (std::int64_t i = 0; i <n; ++i)
             p [i] = statpascal::TRNG::val ();
     }
-    return out;
+    return std::move (out);
 }
 
-extern "C" statpascal::TVectorDataPtr rt_vint_random (std::int64_t m, std::int64_t n) {
-    statpascal::TVectorDataPtr out;
-    initOutVector (out, sizeof (std::int64_t), std::max<std::int64_t> (n, 0));
+extern "C" statpascal::TAnyValue rt_vint_random (std::int64_t m, std::int64_t n) {
+    statpascal::TVectorData out (sizeof (std::int64_t), std::max<std::int64_t> (n, 0));
     if (n >= 1) {
-        std::int64_t *p = &(out)->get<std::int64_t> (0);
+        std::int64_t *p = &out.get<std::int64_t> (0);
         for (std::int64_t i = 0; i <n; ++i)
             p [i] = statpascal::TRNG::val (0, m);
     }
-    return out;
+    return std::move (out);
 }
 
-extern "C" statpascal::TVectorDataPtr rt_vint_sort (statpascal::TVectorDataPtr a) {
+extern "C" statpascal::TAnyValue rt_vint_sort (statpascal::TAnyValue a) {
     return vecsort<std::int64_t> (a);
 }
 
-extern "C"  statpascal::TVectorDataPtr rt_vdbl_sort (statpascal::TVectorDataPtr a) {
+extern "C"  statpascal::TAnyValue rt_vdbl_sort (statpascal::TAnyValue a) {
     return vecsort<double> (a);
 }
 
-extern "C" std::int64_t rt_vint_sum (statpascal::TVectorDataPtr in) {
+extern "C" std::int64_t rt_vint_sum (statpascal::TAnyValue in) {
     return vecsum<std::int64_t, std::int64_t> (in);
 }
 
-extern "C" double rt_vdbl_sum (statpascal::TVectorDataPtr in) {
+extern "C" double rt_vdbl_sum (statpascal::TAnyValue in) {
     return vecsum<double, double> (in);
 }
 
-extern "C" std::int64_t rt_vbool_count (statpascal::TVectorDataPtr in) {
+extern "C" std::int64_t rt_vbool_count (statpascal::TAnyValue in) {
     return vecsum<bool, std::int64_t> (in);
 }
 
-extern "C" statpascal::TVectorDataPtr rt_vint_cumsum (statpascal::TVectorDataPtr a) {
+extern "C" statpascal::TAnyValue rt_vint_cumsum (statpascal::TAnyValue a) {
     return veccumsum<std::int64_t> (a);
 }
 
-extern "C" statpascal::TVectorDataPtr rt_vdbl_cumsum (statpascal::TVectorDataPtr a) {
+extern "C" statpascal::TAnyValue rt_vdbl_cumsum (statpascal::TAnyValue a) {
     return veccumsum<double> (a);
 }
 
 namespace {
 
-template<class TOp> statpascal::TVectorDataPtr applyVectorOperation (statpascal::TVectorDataPtr a, statpascal::TVectorDataPtr b, std::int64_t tca, std::int64_t tcb) {
+template<class TOp> statpascal::TAnyValue applyVectorOperation (statpascal::TAnyValue a, statpascal::TAnyValue b, std::int64_t tca, std::int64_t tcb) {
     TOp op;
     using T = typename TOp::result_type;
     
-    statpascal::TVectorDataPtr out;
-    initOutVector (out, sizeof (T), std::max (a->getElementCount (), b->getElementCount ()));
-    T *result = &out->get<T> (0);
+    const statpascal::TVectorData &av = a.get<statpascal::TVectorData> (), &bv = b.get<statpascal::TVectorData> ();
     
-    const char *srcbegin1 = &a->get<char> (0),
-               *srcbegin2 = &b->get<char> (0),
+    statpascal::TVectorData out (sizeof (T), std::max (av.getElementCount (), bv.getElementCount ()));
+    T *result = &out.get<T> (0);
+    
+    const char *srcbegin1 = &av.get<char> (0),
+               *srcbegin2 = &bv.get<char> (0),
                *srcit1 = srcbegin1,
                *srcit2 = srcbegin2;
     const std::size_t src1size = statpascal::TStdType::scalarTypeSizes [tca],
                       src2size = statpascal::TStdType::scalarTypeSizes [tcb];
-    const char *srcend1 = srcbegin1 + a->getElementCount () * src1size,
-               *srcend2 = srcbegin2 + b->getElementCount () * src2size;
-    const bool inc1 = a->getElementCount () > 1,
-               inc2 = b->getElementCount () > 1;
+    const char *srcend1 = srcbegin1 + av.getElementCount () * src1size,
+               *srcend2 = srcbegin2 + bv.getElementCount () * src2size;
+    const bool inc1 = av.getElementCount () > 1,
+               inc2 = bv.getElementCount () > 1;
     const bool intOp1 = tca != statpascal::TStdType::TScalarTypeCode::single && tca != statpascal::TStdType::TScalarTypeCode::real,
                intOp2 = tcb != statpascal::TStdType::TScalarTypeCode::single && tcb != statpascal::TStdType::TScalarTypeCode::real;
          
     double realop1 = 0.0, realop2 = 0.0;
     std::int64_t intop1 = 0, intop2 = 0;
 
-    for (std::size_t i = 0; i < out->getElementCount (); ++i) {
+    for (std::size_t i = 0; i < out.getElementCount (); ++i) {
         switch (tca) {
             case statpascal::TStdType::TScalarTypeCode::s64:
                 intop1 = *reinterpret_cast<const std::int64_t *> (srcit1);
@@ -730,10 +736,10 @@ template<class TOp> statpascal::TVectorDataPtr applyVectorOperation (statpascal:
         }
     }
     
-    return out;
+    return std::move (out);
 }
 
-template<template<typename T> class TOp> statpascal::TVectorDataPtr applyVectorOperation (statpascal::TVectorDataPtr a, statpascal::TVectorDataPtr b, std::int64_t tca, std::int64_t tcb) {
+template<template<typename T> class TOp> statpascal::TAnyValue applyVectorOperation (statpascal::TAnyValue a, statpascal::TAnyValue b, std::int64_t tca, std::int64_t tcb) {
     using enum statpascal::TStdType::TScalarTypeCode;
     if (tca != real && tcb != real && tca != single && tcb != single)
         return applyVectorOperation<TOp<std::int64_t>> (a, b, tca, tcb);
@@ -743,82 +749,81 @@ template<template<typename T> class TOp> statpascal::TVectorDataPtr applyVectorO
 
 } // anonymous namespace
 
-extern "C" statpascal::TVectorDataPtr rt_vec_add (statpascal::TVectorDataPtr a, statpascal::TVectorDataPtr b, std::int64_t tca, std::int64_t tcb) {
+extern "C" statpascal::TAnyValue rt_vec_add (statpascal::TAnyValue a, statpascal::TAnyValue b, std::int64_t tca, std::int64_t tcb) {
     return applyVectorOperation<std::plus> (a, b, tca, tcb);
 }
 
-extern "C" statpascal::TVectorDataPtr rt_vec_sub (statpascal::TVectorDataPtr a, statpascal::TVectorDataPtr b, std::int64_t tca, std::int64_t tcb) {
+extern "C" statpascal::TAnyValue rt_vec_sub (statpascal::TAnyValue a, statpascal::TAnyValue b, std::int64_t tca, std::int64_t tcb) {
     return applyVectorOperation<std::minus> (a, b, tca, tcb);
 }
 
-extern "C" statpascal::TVectorDataPtr rt_vec_or (statpascal::TVectorDataPtr a, statpascal::TVectorDataPtr b, std::int64_t tca, std::int64_t tcb) {
+extern "C" statpascal::TAnyValue rt_vec_or (statpascal::TAnyValue a, statpascal::TAnyValue b, std::int64_t tca, std::int64_t tcb) {
     return applyVectorOperation<std::bit_or<std::int64_t>> (a, b, tca, tcb);
 }
 
-extern "C" statpascal::TVectorDataPtr rt_vec_xor (statpascal::TVectorDataPtr a, statpascal::TVectorDataPtr b, std::int64_t tca, std::int64_t tcb) {
+extern "C" statpascal::TAnyValue rt_vec_xor (statpascal::TAnyValue a, statpascal::TAnyValue b, std::int64_t tca, std::int64_t tcb) {
     return applyVectorOperation<std::bit_xor<std::int64_t>> (a, b, tca, tcb);
 }
 
-extern "C" statpascal::TVectorDataPtr rt_vec_mul (statpascal::TVectorDataPtr a, statpascal::TVectorDataPtr b, std::int64_t tca, std::int64_t tcb) {
+extern "C" statpascal::TAnyValue rt_vec_mul (statpascal::TAnyValue a, statpascal::TAnyValue b, std::int64_t tca, std::int64_t tcb) {
     return applyVectorOperation<std::multiplies> (a, b, tca, tcb);
 }
 
-extern "C" statpascal::TVectorDataPtr rt_vec_div (statpascal::TVectorDataPtr a, statpascal::TVectorDataPtr b, std::int64_t tca, std::int64_t tcb) {
+extern "C" statpascal::TAnyValue rt_vec_div (statpascal::TAnyValue a, statpascal::TAnyValue b, std::int64_t tca, std::int64_t tcb) {
     return applyVectorOperation<std::divides> (a, b, tca, tcb);
 }
 
-extern "C" statpascal::TVectorDataPtr rt_vec_mod (statpascal::TVectorDataPtr a, statpascal::TVectorDataPtr b, std::int64_t tca, std::int64_t tcb) {
+extern "C" statpascal::TAnyValue rt_vec_mod (statpascal::TAnyValue a, statpascal::TAnyValue b, std::int64_t tca, std::int64_t tcb) {
     return applyVectorOperation<std::modulus<std::int64_t>> (a, b, tca, tcb);
 }
 
-extern "C" statpascal::TVectorDataPtr rt_vec_and (statpascal::TVectorDataPtr a, statpascal::TVectorDataPtr b, std::int64_t tca, std::int64_t tcb) {
+extern "C" statpascal::TAnyValue rt_vec_and (statpascal::TAnyValue a, statpascal::TAnyValue b, std::int64_t tca, std::int64_t tcb) {
     return applyVectorOperation<std::bit_and<std::int64_t>> (a, b, tca, tcb);
 }
 
-extern "C" statpascal::TVectorDataPtr rt_vec_shl (statpascal::TVectorDataPtr a, statpascal::TVectorDataPtr b, std::int64_t tca, std::int64_t tcb) {
+extern "C" statpascal::TAnyValue rt_vec_shl (statpascal::TAnyValue a, statpascal::TAnyValue b, std::int64_t tca, std::int64_t tcb) {
     return applyVectorOperation<bit_shl<std::int64_t>> (a, b, tca, tcb);
 }
 
-extern "C" statpascal::TVectorDataPtr rt_vec_shr (statpascal::TVectorDataPtr a, statpascal::TVectorDataPtr b, std::int64_t tca, std::int64_t tcb) {
+extern "C" statpascal::TAnyValue rt_vec_shr (statpascal::TAnyValue a, statpascal::TAnyValue b, std::int64_t tca, std::int64_t tcb) {
     return applyVectorOperation<bit_shr<std::int64_t>> (a, b, tca, tcb);
 }
 
-extern "C" statpascal::TVectorDataPtr rt_vec_equal (statpascal::TVectorDataPtr a, statpascal::TVectorDataPtr b, std::int64_t tca, std::int64_t tcb) {
+extern "C" statpascal::TAnyValue rt_vec_equal (statpascal::TAnyValue a, statpascal::TAnyValue b, std::int64_t tca, std::int64_t tcb) {
     return applyVectorOperation<std::equal_to> (a, b, tca, tcb);
 }
 
-extern "C" statpascal::TVectorDataPtr rt_vec_not_equal (statpascal::TVectorDataPtr a, statpascal::TVectorDataPtr b, std::int64_t tca, std::int64_t tcb) {
+extern "C" statpascal::TAnyValue rt_vec_not_equal (statpascal::TAnyValue a, statpascal::TAnyValue b, std::int64_t tca, std::int64_t tcb) {
     return applyVectorOperation<std::not_equal_to> (a, b, tca, tcb);
 }
 
-extern "C" statpascal::TVectorDataPtr rt_vec_less_equal (statpascal::TVectorDataPtr a, statpascal::TVectorDataPtr b, std::int64_t tca, std::int64_t tcb) {
+extern "C" statpascal::TAnyValue rt_vec_less_equal (statpascal::TAnyValue a, statpascal::TAnyValue b, std::int64_t tca, std::int64_t tcb) {
     return applyVectorOperation<std::less_equal> (a, b, tca, tcb);
 }
 
-extern "C" statpascal::TVectorDataPtr rt_vec_greater_equal (statpascal::TVectorDataPtr a, statpascal::TVectorDataPtr b, std::int64_t tca, std::int64_t tcb) {
+extern "C" statpascal::TAnyValue rt_vec_greater_equal (statpascal::TAnyValue a, statpascal::TAnyValue b, std::int64_t tca, std::int64_t tcb) {
     return applyVectorOperation<std::greater_equal> (a, b, tca, tcb);
 }
 
-extern "C" statpascal::TVectorDataPtr rt_vec_less (statpascal::TVectorDataPtr a, statpascal::TVectorDataPtr b, std::int64_t tca, std::int64_t tcb) {
+extern "C" statpascal::TAnyValue rt_vec_less (statpascal::TAnyValue a, statpascal::TAnyValue b, std::int64_t tca, std::int64_t tcb) {
     return applyVectorOperation<std::less> (a, b, tca, tcb);
 }
 
-extern "C" statpascal::TVectorDataPtr rt_vec_greater (statpascal::TVectorDataPtr a, statpascal::TVectorDataPtr b, std::int64_t tca, std::int64_t tcb) {
+extern "C" statpascal::TAnyValue rt_vec_greater (statpascal::TAnyValue a, statpascal::TAnyValue b, std::int64_t tca, std::int64_t tcb) {
     return applyVectorOperation<std::greater> (a, b, tca, tcb);
 }
 
-extern "C" statpascal::TVectorDataPtr rt_vec_conv (statpascal::TVectorDataPtr a, std::int64_t tcs, std::int64_t tcd) {
+extern "C" statpascal::TAnyValue rt_vec_conv (statpascal::TAnyValue a, std::int64_t tcs, std::int64_t tcd) {
     using enum statpascal::TStdType::TScalarTypeCode;
     
     const std::size_t 
         srcSize = statpascal::TStdType::scalarTypeSizes [tcs],
         dstSize = statpascal::TStdType::scalarTypeSizes [tcd],
-        n = a->getElementCount ();
-    statpascal::TVectorDataPtr out;
-    initOutVector (out, dstSize, n);
+        n = a.get<statpascal::TVectorData> ().getElementCount ();
+    statpascal::TVectorData out (dstSize, n);
     const bool srcint = tcs != single && tcs != real;
-    const char *srcit = &a->get<char> (0);
-    char *dstit = &out->get<char> (0);
+    const char *srcit = &a.get<statpascal::TVectorData> ().get<char> (0);
+    char *dstit = &out.get<char> (0);
     
     double fVal = 0.0;
     std::int64_t iVal = 0;
@@ -894,7 +899,7 @@ extern "C" statpascal::TVectorDataPtr rt_vec_conv (statpascal::TVectorDataPtr a,
         }
         dstit += dstSize;        
     }    
-    return out;    
+    return std::move (out);
 }
 
 // text files
@@ -1063,60 +1068,50 @@ extern "C" double rt_read_dbl (TFileStruct *f, statpascal::TRuntimeData *runtime
     return runtimeData->getTextFileBaseHandler (f->idx).getDouble ();
 }
 
-extern "C" void rt_write_vint (TFileStruct *f, statpascal::TVectorDataPtr v, std::int64_t length, std::int64_t precision, statpascal::TRuntimeData *runtimeData) {
-    std::ostream &os = runtimeData->getTextFileBaseHandler (f->idx).getOutputStream ();
-    for (std::size_t i = 0, ei = v->getElementCount (); i < ei; ++i) {
-        if (length >= 0)
-            os << std::setw (length) << v->get<std::int64_t> (i);
-        else
-            os << v->get<std::int64_t> (i) << ' ';
-    }
+namespace {
+
+enum class mybool: std::uint8_t { FALSE, TRUE };
+
+std::ostream &operator << (std::ostream &os, mybool f) {
+    os << (f == mybool::TRUE ? "TRUE" : "FALSE");
+    return os;
 }
 
-extern "C" void rt_write_vchar (TFileStruct *f, statpascal::TVectorDataPtr in, std::int64_t length, std::int64_t precision, statpascal::TRuntimeData *runtimeData) {
-    std::ostream &os = runtimeData->getTextFileBaseHandler (f->idx).getOutputStream ();
-    for (std::size_t i = 0, ei = in->getElementCount (); i < ei; ++i) {
-        if (length >= 0)
-            os << std::setw (length) << in->get<unsigned char> (i);
-        else
-            os << in->get<unsigned char> (i) << ' ';
-    }
-}
-
-extern "C" void rt_write_vstring (TFileStruct *f, statpascal::TVectorDataPtr in, std::int64_t length, std::int64_t precision, statpascal::TRuntimeData *runtimeData) {
-    std::ostream &os = runtimeData->getTextFileBaseHandler (f->idx).getOutputStream ();
-    for (std::size_t i = 0, ei = in->getElementCount (); i < ei; ++i) {
-        if (length >= 0)
-            os << std::setw (length) << in->get<statpascal::TAnyValue> (i).get<std::string> ();
-        else
-            os << in->get<statpascal::TAnyValue> (i).get<std::string> () << ' ';
-    }
-}
-
-extern "C" void rt_write_vbool (TFileStruct *f, statpascal::TVectorDataPtr in, std::int64_t length, std::int64_t precision, statpascal::TRuntimeData *runtimeData) {
-    std::ostream &os = runtimeData->getTextFileBaseHandler (f->idx).getOutputStream ();
-    for (std::size_t i = 0, ei = in->getElementCount (); i < ei; ++i) {
-        if (length >= 0)
-            os << std::setw (length);
-        os << (in->get<bool> (i) ? "TRUE" : "FALSE");
-        if (length < 0)
-            os << ' ';
-    }
-}
-
-extern "C" void rt_write_vdbl (TFileStruct *f, statpascal::TVectorDataPtr in, std::int64_t length, std::int64_t precision, statpascal::TRuntimeData *runtimeData) {
+template<typename T> void rt_write_vector (TFileStruct *f, statpascal::TAnyValue v, std::int64_t length, std::int64_t precision, statpascal::TRuntimeData *runtimeData) {
     std::ostream &os = runtimeData->getTextFileBaseHandler (f->idx).getOutputStream ();
     std::streamsize prec = os.precision ();
     if (precision >= 0)
         os << std::fixed << std::setprecision (precision);
-    for (std::size_t i = 0, ei = in->getElementCount (); i < ei; ++i) {
+    for (std::size_t i = 0, ei = v.get<statpascal::TVectorData> ().getElementCount (); i < ei; ++i) {
         if (length >= 0)
             os << std::setw (length);
-        os  << in->get<double> (i);
+        os << v.get<statpascal::TVectorData> ().get<T> (i);
         if (length < 0)
             os << ' ';
     }
     os << std::setprecision (prec);
+}
+
+}
+
+extern "C" void rt_write_vint (TFileStruct *f, statpascal::TAnyValue v, std::int64_t length, std::int64_t precision, statpascal::TRuntimeData *runtimeData) {
+    rt_write_vector<std::int64_t> (f, v, length, precision, runtimeData);
+}
+
+extern "C" void rt_write_vchar (TFileStruct *f, statpascal::TAnyValue v, std::int64_t length, std::int64_t precision, statpascal::TRuntimeData *runtimeData) {
+    rt_write_vector<unsigned char> (f, v, length, precision, runtimeData);
+}
+
+extern "C" void rt_write_vstring (TFileStruct *f, statpascal::TAnyValue v, std::int64_t length, std::int64_t precision, statpascal::TRuntimeData *runtimeData) {
+    rt_write_vector<std::string> (f, v, length, precision, runtimeData);
+}
+
+extern "C" void rt_write_vbool (TFileStruct *f, statpascal::TAnyValue v, std::int64_t length, std::int64_t precision, statpascal::TRuntimeData *runtimeData) {
+    rt_write_vector<mybool> (f, v, length, precision, runtimeData);
+}
+
+extern "C" void rt_write_vdbl (TFileStruct *f, statpascal::TAnyValue v, std::int64_t length, std::int64_t precision, statpascal::TRuntimeData *runtimeData) {
+    rt_write_vector<double> (f, v, length, precision, runtimeData);
 }
 
 extern "C" void rt_str_int (std::int64_t n, std::int64_t length, std::int64_t precision, statpascal::TAnyValue *res) {

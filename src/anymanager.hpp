@@ -38,12 +38,14 @@ public:
     virtual void copy (const void *source, void *dest) override;
 };
 
+/*
 class TAnyVectorManager: public TAnyManager {
 public:
     virtual void init (void *base) override;
     virtual void destroy (void *base) override;
     virtual void copy (const void *source, void *dest) override;
 };
+*/
 
 class TAnyArrayManager: public TAnyManager {
 public:

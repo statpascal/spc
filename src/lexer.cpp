@@ -400,13 +400,10 @@ void TLexer::TLexerImpl::parseString () {
 void TLexer::TLexerImpl::parseSymbol () {
     sVal.clear (); 
     sValLower.clear ();
-    while (isalnum (*sourceIt) || *sourceIt == '_') {
-        sVal.push_back (*sourceIt);
-        sValLower.push_back (::tolower (*sourceIt));
-        ++sourceIt;
-    }
-//    sValLower.resize (sVal.length ());
-//    std::transform (sVal.begin (), sVal.end (), sValLower.begin (), ::tolower);
+    while (isalnum (*sourceIt) || *sourceIt == '_') 
+        sVal.push_back (*sourceIt++);
+    sValLower.resize (sVal.length ());
+    std::transform (sVal.begin (), sVal.end (), sValLower.begin (), ::tolower);
     
     TStringTokenMap::const_iterator it = reservedWords.find (sValLower);
     currentToken = (it == reservedWords.end ()) ? TToken::Identifier : it->second;

@@ -34,6 +34,7 @@ public:
     bool canMove () const;
     
     template<typename T> T &get ();
+    template<typename T> const T &get () const;
     
     void *makeRef () const;
     void releaseRef ();
@@ -113,6 +114,10 @@ inline TAnyValue &TAnyValue::swap (TAnyValue &other) {
 
 template<typename T> inline T &TAnyValue::get () {
     return static_cast<TConcreteValue<T> *> (value)->concreteValue;
+}
+
+template<typename T> inline const T &TAnyValue::get () const {
+    return static_cast<const TConcreteValue<T> *> (value)->concreteValue;
 }
 
 inline void *TAnyValue::makeRef () const {

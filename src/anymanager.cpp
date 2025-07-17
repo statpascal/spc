@@ -33,6 +33,7 @@ void TAnySimpleValueManager::copy (const void *source, void *dest) {
 //    *static_cast<TAnyValue *> (dest) = *static_cast<const TAnyValue *> (source);
 }
 
+/*
 void TAnyVectorManager::init (void *base) {
     memset (base, 0, sizeof (void *));
 }
@@ -45,6 +46,7 @@ void TAnyVectorManager::destroy (void *base) {
 void TAnyVectorManager::copy (const void *source, void *dest) {
     new (dest) TVectorDataPtr (*static_cast<const TVectorDataPtr *> (source));
 }
+*/
 
 TAnyArrayManager::TAnyArrayManager (TAnyManager *anyType, std::size_t count, std::size_t size):
   anyType (anyType), count (count), size (size) {
