@@ -52,7 +52,7 @@ inline TVectorData::TVectorData (std::size_t size, std::size_t count, TAnyManage
 inline TVectorData::~TVectorData () {
     if (anyManager)
         deleteData ();
-      operator delete (data);
+    operator delete (data);
 }
 
 inline TAnyManager *TVectorData::getElementAnyManager () const {

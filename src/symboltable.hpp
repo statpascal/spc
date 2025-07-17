@@ -35,7 +35,7 @@ public:
     ~TSymbol () = default;
 
     void setName (const std::string &s);    
-    std::string getName () const;
+    const std::string &getName () const;
     TSymbol *getAlias () const;
     
     void setExternal (const std::string &libName, const std::string &symbolName);
@@ -77,8 +77,8 @@ public:
     const TConstant *getConstant () const;
 
     // forward calls    
-    void appendUnresolvedReferencePosition (std::size_t);
-    const std::vector<std::size_t> &getUnresolvedReferencePositions () const;
+//    void appendUnresolvedReferencePosition (std::size_t);
+//    const std::vector<std::size_t> &getUnresolvedReferencePositions () const;
     
     // set level/offset from alias
     void setAliasData ();
@@ -94,7 +94,7 @@ private:
     bool aliased;
     TType *type;
     const TConstant *constantValue;
-    std::vector<std::size_t> unresolvedReferencePositions;
+//    std::vector<std::size_t> unresolvedReferencePositions;
 };
 
 
@@ -214,6 +214,7 @@ inline std::string TSymbol::getOverloadName () const {
     return overloadName;
 }
 
+/*
 inline void TSymbol::appendUnresolvedReferencePosition (std::size_t pos) {
     unresolvedReferencePositions.push_back (pos);
 }
@@ -221,5 +222,6 @@ inline void TSymbol::appendUnresolvedReferencePosition (std::size_t pos) {
 inline const std::vector<std::size_t> &TSymbol::getUnresolvedReferencePositions () const {
     return unresolvedReferencePositions;
 }
+*/
 
 }

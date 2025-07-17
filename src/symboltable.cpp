@@ -18,7 +18,7 @@ void TSymbol::setName (const std::string &s) {
     name = s;
 }
 
-std::string TSymbol::getName () const {
+const std::string &TSymbol::getName () const {
     return name;
 }
 
@@ -217,7 +217,7 @@ std::vector<TSymbol *> TSymbolList::search (const std::string &name) const {
     for (TSymbol *s: symbols)
         if (s->getName () == name)
             result.push_back (s);
-    return result;
+    return std::move (result);
 }
 
 std::size_t TSymbolList::getParameterSize () const {
