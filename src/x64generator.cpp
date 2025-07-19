@@ -2154,8 +2154,18 @@ void TX64Generator::initStaticRoutinePtr (std::size_t addr, const TRoutineValue 
     outputCode (TX64Op::mov, TX64Operand (TX64Reg::none, reinterpret_cast<std::uint64_t> (addr)), TX64Reg::rax);
 }
     
+// TODO: move to class !!!!
+std::unordered_map<std::string, void *> openLibs;    
+    
 void TX64Generator::externalRoutine (TSymbol &s) {
-    void *f = dlsym (dlopen (s.getExtLibName ().c_str (), RTLD_NOW), s.getExtSymbolName ().c_str ());
+    void *lib;
+    std::unordered_map<std::string, void *>::iterator it = openLibs.find (s.getExtLibName ());
+    if (it == openLibs.end ())
+        lib = openLibs [s.getExtLibName ()] = dlopen (s.getExtLibName ().c_str (), RTLD_NOW);
+    else
+        lib = it->second;
+    
+    void *f = dlsym (lib, s.getExtSymbolName ().c_str ());
     if (f)
         s.setOffset (reinterpret_cast<std::int64_t> (f));
     else

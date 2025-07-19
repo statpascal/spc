@@ -14,86 +14,10 @@ TSymbol::TSymbol (const std::string &name, TType *type, std::size_t level, TFlag
     setType (type);
 }
 
-void TSymbol::setName (const std::string &s) {
-    name = s;
-}
-
-const std::string &TSymbol::getName () const {
-    return name;
-}
-
-TSymbol *TSymbol::getAlias () const {
-    return alias;
-}
-
 void TSymbol::setExternal (const std::string &lib, const std::string &sym) {
     libName = lib;
     extSymbolName = sym;
     addSymbolFlags (External);
-}
-
-std::string TSymbol::getExtLibName () const {
-    return libName;
-}
-
-std::string TSymbol::getExtSymbolName () const {
-    return extSymbolName;
-}
-
-void TSymbol::setType (TType *t) {
-    type = t;
-}
-
-TType *TSymbol::getType () const {
-    return type;
-}
-
-void TSymbol::setOffset (ssize_t n) {
-    offset = n;
-}
-
-ssize_t TSymbol::getOffset () const {
-    return offset;
-}
-
-void TSymbol::setParameterPosition (ssize_t n) {
-    parameterPosition = n;
-}
-
-ssize_t TSymbol::getParameterPosition () const {
-    return parameterPosition;
-}
-
-void TSymbol::setRegister (ssize_t n) {
-    assignedRegister = n;
-}
-
-ssize_t TSymbol::getRegister () const {
-    return assignedRegister;
-}
-
-void TSymbol::setAliased () {
-    aliased = true;
-}
-
-bool TSymbol::isAliased () const {
-    return aliased || !!alias;
-}
-
-void TSymbol::setBlock (TBlock *b) {
-    block = b;
-}
-
-TBlock *TSymbol::getBlock () const {
-    return block;
-}
-
-void TSymbol::setLevel (std::size_t n) {
-    level = n;
-}
-
-std::size_t TSymbol::getLevel () const {
-    return level;
 }
 
 void TSymbol::setAliasData () {
@@ -154,8 +78,9 @@ TSymbolList::TAddSymbolResult TSymbolList::addNamedType (const std::string &name
 
 TSymbolList::TAddSymbolResult TSymbolList::addSymbol (const std::string &name, TType *type, TSymbol::TFlags flags, TSymbol *alias) {
     thread_local static std::uint64_t routineCount = 0;
-    std::vector<TSymbol *> results = search (name);
-    
+
+    std::vector<TSymbol *> results;
+    std::copy_if (symbols.begin (), symbols.end (), std::back_inserter (results), [&name] (TSymbol *s) { return s->getName () == name; });
     if (!results.empty ()) {
         if (type && type->isRoutine () && results.front ()->getType ()->isRoutine ()) {
             for (TSymbol *s: results)
@@ -181,17 +106,20 @@ TSymbol *TSymbolList::searchSymbol (const std::string &name, TSymbol::TFlags fla
 }
 
 std::vector<TSymbol *> TSymbolList::searchSymbols (const std::string &name, TSymbol::TFlags flags) const {
-    std::vector<TSymbol *> result = search (name);
+    std::vector<TSymbol *> result; // = search (name);
+    std::copy_if (symbols.begin (), symbols.end (), std::back_inserter (result), [&name] (TSymbol *s) { return s->getName () == name; });
     if (result.empty () && previousLevel)
         return previousLevel->searchSymbols (name, flags);
+        
     result.erase (
         std::remove_if (result.begin (), result.end (), [flags] (const TSymbol *s) {return !(s->getSymbolFlags () & flags);}),
         result.end ());
-    return result;
+    return std::move (result);
 }
 
 void TSymbolList::removeSymbol (const TSymbol *symbol) {
     symbols.erase (std::remove (symbols.begin (), symbols.end (), symbol), symbols.end ());
+    
 }
 
 void TSymbolList::moveSymbols (TSymbol::TFlags flags, TSymbolList &dest) {
@@ -210,14 +138,6 @@ void TSymbolList::copySymbols (TSymbol::TFlags flags, TSymbolList &dest) {
             if (std::find (dest.begin (), dest.end (), s) == dest.end ()) 
                 dest.symbols.push_back (s);
     }
-}
-
-std::vector<TSymbol *> TSymbolList::search (const std::string &name) const {
-    std::vector<TSymbol *> result;
-    for (TSymbol *s: symbols)
-        if (s->getName () == name)
-            result.push_back (s);
-    return std::move (result);
 }
 
 std::size_t TSymbolList::getParameterSize () const {

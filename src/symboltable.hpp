@@ -5,6 +5,7 @@
 
 #include <array>
 #include <vector>
+#include <unordered_map>
 
 #include "constant.hpp"
 #include "mempoolfactory.hpp"
@@ -39,11 +40,11 @@ public:
     TSymbol *getAlias () const;
     
     void setExternal (const std::string &libName, const std::string &symbolName);
-    std::string getExtLibName () const;
-    std::string getExtSymbolName () const;
+    const std::string &getExtLibName () const;
+    const std::string &getExtSymbolName () const;
     
     void setOverloadName (const std::string &);
-    std::string getOverloadName () const;
+    const std::string &getOverloadName () const;
     
     void setType (TType *);
     TType *getType () const;
@@ -142,8 +143,6 @@ public:
     
 private:
     TAddSymbolResult addSymbol (const std::string &name, TType *type, TSymbol::TFlags flags, TSymbol *alias);
-    std::vector<TSymbol *> search (const std::string &name) const;
-
     TSymbolList *previousLevel;    
     TMemoryPoolFactory &memoryPoolFactory;
     TBaseContainer symbols;    
@@ -181,6 +180,82 @@ inline TSymbolList::TBaseContainer::const_iterator TSymbolList::end () const {
 }
 
 
+inline void TSymbol::setName (const std::string &s) {
+    name = s;
+}
+
+inline const std::string &TSymbol::getName () const {
+    return name;
+}
+
+inline TSymbol *TSymbol::getAlias () const {
+    return alias;
+}
+
+inline const std::string &TSymbol::getExtLibName () const {
+    return libName;
+}
+
+inline const std::string &TSymbol::getExtSymbolName () const {
+    return extSymbolName;
+}
+
+inline void TSymbol::setType (TType *t) {
+    type = t;
+}
+
+inline TType *TSymbol::getType () const {
+    return type;
+}
+
+inline void TSymbol::setOffset (ssize_t n) {
+    offset = n;
+}
+
+inline ssize_t TSymbol::getOffset () const {
+    return offset;
+}
+
+inline void TSymbol::setParameterPosition (ssize_t n) {
+    parameterPosition = n;
+}
+
+inline ssize_t TSymbol::getParameterPosition () const {
+    return parameterPosition;
+}
+
+inline void TSymbol::setRegister (ssize_t n) {
+    assignedRegister = n;
+}
+
+inline ssize_t TSymbol::getRegister () const {
+    return assignedRegister;
+}
+
+inline void TSymbol::setAliased () {
+    aliased = true;
+}
+
+inline bool TSymbol::isAliased () const {
+    return aliased || !!alias;
+}
+
+inline void TSymbol::setBlock (TBlock *b) {
+    block = b;
+}
+
+inline TBlock *TSymbol::getBlock () const {
+    return block;
+}
+
+inline void TSymbol::setLevel (std::size_t n) {
+    level = n;
+}
+
+inline std::size_t TSymbol::getLevel () const {
+    return level;
+}
+
 inline TSymbol::TFlags TSymbol::getSymbolFlags () const {
     return flags;
 }
@@ -210,7 +285,7 @@ inline void TSymbol::setOverloadName (const std::string &s) {
     overloadName = s;
 }
 
-inline std::string TSymbol::getOverloadName () const {
+inline const std::string &TSymbol::getOverloadName () const {
     return overloadName;
 }
 
