@@ -4,7 +4,7 @@
 #pragma once
 
 #include <set>
-#include <deque>
+#include <list>
 
 #include "codegenerator.hpp"
 #include "x64asm.hpp"
@@ -34,10 +34,7 @@ public:
     virtual void generateCode (TRecordComponent &) override;
     virtual void generateCode (TPointerDereference &) override;
     
-//    virtual void generateCode (TRuntimeRoutine &) override;
     virtual void generateCode (TPredefinedRoutine &) override;
-    
-    virtual void generateCode (TSimpleStatement &) override;
     virtual void generateCode (TAssignment &) override;
     virtual void generateCode (TRoutineCall &) override;
     virtual void generateCode (TIfStatement &) override;
@@ -75,10 +72,13 @@ private:
         std::size_t size;
     };
     
+    using TCodeSequence = std::list<TX64Operation>;
+    TCodeSequence program, *currentOutput;
+
     void assignParameterOffsets (ssize_t &pos, TBlock &, std::vector<TSymbol *> &registerParameters);
     void assignStackOffsets (TBlock &);    
     void assignRegisters (TSymbolList &);
-    void codeBlock (TBlock &block, bool hasStackFrame, std::deque<TX64Operation> &blockStatements);
+    void codeBlock (TBlock &block, bool hasStackFrame, TCodeSequence &blockStatements);
     void generateBlock (TBlock &);
     void externalRoutine (TSymbol &);
     void beginRoutineBody (const std::string &routineName, std::size_t level, TSymbolList &, const std::set<TX64Reg> &saveRegs, bool hasStackFrame);
@@ -152,10 +152,8 @@ private:
         std::vector<std::string> jumpLabels;
     };
     std::vector<TJumpTable> jumpTableDefinitions;
-    
-    std::deque<TX64Operation> program, *currentOutput;
 
-    void setOutput (std::deque<TX64Operation> *);
+    void setOutput (TCodeSequence *);
     void outputCode (const TX64Operation &);
     void outputCode (TX64Op, TX64Operand = TX64Operand (), TX64Operand = TX64Operand (), const std::string &comment = std::string ());
     void outputLabel (const std::string &label);
@@ -194,12 +192,12 @@ private:
     bool tryMergeOperands (TX64Operand &op1, TX64Reg r1, const TX64Operand &op2);
     bool tryReplaceOperand (TX64Operand &op1, TX64Operand &op2, TX64OpSize opSize);
     bool tryReplaceShift (TX64Operand &op, TX64Reg reg, ssize_t imm);
-    void removeLines (std::deque<TX64Operation> &code, std::size_t &line, std::size_t count);
+    void removeLines (TCodeSequence &code, TCodeSequence::iterator &line, std::size_t count);
     
-    void removeUnusedLocalLabels (std::deque<TX64Operation> &code);
-    void tryLeaveFunctionOptimization (std::deque<TX64Operation> &);
-    void trySingleReplacements (std::deque<TX64Operation> &);
-    void optimizePeepHole (std::deque<TX64Operation> &);
+    void removeUnusedLocalLabels (TCodeSequence &code);
+    void tryLeaveFunctionOptimization (TCodeSequence &);
+    void trySingleReplacements (TCodeSequence &);
+    void optimizePeepHole (TCodeSequence &);
     
     void replaceLabel (TX64Operation &, TX64Operand &, std::size_t offset);
     void assemblePass (int pass, std::vector<std::uint8_t> &opcodes, bool generateListing, std::vector<std::string> &listing);

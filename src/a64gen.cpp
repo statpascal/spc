@@ -1846,55 +1846,6 @@ void TA64Generator::generateCode (TRoutineCall &routineCall) {
     visit (routineCall.getRoutineCall ());
 }
 
-void TA64Generator::generateCode (TSimpleStatement &simpleStatement) {
-/*
-    TType *type = (simpleStatement.getLeftExpression ()->getType ()),
-          *st = getMemoryOperationType (type);
-    
-    if (simpleStatement.getRightExpression ()) {
-        visit (simpleStatement.getRightExpression ());
-        
-        TA64Reg addrReg = TA64Reg::none;
-        
-        if (simpleStatement.getLeftExpression ()->isSymbol ()) {
-            const TSymbol *s = static_cast<TVariable *> (simpleStatement.getLeftExpression ())->getSymbol ();
-            if (s->getRegister () != TSymbol::InvalidRegister) {
-                if (simpleStatement.getLeftExpression ()->isReference ())
-                    addrReg = static_cast<TA64Reg> (s->getRegister ());
-                else {
-                    if (st == &stdType.Real)
-                        outputCode (TA64Op::fmov, {static_cast<TA64Reg> (s->getRegister ()), fetchDblReg (dblScratchReg1)});
-                    else
-                        outputCode (TA64Op::mov, {static_cast<TA64Reg> (s->getRegister ()), fetchReg (intScratchReg1)});
-                    return;
-                }
-            }
-        }
-        
-        if (addrReg == TA64Reg::none)
-            visit (simpleStatement.getLeftExpression ());
-            
-        if (st != &stdType.UnresOverload) {
-            // TODO: einfacher
-            TA64Operand operand = addrReg == TA64Reg::none ? TA64Operand (fetchReg (intScratchReg1), TA64Reg::none, 0) : TA64Operand (addrReg, TA64Reg::none, 0);
-            if (st == &stdType.Real || st == &stdType.Single)
-                codeStoreMemory (st, fetchDblReg (dblScratchReg1), operand);
-            else
-                codeStoreMemory (st, fetchReg (intScratchReg1), operand);
-        } else {
-            TTypeAnyManager typeAnyManager = lookupAnyManager (type);
-            loadReg (TA64Reg::x0);
-            loadReg (TA64Reg::x1);
-            if (typeAnyManager.anyManager) 
-                codeRuntimeCall ("rt_copy_mem", TA64Reg::x5, {{TA64Reg::x2, type->getSize ()}, {TA64Reg::x3, typeAnyManager.runtimeIndex}, {TA64Reg::x4, 1}});
-            else 
-                codeRuntimeCall ("memcpy", TA64Reg::none, {{TA64Reg::x2, type->getSize ()}});
-        }
-    } else
-        visit (simpleStatement.getLeftExpression ());
-*/        
-}
-
 void TA64Generator::generateCode (TIfStatement &ifStatement) {
     const std::string l1 = getNextLocalLabel ();
     outputBooleanCheck (ifStatement.getCondition (), l1);

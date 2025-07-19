@@ -107,6 +107,18 @@ TSymbol *TSymbolList::searchSymbol (const std::string &name, TSymbol::TFlags fla
 
 std::vector<TSymbol *> TSymbolList::searchSymbols (const std::string &name, TSymbol::TFlags flags) const {
     std::vector<TSymbol *> result; // = search (name);
+    const TSymbolList *searchLevel = this;
+    do {
+        std::copy_if (searchLevel->symbols.begin (), searchLevel->symbols.end (), std::back_inserter (result), [&name] (TSymbol *s) { return s->getName () == name; });
+        searchLevel = searchLevel->previousLevel;
+    } while (result.empty () && searchLevel);
+        
+    result.erase (
+        std::remove_if (result.begin (), result.end (), [flags] (const TSymbol *s) {return !(s->getSymbolFlags () & flags);}),
+        result.end ());
+    return result;
+    /*
+    std::vector<TSymbol *> result; // = search (name);
     std::copy_if (symbols.begin (), symbols.end (), std::back_inserter (result), [&name] (TSymbol *s) { return s->getName () == name; });
     if (result.empty () && previousLevel)
         return previousLevel->searchSymbols (name, flags);
@@ -114,7 +126,8 @@ std::vector<TSymbol *> TSymbolList::searchSymbols (const std::string &name, TSym
     result.erase (
         std::remove_if (result.begin (), result.end (), [flags] (const TSymbol *s) {return !(s->getSymbolFlags () & flags);}),
         result.end ());
-    return std::move (result);
+    return result;
+    */
 }
 
 void TSymbolList::removeSymbol (const TSymbol *symbol) {

@@ -36,10 +36,7 @@ public:
     virtual void generateCode (TRecordComponent &) = 0;
     virtual void generateCode (TPointerDereference &) = 0;
     
-//    virtual void generateCode (TRuntimeRoutine &) = 0;
     virtual void generateCode (TPredefinedRoutine &) = 0;
-    
-    virtual void generateCode (TSimpleStatement &) = 0;
     virtual void generateCode (TAssignment &) = 0;
     virtual void generateCode (TRoutineCall &) = 0;
     virtual void generateCode (TIfStatement &) = 0;

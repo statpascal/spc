@@ -134,12 +134,11 @@ bool TX64Generator::isRIPRelative (const TX64Operand &op) {
     return op.isLabel && op.ripRelative;
 }
 
-void TX64Generator::removeLines (std::deque<TX64Operation> &code, std::size_t &line, std::size_t count) {
-    code.erase (code.begin () + line, code.begin () + line + count);
-    if (line > count)
-        line -= (count + 1);
-    else
-        line = 0;
+void TX64Generator::removeLines (TCodeSequence &code, TCodeSequence::iterator &line, std::size_t count) {
+    for (std::size_t i = 0; i < count && line != code.end (); ++i)
+        line = code.erase (line);
+    for (std::size_t i = 0; i < count && line != code.begin (); ++i)
+        --line;
 }
 
 void TX64Generator::modifyReg (TX64Operand &operand, TX64Reg a, TX64Reg b) {
@@ -162,7 +161,7 @@ static void addUsedRegs (std::array<bool, static_cast<std::size_t> (TX64Reg::nrR
     }
 }
 
-void TX64Generator::tryLeaveFunctionOptimization (std::deque<TX64Operation> &code) {
+void TX64Generator::tryLeaveFunctionOptimization (TCodeSequence &code) {
     std::array<bool, static_cast<std::size_t> (TX64Reg::nrRegs)> regsUsed;
     regsUsed.fill (false);
     bool callUsed = false;
@@ -199,7 +198,7 @@ void TX64Generator::tryLeaveFunctionOptimization (std::deque<TX64Operation> &cod
     }
 }
 
-void TX64Generator::removeUnusedLocalLabels (std::deque<TX64Operation> &code) {
+void TX64Generator::removeUnusedLocalLabels (TCodeSequence &code) {
     std::set<std::string> usedLabels;
     for (TX64Operation &op: code) 
         if (op.operation != TX64Op::def_label) {
@@ -208,16 +207,15 @@ void TX64Generator::removeUnusedLocalLabels (std::deque<TX64Operation> &code) {
             if (op.operand2.isLabel)
                 usedLabels.insert (op.operand2.label);
         }
-    std::size_t line = 0;
-    while (line < code.size ())
-        if (code [line].operation == TX64Op::def_label && code [line].operand1.label.substr (0, 2) == ".l" &&
-            usedLabels.find (code [line].operand1.label) == usedLabels.end ())
-            code.erase (code.begin () + line);
+    TCodeSequence::iterator line = code.begin ();
+    while (line != code.end ())
+        if (line->operation == TX64Op::def_label && line->operand1.label.substr (0, 2) == ".l" && usedLabels.find (line->operand1.label) == usedLabels.end ())
+            line = code.erase (line);
         else
             ++line;
 }
 
-void TX64Generator::trySingleReplacements (std::deque<TX64Operation> &code) {
+void TX64Generator::trySingleReplacements (TCodeSequence &code) {
     for (TX64Operation &opcode: code) {
         TX64Op &op = opcode.operation;
         TX64Operand &op1 = opcode.operand1,
@@ -332,32 +330,37 @@ namespace {
 bool logOptimizer = false;
 }
 
-void TX64Generator::optimizePeepHole (std::deque<TX64Operation> &code) {
-    std::size_t line = 0;
-    
+void TX64Generator::optimizePeepHole (TCodeSequence &code) {
     bool doLog = true;
     
     code.push_back (TX64Op::end);
     code.push_back (TX64Op::end);
     
-    while (line + 1 < code.size ()) {
-
+    TCodeSequence::iterator line = code.begin ();
+    while (line != code.end ()) {	// line + 1 !!!!
         if (logOptimizer && doLog) {
             for (const TX64Operation &op: code)
                 std::cout << op.makeString () << std::endl;
             std::cout << std::endl << "----------------" << std::endl;
         }
-        
         doLog = true;
         
-        TX64Operand &op_1_1 = code [line].operand1,
-                    &op_1_2 = code [line].operand2,
-                    &op_2_1 = code [line + 1].operand1,
-                    &op_2_2 = code [line + 1].operand2;
-        TX64Op &op1 = code [line].operation,
-               &op2 = code [line + 1].operation;
-        std::string &comm_1 = code [line].comment,
-                    &comm_2 = code [line + 1].comment; 
+        TCodeSequence::iterator line1 = line;
+        ++line1;
+        TCodeSequence::iterator line2 = line1;
+        ++line2;
+        TCodeSequence::iterator line3 = line2;
+        ++line3;
+        
+        TX64Operand &op_1_1 = line->operand1,
+                    &op_1_2 = line->operand2;
+        TX64Op      &op1 = line->operation;
+        std::string &comm_1 = line->comment;
+        
+        TX64Operand &op_2_1 = line1->operand1,
+                    &op_2_2 = line1->operand2;
+        TX64Op      &op2 = line1->operation;
+        std::string &comm_2 = line1->comment; 
                     
         // push r1
         // pop r2
@@ -479,7 +482,7 @@ void TX64Generator::optimizePeepHole (std::deque<TX64Operation> &code) {
         else if (op1 == TX64Op::lea && op_1_2.isPtr && op_1_1.reg == op_1_2.base && (op_1_2.index == TX64Reg::none || (op_1_2.offset == 0 && op_1_2.shift == 1))) {
             op1 = TX64Op::add;
             op_1_2 = (op_1_2.index != TX64Reg::none) ? TX64Operand (op_1_2.index) : TX64Operand (op_1_2.offset);
-            if (line) --line;
+            if (line != code.begin ()) --line;
         }
         
         // lea r1, [r2]
@@ -488,7 +491,7 @@ void TX64Generator::optimizePeepHole (std::deque<TX64Operation> &code) {
         else if (op1 == TX64Op::lea && isRegisterIndirectAddress (op_1_2)) {
             op1 = TX64Op::mov;
             op_1_2 = TX64Operand (op_1_2.base);
-            if (line) --line;
+            if (line != code.begin ()) --line;
         }
             
         // shl rstack, [1|2|3]
@@ -642,13 +645,14 @@ void TX64Generator::optimizePeepHole (std::deque<TX64Operation> &code) {
         // ->
         // remove cmp
         else if ((op1 >= TX64Op::seta && op1 <= TX64Op::setz) && op2 == TX64Op::movzx &&
-                 line + 3 < code.size () && code [line + 2].operation == TX64Op::cmp && code [line + 2].operand2.isImm && code [line + 2].operand2.imm == 1 && (code [line + 3].operation == TX64Op::jne || code [line + 3].operation == TX64Op::je)) {
+                 line3 != code.end () && line3->operation == TX64Op::cmp && line2->operand2.isImm && 
+                 line2->operand2.imm == 1 && (line3->operation == TX64Op::jne || line3->operation == TX64Op::je)) {
             static const std::map<TX64Op, std::map<TX64Op, TX64Op>> replaceOp = {
                 {TX64Op::jne, {{TX64Op::seta, TX64Op::jbe}, {TX64Op::setae, TX64Op::jb}, {TX64Op::setb, TX64Op::jae}, {TX64Op::setbe, TX64Op::ja}, {TX64Op::setc, TX64Op::jnc}, {TX64Op::setg, TX64Op::jle}, {TX64Op::setge, TX64Op::jl}, {TX64Op::setl, TX64Op::jge}, {TX64Op::setle, TX64Op::jg}, {TX64Op::setnz, TX64Op::je}, {TX64Op::setz, TX64Op::jne}}},
                 {TX64Op::je,  {{TX64Op::seta, TX64Op::ja}, {TX64Op::setae, TX64Op::jae}, {TX64Op::setb, TX64Op::jb}, {TX64Op::setbe, TX64Op::jbe}, {TX64Op::setc, TX64Op::jc}, {TX64Op::setg, TX64Op::jg}, {TX64Op::setge, TX64Op::jge}, {TX64Op::setl, TX64Op::jl}, {TX64Op::setle, TX64Op::jle}, {TX64Op::setnz, TX64Op::jne}, {TX64Op::setz, TX64Op::je}}}
             };
-            code [line + 3].operation = replaceOp.at (code [line + 3].operation).at (op1);
-            line += 2;
+            line3->operation = replaceOp.at (line3->operation).at (op1);
+            line = line2;
             removeLines (code, line, 1);
         }
         
@@ -657,7 +661,7 @@ void TX64Generator::optimizePeepHole (std::deque<TX64Operation> &code) {
         // ret		; yet an end as placeholder
         // ->
         // remove r1
-        else if ((op1 == TX64Op::mov || op1 == TX64Op::movsx || op1 == TX64Op::movzx) && (op2 == TX64Op::mov) && line + 2 < code.size () && code [line + 2].operation == TX64Op::end &&
+        else if ((op1 == TX64Op::mov || op1 == TX64Op::movsx || op1 == TX64Op::movzx) && (op2 == TX64Op::mov) && line2 != code.end () && line2->operation == TX64Op::end &&
                  op_2_1.isReg && op_2_1.reg == TX64Reg::rax && isSameReg (op_2_2, op_1_1)) {
             op_1_1.reg = TX64Reg::rax;
             ++line;
@@ -771,7 +775,7 @@ void TX64Generator::getAssemblerCode (std::vector<std::uint8_t> &opcodes, bool g
         assemblePass (pass, opcodes, generateListing, listing);
 }
 
-void TX64Generator::setOutput (std::deque<TX64Operation> *output) {
+void TX64Generator::setOutput (TCodeSequence *output) {
     currentOutput = output;
 }
 
@@ -1942,55 +1946,6 @@ void TX64Generator::generateCode (TRoutineCall &routineCall) {
     visit (routineCall.getRoutineCall ());
 }
 
-void TX64Generator::generateCode (TSimpleStatement &simpleStatement) {
-}
-
-/*
-void TX64Generator::generateCode (TSimpleStatement &simpleStatement) {
-    TType *type = (simpleStatement.getLeftExpression ()->getType ()),
-          *st = getMemoryOperationType (type);
-    
-    if (simpleStatement.getRightExpression ()) {
-        visit (simpleStatement.getRightExpression ());
-        TX64Reg addrReg = TX64Reg::none;
-        if (simpleStatement.getLeftExpression ()->isSymbol ()) {
-            const TSymbol *s = static_cast<TVariable *> (simpleStatement.getLeftExpression ())->getSymbol ();
-            if (s->getRegister () != TSymbol::InvalidRegister) {
-                if (simpleStatement.getLeftExpression ()->isReference ())
-                    addrReg = static_cast<TX64Reg> (s->getRegister ());
-                else {
-                    if (st == &stdType.Real)
-                        outputCode (TX64Op::movapd, static_cast<TX64Reg> (s->getRegister ()), fetchXmmReg (xmmScratchReg1));
-                    else
-                        outputCode (TX64Op::mov, static_cast<TX64Reg> (s->getRegister ()), fetchReg (intScratchReg1));
-                    return;
-                }
-            }
-        }
-        
-        if (addrReg == TX64Reg::none)
-            visit (simpleStatement.getLeftExpression ());
-            
-        if (st != &stdType.UnresOverload) {
-            TX64Operand operand = addrReg == TX64Reg::none ? TX64Operand (fetchReg (intScratchReg1), 0) : TX64Operand (addrReg, 0);
-            if (st == &stdType.Real || st == &stdType.Single)
-                codeStoreMemory (st, operand, fetchXmmReg (xmmScratchReg1));
-            else
-                codeStoreMemory (st, operand, fetchReg (intScratchReg1));
-        } else {
-            TTypeAnyManager typeAnyManager = lookupAnyManager (type);
-            loadReg (TX64Reg::rdi);
-            loadReg (TX64Reg::rsi);
-            if (typeAnyManager.anyManager)
-                codeRuntimeCall ("rt_copy_mem", TX64Reg::r9, {{TX64Reg::rdx, type->getSize ()}, {TX64Reg::rcx, typeAnyManager.runtimeIndex}, {TX64Reg::r8, 1}});
-            else 
-                codeMove (type->getSize ());
-        }
-    } else
-        visit (simpleStatement.getLeftExpression ());
-}
-*/
-
 void TX64Generator::generateCode (TIfStatement &ifStatement) {
     const std::string l1 = getNextLocalLabel ();
     outputBooleanCheck (ifStatement.getCondition (), l1);
@@ -2411,11 +2366,11 @@ void TX64Generator::assignRegisters (TSymbolList &blockSymbols) {
         }
 }
 
-void TX64Generator::codeBlock (TBlock &block, bool hasStackFrame, std::deque<TX64Operation> &blockStatements) {
+void TX64Generator::codeBlock (TBlock &block, bool hasStackFrame, TCodeSequence &blockStatements) {
     TSymbolList &blockSymbols = block.getSymbols ();
     const std::size_t level = blockSymbols.getLevel ();
     
-    std::deque<TX64Operation> blockPrologue, blockEpilogue, blockCode, globalInits;
+    TCodeSequence blockPrologue, blockEpilogue, blockCode, globalInits;
 
     stackPositions = 0;
     intStackCount = 0;
@@ -2499,7 +2454,7 @@ void TX64Generator::generateBlock (TBlock &block) {
 //    std::cout << "Entering: " << block.getSymbol ()->getName () << std::endl;
 
     TSymbolList &blockSymbols = block.getSymbols ();
-    std::deque<TX64Operation> blockStatements;
+    TCodeSequence blockStatements;
     
     assignStackOffsets (block);
     clearRegsUsed ();

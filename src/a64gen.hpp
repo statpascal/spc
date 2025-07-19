@@ -32,10 +32,7 @@ public:
     virtual void generateCode (TRecordComponent &) override;
     virtual void generateCode (TPointerDereference &) override;
     
-//    virtual void generateCode (TRuntimeRoutine &) override;
     virtual void generateCode (TPredefinedRoutine &) override;
-    
-    virtual void generateCode (TSimpleStatement &) override;
     virtual void generateCode (TAssignment &) override;
     virtual void generateCode (TRoutineCall &) override;
     virtual void generateCode (TIfStatement &) override;

@@ -48,6 +48,11 @@ public:
     
     TX64Operand (std::string label, bool ripRelative = false, TX64OpSize = TX64OpSize::bit_default);
     
+    TX64Operand (const TX64Operand &) = default;
+    TX64Operand (TX64Operand &&) = default;
+    TX64Operand &operator = (TX64Operand &&) = default;
+    TX64Operand &operator = (const TX64Operand &) = default;
+    
     std::string makeString () const;
     bool isValid () const;
     
@@ -67,6 +72,9 @@ public:
 class TX64Operation {
 public:
     TX64Operation (TX64Op, TX64Operand = TX64Operand (), TX64Operand = TX64Operand (), const std::string &comment = std::string ());
+    
+    TX64Operation (const TX64Operation &) = default;
+    TX64Operation (TX64Operation &&) = default;
     
     std::string makeString () const;
     void outputCode (std::vector<std::uint8_t> &code, std::size_t offset);
