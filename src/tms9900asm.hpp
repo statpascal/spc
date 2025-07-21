@@ -24,7 +24,7 @@ public:
     enum class TAddressingMode { Reg, RegInd, RegIndInc, Indexed };
     
     T9900Operand ();
-    T9900Operand (T9900Reg, TAddressingMode t);
+    T9900Operand (T9900Reg, TAddressingMode t = TAddressingMode::Reg);
     T9900Operand (T9900Reg, std::uint16_t offset);
     T9900Operand (std::uint16_t imm);
     T9900Operand (const std::string &label);

@@ -1225,9 +1225,6 @@ void TX64Generator::generateCode (TTerm &term) {
     outputBinaryOperation (term.getOperation (), term.getLeftExpression (), term.getRightExpression ());
 }
 
-void TX64Generator::generateCode (TVectorIndex &) {
-}
-
 void TX64Generator::codeInlinedFunction (TFunctionCall &functionCall) {
     TExpressionBase *function = functionCall.getFunction ();
     const std::vector<TExpressionBase *> &args = functionCall.getArguments ();
@@ -1449,12 +1446,7 @@ void TX64Generator::generateCode (TFunctionCall &functionCall) {
 }
 
 void TX64Generator::generateCode (TConstantValue &constant) {
-    if (constant.getType ()->isSet ()) {
-        const std::string label = registerConstant (constant.getConstant ()->getSetValues ());
-        const TX64Reg reg = getSaveReg (intScratchReg1);
-        outputCode (TX64Op::lea, reg, TX64Operand (label, true));
-        saveReg (reg);
-    } else if (constant.getType () == &stdType.Real) {
+    if (constant.getType () == &stdType.Real) {
         const TX64Reg reg = getSaveXmmReg (xmmScratchReg1);
         const std::string label = registerConstant (constant.getConstant ()->getDouble ());
         outputCode (TX64Op::movq, reg, TX64Operand (label, true));
@@ -1465,8 +1457,8 @@ void TX64Generator::generateCode (TConstantValue &constant) {
             const std::size_t stringIndex = registerStringConstant (constant.getConstant ()->getString ());
             outputCode (TX64Op::mov, reg, stringIndex);
         } else if (constant.getType ()->isSet ()) {
-            const std::size_t dataIndex = registerData (&constant.getConstant ()->getSetValues () [0], sizeof (std::int64_t) * TConfig::setwords);
-            outputCode (TX64Op::mov, reg, dataIndex);
+            const std::string label = registerConstant (constant.getConstant ()->getSetValues ());
+            outputCode (TX64Op::lea, reg, TX64Operand (label, true));
         } else {
             const std::int64_t n = constant.getConstant ()->getInteger ();
             outputCode (TX64Op::mov, reg, n);
@@ -2045,21 +2037,6 @@ void TX64Generator::generateCode (TCaseStatement &caseStatement) {
 void TX64Generator::generateCode (TStatementSequence &statementSequence) {
     for (TStatement *statement: statementSequence.getStatements ())
         visit (statement);
-}
-
-TX64Operand TX64Generator::makeOperand (const TSymbol *s, TX64OpSize opsize) {
-    if (s->getLevel () == 1) {
-        outputCode (TX64Op::mov, intScratchReg2, s->getOffset ());
-        return TX64Operand (intScratchReg2, 0, opsize);
-    } else if (s->getLevel () == currentLevel) {
-        if (s->getRegister () == TSymbol::InvalidRegister)
-            return TX64Operand (TX64Reg::rbp, s->getOffset (), opsize);
-        else
-            return TX64Operand (static_cast<TX64Reg> (s->getRegister ()));
-    }
-    // !!!!
-    std::cout << "Internal error: cannot access symbol " << s->getName () << std::endl;
-    exit (1);
 }
 
 void TX64Generator::outputCompare (const TX64Operand &var, const std::int64_t n) {

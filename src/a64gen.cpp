@@ -1135,9 +1135,6 @@ void TA64Generator::generateCode (TTerm &term) {
     outputBinaryOperation (term.getOperation (), term.getLeftExpression (), term.getRightExpression ());
 }
 
-void TA64Generator::generateCode (TVectorIndex &) {
-}
-
 void TA64Generator::codeInlinedFunction (TFunctionCall &functionCall) {
     TExpressionBase *function = functionCall.getFunction ();
     const std::vector<TExpressionBase *> &args = functionCall.getArguments ();

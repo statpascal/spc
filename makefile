@@ -14,8 +14,8 @@ SRC = compiler.cpp anymanager.cpp expression.cpp predefined.cpp constant.cpp \
 OBJ = $(patsubst %.cpp,$(OBJDIR)/%.o,$(SRC))
 
 LIBS = -ldl -lffi -lm -lstdc++ -lstdc++fs -pthread
-# CPPFLAGS = -g -std=c++20 -pthread -Wall -pedantic 
-CPPFLAGS += -g -std=c++20 -O3 -fomit-frame-pointer -falign-functions=16 -march=native -funroll-loops 
+CPPFLAGS = -g -std=c++20 -pthread -Wall -pedantic 
+# CPPFLAGS += -g -std=c++20 -O3 -fomit-frame-pointer -falign-functions=16 -march=native -funroll-loops 
 ifeq ($(CXX),clang++)
     CPPFLAGS += -Wno-return-type-c-linkage -Wno-logical-op-parentheses
 else

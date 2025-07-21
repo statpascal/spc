@@ -21,7 +21,6 @@ public:
     virtual void generateCode (TPrefixedExpression &) override;
     virtual void generateCode (TSimpleExpression &) override;
     virtual void generateCode (TTerm &) override;
-    virtual void generateCode (TVectorIndex &) override;
     virtual void generateCode (TFunctionCall &) override;
     virtual void generateCode (TConstantValue &) override;
     virtual void generateCode (TRoutineValue &) override;
@@ -90,7 +89,6 @@ private:
     void outputBinaryOperation (TToken operation, TExpressionBase *left, TExpressionBase *right);
     void outputCompare (const TA64Operand &, const std::int64_t);
     
-    TA64Operand makeOperand (const TSymbol *, TA64OpSize = TA64OpSize::bit_default);	// only for globals and current level
     void codeSymbol (const TSymbol *, TA64Reg reg);	// address -> reg
     void loadLabelAddress (const std::string &label, TA64Reg reg);	// address of label (PIC) -> reg
     void loadImmediate (TA64Reg reg, ssize_t n);

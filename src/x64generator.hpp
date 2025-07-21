@@ -23,7 +23,6 @@ public:
     virtual void generateCode (TPrefixedExpression &) override;
     virtual void generateCode (TSimpleExpression &) override;
     virtual void generateCode (TTerm &) override;
-    virtual void generateCode (TVectorIndex &) override;
     virtual void generateCode (TFunctionCall &) override;
     virtual void generateCode (TConstantValue &) override;
     virtual void generateCode (TRoutineValue &) override;
@@ -94,7 +93,6 @@ private:
     void outputBinaryOperation (TToken operation, TExpressionBase *left, TExpressionBase *right);
     void outputCompare (const TX64Operand &, const std::int64_t);
     
-    TX64Operand makeOperand (const TSymbol *, TX64OpSize = TX64OpSize::bit_default);	// only for globals and current level
     void codeSymbol (const TSymbol *, TX64Reg reg);	// address -> regName
     void codeLoadMemory (TType *, TX64Reg destReg, TX64Operand srcMem);
     void codeStoreMemory (TType *, TX64Operand destMem, TX64Reg srcReg);

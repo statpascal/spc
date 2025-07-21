@@ -25,7 +25,6 @@ public:
     virtual void generateCode (TPrefixedExpression &) = 0;
     virtual void generateCode (TSimpleExpression &) = 0;
     virtual void generateCode (TTerm &) = 0;
-    virtual void generateCode (TVectorIndex &) = 0;
     virtual void generateCode (TFunctionCall &) = 0;
     virtual void generateCode (TConstantValue &) = 0;
     virtual void generateCode (TRoutineValue &) = 0;
