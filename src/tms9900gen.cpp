@@ -65,8 +65,11 @@ const std::vector<T9900Reg>
     intStackReg = {TMS9900Reg::r1, TMS9900Reg::r2, TMS9900Reg::r3, TMS9900Reg::r4, TMS9900Reg::r5, TMS9900Reg::r6, TMS9900Reg::r7, TMS9900Reg::r8}; 
     
 const T9900Reg 
-    intScratchReg1 = TX64Reg::r0,
-    intScratchReg2 = TX64Reg::r12;
+    intScratchReg1 = T9900Reg::r0,
+    intScratchReg2 = T9900Reg::r12,
+    intScratchReg3 = T9900Reg::r13,
+    intScratchReg4 = T9900Reg::r14;
+    
 
 const std::size_t
     intStackRegs = intStackReg.size ();
@@ -74,16 +77,6 @@ const std::size_t
 const std::string 
     globalRuntimeDataName = "__globalruntimedata",
     dblAbsMask = "__dbl_abs_mask";
-
-TX64OpSize getX64OpSize (TType *const t) {
-    if (t == &stdType.Int8 || t == &stdType.Uint8)
-        return TX64OpSize::bit8;
-    if (t == &stdType.Int16 || t == &stdType.Uint16)
-        return TX64OpSize::bit16;
-    if (t == &stdType.Int32 || t == &stdType.Uint32)
-        return TX64OpSize::bit32;
-    return TX64OpSize::bit64;
-}
 
 }  // namespace
 
@@ -135,69 +128,10 @@ void T9900Generator::removeLines (TCodeSequence &code, TCodeSequence::iterator &
 }
 
 
-#if 0
-
-void TX64Generator::modifyReg (TX64Operand &operand, TX64Reg a, TX64Reg b) {
-    if (operand.isReg) 
-        if (operand.reg == a) operand.reg = b;
-    if (operand.isPtr) {
-        if (operand.base == a) operand.base = b;
-        if (operand.index == a) operand.index = b;
-    }
-}
-
-static void addUsedRegs (std::array<bool, static_cast<std::size_t> (TX64Reg::nrRegs)> &regsUsed, TX64Operand operand) {
-    if (operand.isReg)
-        regsUsed [static_cast<std::size_t> (operand.reg)] = true;
-    if (operand.isPtr) {
-        if (operand.base != TX64Reg::none)
-            regsUsed [static_cast<std::size_t> (operand.base)] = true;
-        if (operand.index != TX64Reg::none)
-            regsUsed [static_cast<std::size_t> (operand.index)] = true;
-    }
-}
-
-void TX64Generator::tryLeaveFunctionOptimization (TCodeSequence &code) {
-    std::array<bool, static_cast<std::size_t> (TX64Reg::nrRegs)> regsUsed;
-    regsUsed.fill (false);
-    bool callUsed = false;
-    for (TX64Operation &op: code) {
-        if (op.operation == TX64Op::call)
-            callUsed = true;
-        if (op.operation == TX64Op::idiv)
-            addUsedRegs (regsUsed, TX64Reg::rdx);
-        addUsedRegs (regsUsed, op.operand1);
-        addUsedRegs (regsUsed, op.operand2);
-    }
-    
-    
-    if (!callUsed) {
-        static const std::vector<TX64Reg> r1 = {TX64Reg::rax, TX64Reg::rcx, TX64Reg::rdi, TX64Reg::rsi, TX64Reg::rdx, TX64Reg::r8, TX64Reg::r9, TX64Reg::r10, TX64Reg::r11},
-                                          r2 = {TX64Reg::rbx, TX64Reg::r12, TX64Reg::r13, TX64Reg::r14, TX64Reg::r15};
-        std::vector<TX64Reg> avail, used;
-        for (TX64Reg r: r1)
-            if (!regsUsed [static_cast<std::size_t> (r)])
-                avail.push_back (r);
-        for (TX64Reg r: r2)
-            if (regsUsed [static_cast<std::size_t> (r)])
-                used.push_back (r);
-/*                
-        std::cout << std::endl;
-        for (std::size_t i = 0; i < std::min (avail.size (), used.size ()); ++i) 
-            std::cout << x64RegName [static_cast<std::size_t> (used [i])] << " -> " << x64RegName [static_cast<std::size_t> (avail [i])] << std::endl;
-*/
-        for (std::size_t i = 0; i < std::min (avail.size (), used.size ()); ++i)
-            for (TX64Operation &op: code) {
-                modifyReg (op.operand1, used [i], avail [i]);
-                modifyReg (op.operand2, used [i], avail [i]);
-            }
-    }
-}
-
-void TX64Generator::removeUnusedLocalLabels (TCodeSequence &code) {
+void T9900Generator::removeUnusedLocalLabels (TCodeSequence &code) {
     std::set<std::string> usedLabels;
-    for (TX64Operation &op: code) 
-        if (op.operation != TX64Op::def_label) {
+    for (T00ßßOperation &op: code) 
+        if (op.operation != T9900Op::def_label) {
             if (op.operand1.isLabel)
                 usedLabels.insert (op.operand1.label);
             if (op.operand2.isLabel)
@@ -205,137 +139,22 @@ void TX64Generator::removeUnusedLocalLabels (TCodeSequence &code) {
         }
     TCodeSequence::iterator line = code.begin ();
     while (line != code.end ())
-        if (line->operation == TX64Op::def_label && line->operand1.label.substr (0, 2) == ".l" && usedLabels.find (line->operand1.label) == usedLabels.end ())
+        if (line->operation == T9900Op::def_label && line->operand1.label.substr (0, 2) == ".l" && usedLabels.find (line->operand1.label) == usedLabels.end ())
             line = code.erase (line);
         else
             ++line;
 }
 
-void TX64Generator::trySingleReplacements (TCodeSequence &code) {
-    for (TX64Operation &opcode: code) {
-        TX64Op &op = opcode.operation;
-        TX64Operand &op1 = opcode.operand1,
-                    &op2 = opcode.operand2;
-        
-        // sub rsp, 8
-        // ->
-        // push rax
-        if (op == TX64Op::sub && op1.isReg && op1.reg == TX64Reg::rsp && op2.isImm && op2.imm == 8) {
-            op = TX64Op::push;
-            op1 = TX64Reg::rax;
-            op2.isImm = false;
-        }  
-        
-        // add | sub op, 1
-        // ->
-        // inc | dec op
-        else if ((op == TX64Op::add || op == TX64Op::sub) && op2.isImm && (op2.imm == 1 || op2.imm == -1)) {
-            op = ((op == TX64Op::add) == (op2.imm == 1)) ? TX64Op::inc : TX64Op::dec;
-            op2.isImm = false;
-        }
-        // cmp reg, 0
-        // ->
-        // test reg, reg
-        else if (op == TX64Op::cmp && op1.isReg && op2.isImm && !op2.imm) {
-            op = TX64Op::test;
-            op2 = op1;
-        }
-            
-        // mov reg, 0
-        // ->
-        // xor reg, reg
-        else if (op == TX64Op::mov && op1.isReg && op2.isImm && !op2.imm) {
-            op = TX64Op::xor_;
-            op2 = op1;
-        }
-        
-    }
-}
-
-bool TX64Generator::tryReplaceShift (TX64Operand &op, TX64Reg reg, ssize_t imm) {
-    if (op.isPtr && op.index == reg && (op.shift << imm) <= 8) {
-        op.shift <<= imm;
-        return true;
-    }
-    return false;
-}
-
-/** merge address calculations after
-    lea rstack, [op2]
-    and usage of rstack in memmory operand in following operaton
-*/    
-
-bool TX64Generator::tryMergeOperands (TX64Operand &op1, TX64Reg r1, const TX64Operand &op2) {
-    if (op1.isPtr) {
-         if (op2.isPtr && op2.index == TX64Reg::none && is32BitLimit (op1.offset + op2.offset)) {
-            bool changed = op1.base == r1 || op1.index == r1;
-            if (op1.base == r1) {
-                op1.base = op2.base;
-                op1.offset += op2.offset;
-            }
-            if (op1.index == r1) {
-                op1.index = op2.base;
-                // TODO: check limits
-                op1.offset += (op2.offset * op1.shift);
-            }
-            return changed;
-        }
-        if (op2.isImm && (op1.index == r1 || op1.base == r1) && is32BitLimit (op1.offset + op2.imm)) {
-            if (op1.index == r1)
-                op1.offset += op2.imm * op1.shift;
-            else
-                op1.offset += op2.imm;
-            return true;
-        }
-        if (op2.isReg && op1.base == r1 && op1.index == TX64Reg::none) {
-            op1.index = op2.reg;
-            op1.shift = 1;
-            return true;
-        }
-        if ((isRIPRelative (op2) || op2.isPtr) && isRegisterIndirectAddress (op1) && isSameCalcStackReg (r1, op1.base)) {
-            TX64Operand op = op2;
-            op.opSize = op1.opSize;
-            op1 = op;
-            return true;
-        }
-    }
-    return false;
-}
-
-bool TX64Generator::tryReplaceOperand (TX64Operand &op1, TX64Operand &op2, TX64OpSize opSize)  {
-    if (op2.isImm) {
-        if (is32BitLimit (op2.imm)) {
-            op1.opSize = opSize == TX64OpSize::bit_default ? TX64OpSize::bit64 : opSize;
-            return true;
-        } else
-            return false;
-    }
-    if (op2.isReg) {
-        op2.opSize = opSize;
-        return true;
-    }
-    if (op1.isReg || op2.isReg) {
-        const TX64OpSize opSize1 = op1.opSize == TX64OpSize::bit_default ? TX64OpSize::bit64 : op1.opSize,
-                         opSize2 = op2.opSize == TX64OpSize::bit_default ? TX64OpSize::bit64 : op2.opSize;
-        return opSize1 == opSize2;
-    }
-    return false;
-}
-
-namespace {
-bool logOptimizer = false;
-}
-
-void TX64Generator::optimizePeepHole (TCodeSequence &code) {
+void T9900Generator::optimizePeepHole (TCodeSequence &code) {
     bool doLog = true;
     
-    code.push_back (TX64Op::end);
-    code.push_back (TX64Op::end);
+    code.push_back (T9900Op::end);
+    code.push_back (T00ßßOp::end);
     
     TCodeSequence::iterator line = code.begin ();
     while (line != code.end ()) {	// line + 1 !!!!
-        if (logOptimizer && doLog) {
-            for (const TX64Operation &op: code)
+        if (doLog) {
+            for (const T9900Operation &op: code)
                 std::cout << op.makeString () << std::endl;
             std::cout << std::endl << "----------------" << std::endl;
         }
@@ -348,364 +167,22 @@ void TX64Generator::optimizePeepHole (TCodeSequence &code) {
         TCodeSequence::iterator line3 = line2;
         ++line3;
         
-        TX64Operand &op_1_1 = line->operand1,
-                    &op_1_2 = line->operand2;
-        TX64Op      &op1 = line->operation;
+        T9900Operand &op_1_1 = line->operand1,
+                     &op_1_2 = line->operand2;
+        T9900Op      &op1 = line->operation;
         std::string &comm_1 = line->comment;
         
-        TX64Operand &op_2_1 = line1->operand1,
-                    &op_2_2 = line1->operand2;
-        TX64Op      &op2 = line1->operation;
+        T9900Operand &op_2_1 = line1->operand1,
+                     &op_2_2 = line1->operand2;
+        T9900Op      &op2 = line1->operation;
         std::string &comm_2 = line1->comment; 
                     
-        // push r1
-        // pop r2
-        // ->
-        // mov r2, r2
-        if (op1 == TX64Op::push && op2 == TX64Op::pop && op_1_1.isReg) {
-            op2 = TX64Op::mov;
-            op_2_2 = op_1_1;
-            removeLines (code, line, 1);
-        }
-        
-        // mov[apd] reg, reg
-        // -> remove
-        else if ((op1 == TX64Op::mov || op1 == TX64Op::movapd) && isSameReg (op_1_1, op_1_2))
-            removeLines (code, line, 1);
-
-        // add | sub op, 0
-        // -> remove
-        else if ((op1 == TX64Op::add || op1 == TX64Op::sub) && op_1_2.isImm && op_1_2.imm == 0) 
-            removeLines (code, line, 1);
-            
-        // imul reg, imm1
-        // imul reg, imm2
-        // ->
-        // imul reg, imm1 * imm2
-        else if (op1 == TX64Op::imul && op2 == TX64Op::imul && isSameReg (op_1_1, op_2_1) && op_1_2.isImm && op_2_2.isImm && is32BitLimit (op_1_2.imm * op_2_2.imm)) {
-            op_2_2.imm *= op_1_2.imm;
-            removeLines (code, line, 1);
-        }
-        
-        // add reg, imm1
-        // add reg, imm2
-        // ->
-        // add reg, imm1 + imm2
-        
-        else if (op1 == TX64Op::add && op2 == TX64Op::add && isSameReg (op_1_1, op_2_1) && op_1_2.isImm && op_2_2.isImm && is32BitLimit (op_1_2.imm + op_2_2.imm)) {
-            op_2_2.imm += op_1_2.imm;
-            removeLines (code, line, 1);
-        }
-        
-        // mov rstack, imm1
-        // shl | imul | add rstack, imm2
-        // -> 
-        // mov rstack, val
-        else if (op1 == TX64Op::mov && (op2 == TX64Op::shl || op2 == TX64Op::imul || op2 == TX64Op::add) && isSameReg (op_1_1, op_2_1) && op_1_2.isImm && op_2_2.isImm) {
-            if (op2 == TX64Op::shl)
-                op_2_2.imm = op_1_2.imm << op_2_2.imm;
-            else if (op2 == TX64Op::imul)
-                op_2_2.imm *= op_1_2.imm;
-            else
-                op_2_2.imm += op_1_2.imm;
-            op2 = TX64Op::mov;
-            removeLines (code, line, 1);
-        }
-        
-        // lea r1, [rel f]
-        // call r1
-        // ->
-        // call f
-        else if (op1 == TX64Op::lea && op2 == TX64Op::call && isRIPRelative (op_1_2) && isSameReg (op_1_1, op_2_1)) {
-            op_2_1 = TX64Operand (op_1_2.label);
-            removeLines (code, line, 1);
-        }
-        
-        // lea | mov[sx|zx|zxd] rstack, op
-        // mov reg, rstack
-        // ->
-        // lea | mov[sx|zx|zxd] reg, op
-        else if ((op1 == TX64Op::lea || op1 == TX64Op::mov || op1 == TX64Op::movsx || op1 == TX64Op::movzx || op1 == TX64Op::movsxd) && op2 == TX64Op::mov &&
-            isSameCalcStackReg (op_1_1, op_2_2) && op_2_1.isReg) {
-            op_1_1.reg = op_2_1.reg;
-            ++line;
-            removeLines (code, line, 1);
-        }
-
-        // mov rstack. op1
-        // op op2, rstack
-        // ->
-        // op op2, op1
-        else if (op1 == TX64Op::mov && (op2 == TX64Op::mov || op2 == TX64Op::cmp || op2 == TX64Op::add || op2 == TX64Op::sub || op2 == TX64Op::imul || op2 ==  TX64Op::and_ || op2 == TX64Op::or_ || op2 == TX64Op::xor_) && 
-                 isSameCalcStackReg (op_1_1, op_2_2) && tryReplaceOperand (op_2_1, op_1_2, op_2_2.opSize)) {
-            if (comm_2.empty ())
-                comm_2 = comm_1;
-            op_2_2 = op_1_2;
-            removeLines (code, line, 1);
-        }
-        
-        // lea rstack, [op]
-        //
-        // try merge with following operation
-        else if (op1 == TX64Op::lea && isCalcStackReg (op_1_1) &&
-                 (tryMergeOperands (op_2_1, op_1_1.reg, op_1_2) || tryMergeOperands (op_2_2, op_1_1.reg, op_1_2))) {
-            comm_2 = comm_1;
-            removeLines (code, line, 1);
-        }
-        
-        // mov rstack, reg1
-        // 
-        // handle as "lea rstack, [r1]" and try merge with following operation
-        else if (op1 == TX64Op::mov && op_1_2.isReg && isCalcStackReg (op_1_1) && 
-                 (tryMergeOperands (op_2_1, op_1_1.reg, TX64Operand (op_1_2.reg, 0)) || tryMergeOperands (op_2_2, op_1_1.reg, TX64Operand (op_1_2.reg, 0)))) {
-            comm_2 = comm_1;
-            removeLines (code, line, 1);
-        }
-
-        // add rstack, reg | imm
-        //
-        // handle as lea rstack, [rstack + reg | imm] and try merge with following operation
-        else if (op1 == TX64Op::add && isCalcStackReg (op_1_1) && 
-                 ((op_1_2.isReg && (tryMergeOperands (op_2_1, op_1_1.reg, TX64Operand (op_1_1.reg, op_1_2.reg, 1, 0)) || tryMergeOperands (op_2_2, op_1_1.reg, TX64Operand (op_1_1.reg, op_1_2.reg, 1, 0)))) ||
-                  (op_1_2.isImm && (tryMergeOperands (op_2_1, op_1_1.reg, TX64Operand (op_1_1.reg, op_1_2.imm)) || tryMergeOperands (op_2_2, op_1_1.reg, TX64Operand (op_1_1.reg, op_1_2.imm)))))) {
-            comm_2 = comm_1;
-            removeLines (code, line, 1);
-        }
-
-        // lea reg, [reg + v]
-        // -> 
-        // add reg, v
-        else if (op1 == TX64Op::lea && op_1_2.isPtr && op_1_1.reg == op_1_2.base && (op_1_2.index == TX64Reg::none || (op_1_2.offset == 0 && op_1_2.shift == 1))) {
-            op1 = TX64Op::add;
-            op_1_2 = (op_1_2.index != TX64Reg::none) ? TX64Operand (op_1_2.index) : TX64Operand (op_1_2.offset);
-            if (line != code.begin ()) --line;
-        }
-        
-        // lea r1, [r2]
-        // ->
-        // mov r1, r2
-        else if (op1 == TX64Op::lea && isRegisterIndirectAddress (op_1_2)) {
-            op1 = TX64Op::mov;
-            op_1_2 = TX64Operand (op_1_2.base);
-            if (line != code.begin ()) --line;
-        }
-            
-        // shl rstack, [1|2|3]
-        // try rstack as index in following operation
-        else if (op1 == TX64Op::shl && isCalcStackReg (op_1_1) && op_1_2.isImm && (tryReplaceShift (op_2_1, op_1_1.reg, op_1_2.imm) || tryReplaceShift (op_2_2, op_1_1.reg, op_1_2.imm)))
-            removeLines (code, line, 1);
-        
-        // mov reg1, reg2
-        // add reg1, n
-        // ->
-        // lea reg1, [reg2 + n]
-        
-        else if (op1 == TX64Op::mov && op2 == TX64Op::add && isSameReg (op_1_1, op_2_1) && op_1_2.isReg && op_2_2.isImm) {
-            op_2_2 = TX64Operand (op_1_2.reg, TX64Reg::none, 1, op_2_2.imm);
-            op2 = TX64Op::lea;
-            comm_2 = comm_1;
-            removeLines (code, line, 1);
-        }
-        
-        // add rstack, n | reg
-        // mov reg, rstack
-        // ->
-        // lea reg, [rstack + n | reg}
-        else if (op1 == TX64Op::add && op2 == TX64Op::mov && isSameCalcStackReg (op_1_1, op_2_2) && op_2_1.isReg && (op_1_2.isImm || op_1_2.isReg)) {
-            if (op_1_2.isReg)
-                op_2_2 = TX64Operand (op_1_1.reg, op_1_2.reg, 1, 0);
-            else
-                op_2_2 = TX64Operand (op_1_1.reg, TX64Reg::none, 1, op_1_2.imm);
-            op2 = TX64Op::lea;
-            comm_2 = comm_1;
-            removeLines (code, line, 1);
-        }
-        
-        // add reg1, reg2
-        // add|sub reg1, imm
-        // ->
-        // lea reg1, [reg1 + reg2 +|. imm]
-
-        // TODO: 3 address lea is slow, avoid?
-        else if (op1 == TX64Op::add && (op2 == TX64Op::add || op2 ==TX64Op::sub) && isSameReg (op_1_1, op_2_1) && op_1_2.isReg && op_2_2.isImm) {
-            op_2_2 = TX64Operand (op_1_1.reg, op_1_2.reg, 1, op2 == TX64Op::add ? op_2_2.imm : -op_2_2.imm);
-            op2 = TX64Op::lea;
-            comm_2 = comm_1;
-            removeLines (code, line, 1);
-        }
-        
-        // imul rstack, r2
-        // mov r2, rstack
-        // ->
-        // imul r2, rstack
-        else if (op1 == TX64Op::imul && op2 == TX64Op::mov && isSameCalcStackReg (op_1_1, op_2_2) && isSameReg (op_1_2, op_2_1)) {
-            op2 = TX64Op::imul;
-            removeLines (code, line, 1);
-        }
-        
-        // movq/movapd xmmstack, {op1]
-        // op xmmreg2, xmmstack
-        // ->
-        // op xmmreg2, [op1]
-        else if ((op1 == TX64Op::movq || op1 == TX64Op::movapd) && (op2 ==  TX64Op::comisd || op2 == TX64Op::addsd || op2 == TX64Op::subsd || op2 == TX64Op::mulsd || op2 == TX64Op::divsd || op2 == TX64Op::comisd || op2 == TX64Op::sqrtsd) && isSameXmmStackReg (op_1_1, op_2_2) && (op_1_2.isPtr || isRIPRelative (op_1_2) || isXmmReg (op_1_2))) {
-            op_2_2 = op_1_2;
-            comm_2 = comm_1;
-            removeLines (code, line, 1);
-        }
-
-        // mov rstack. op1
-        // cmp rstack, op2
-        // ->
-        // cmp op1, op2
-        else if (op1 == TX64Op::mov && op2 == TX64Op::cmp && isSameCalcStackReg (op_1_1, op_2_1) && (op_2_2.isImm ||  op_1_1.opSize == op_2_2.opSize) && op_1_2.isReg) {
-            op_2_1 = op_1_2;
-            removeLines (code, line, 1);
-        }
-
-        // movapd xmmstack, xmmreg2
-        // comisd xmmstack, op
-        // ->	2 rules above ????
-        // comisd xmmreg2, op
-        else if (op1 == TX64Op::movapd && op2 == TX64Op::comisd && isSameXmmStackReg (op_1_1, op_2_1) && op_1_2.isReg) {
-            op_2_1 = op_1_2;
-            comm_2 = comm_1;
-            removeLines (code, line, 1);
-        }
-        
-        // mov[[sx|zx|zxd] rstack, op1
-        // cmp rstack, op2
-        // ->
-        // cmp op1, op2
-/*        
-
-    Problems with sign extension: casetest.sp
-
-        else if (checkCode (code, line, {TX64Op::mov, TX64Op::movsx,  TX64Op::movzx, TX64Op::movsxd}, {TX64Op::cmp}) && isSameCalcStackReg (op_1_1, op_2_1) && (op_1_2.isReg || op_1_2.isPtr) && (op_2_2.isReg || op_2_2.isPtr || op_2_2.isImm) && !(op_1_2.isPtr && op_2_2.isPtr)) {
-            op1 = TX64Op::cmp;
-            op_1_1 = op_1_2;
-            op_1_2 = op_2_2;
-            ++line;
-            removeLines (code, line, 1);
-        }
-*/
-        // and|or|xor|add|sub reg, op
-        // cmp|test reg, 0
-        // -> remove comparison (do this after any LEA replacements which will not set flags)
-        else if ((op1 == TX64Op::and_ || op1 == TX64Op::or_ || op1 == TX64Op::xor_ || op1 == TX64Op::add || op1 == TX64Op::sub) && (op2 == TX64Op::cmp || op2 == TX64Op::test) &&
-                isSameCalcStackReg (op_1_1, op_2_1) && ((op_2_2.isImm && op_2_2.imm == 0) || op2 == TX64Op::test)) {
-            ++line;
-            removeLines (code, line, 1);
-        }
-        
-        // movq/movapd xmmstack, op
-        // movapd xmmreg, xmmstack
-        // ->
-        // movq/movapd xmmreg, op
-        //
-        // movsd xmmstack, xmmreg	-- not handled here?
-        // movq op, xmmstack
-        // ->
-        // movq op, xmmreg
-        else if ((op1 == TX64Op::movq || op1 == TX64Op::movapd) && op2 == TX64Op::movapd && isSameXmmStackReg (op_1_1, op_2_2) && (isXmmReg (op_2_1) || isXmmReg (op_1_2))) {
-            op2 = op1;
-            op_2_2 = op_1_2;
-            comm_2 = comm_1;
-            removeLines (code, line, 1);
-        }
-        
-        // mov rstack, op
-        // cvtsi2sd xmmreg, rstack
-        // ->
-        // cvtsi2sd xmmreg, op
-        else if (op1 == TX64Op::mov && op2 == TX64Op::cvtsi2sd && isSameCalcStackReg (op_1_1, op_2_2) && !op_1_2.isImm) {
-            op_2_2 = op_1_2;
-            comm_2 = comm_1;
-            removeLines (code, line, 1);
-        }
-        
-        // movq/movapd xmmreg1, op
-        // movapd xmm0, xmmreg1
-        // ->
-        // movq/movapd xmm0, op
-        else if ((op1 == TX64Op::movapd || op1 == TX64Op::movq) && op2 == TX64Op::movapd && isSameXmmReg (op_1_1, op_2_2) && op_2_1.isReg && op_2_1.reg == TX64Reg::xmm0) {
-            op2 = op1;
-            op_2_2 = op_1_2;
-            comm_2 = comm_1;
-            removeLines (code, line, 1);
-        }
-        
-        // setcc reg8
-        // movzx reg32, reg8
-        // cmp reg64, 1
-        // je|jne label
-        // ->
-        // remove cmp
-        else if ((op1 >= TX64Op::seta && op1 <= TX64Op::setz) && op2 == TX64Op::movzx &&
-                 line3 != code.end () && line3->operation == TX64Op::cmp && line2->operand2.isImm && 
-                 line2->operand2.imm == 1 && (line3->operation == TX64Op::jne || line3->operation == TX64Op::je)) {
-            static const std::map<TX64Op, std::map<TX64Op, TX64Op>> replaceOp = {
-                {TX64Op::jne, {{TX64Op::seta, TX64Op::jbe}, {TX64Op::setae, TX64Op::jb}, {TX64Op::setb, TX64Op::jae}, {TX64Op::setbe, TX64Op::ja}, {TX64Op::setc, TX64Op::jnc}, {TX64Op::setg, TX64Op::jle}, {TX64Op::setge, TX64Op::jl}, {TX64Op::setl, TX64Op::jge}, {TX64Op::setle, TX64Op::jg}, {TX64Op::setnz, TX64Op::je}, {TX64Op::setz, TX64Op::jne}}},
-                {TX64Op::je,  {{TX64Op::seta, TX64Op::ja}, {TX64Op::setae, TX64Op::jae}, {TX64Op::setb, TX64Op::jb}, {TX64Op::setbe, TX64Op::jbe}, {TX64Op::setc, TX64Op::jc}, {TX64Op::setg, TX64Op::jg}, {TX64Op::setge, TX64Op::jge}, {TX64Op::setl, TX64Op::jl}, {TX64Op::setle, TX64Op::jle}, {TX64Op::setnz, TX64Op::jne}, {TX64Op::setz, TX64Op::je}}}
-            };
-            line3->operation = replaceOp.at (line3->operation).at (op1);
-            line = line2;
-            removeLines (code, line, 1);
-        }
-        
-        // mov|movsx|movzx r1, val
-        // mov rax, r1
-        // ret		; yet an end as placeholder
-        // ->
-        // remove r1
-        else if ((op1 == TX64Op::mov || op1 == TX64Op::movsx || op1 == TX64Op::movzx) && (op2 == TX64Op::mov) && line2 != code.end () && line2->operation == TX64Op::end &&
-                 op_2_1.isReg && op_2_1.reg == TX64Reg::rax && isSameReg (op_2_2, op_1_1)) {
-            op_1_1.reg = TX64Reg::rax;
-            ++line;
-            removeLines (code, line, 1);
-        }
-        
-        // mov rstack, imm32
-        // op op1, [rstack]
-        // ->
-        // op op1, [imm32]
-        else if (op1 == TX64Op::mov && op_2_2.isPtr && op_2_2.index == TX64Reg::none && op_2_2.offset == 0 && isSameCalcStackReg (op_1_1, op_2_2.base) && op_1_2.isImm && op_1_2.imm <= std::numeric_limits<std::uint32_t>::max ()) {
-            op_2_2.base = TX64Reg::none;
-            op_2_2.offset = op_1_2.imm;
-            comm_2 = comm_1;
-            removeLines (code, line, 1);
-        }
-        
-        // mov rstack, imm32
-        // op [rstack], op1
-        // ->
-        // op [imm32], op1
-        else if (op1 == TX64Op::mov && op_2_1.isPtr && op_2_1.index == TX64Reg::none && op_2_1.offset == 0 && isSameCalcStackReg (op_1_1, op_2_1.base) && op_1_2.isImm && op_1_2.imm <= std::numeric_limits<std::uint32_t>::max ()) {
-            op_2_1.base = TX64Reg::none;
-            op_2_1.offset = op_1_2.imm;
-            removeLines (code, line, 1);
-        }
-        
-        // mov r1, imm
-        // mov r2, imm
-        // ->
-        // mov r1, imm
-        // mov r2, r1
-
-        else if (op1 == TX64Op::mov && op2 == TX64Op::mov && op_1_1.isReg && op_1_2.isImm && op_2_2.isImm && op_1_2.imm == op_2_2.imm && !isCalcStackReg (op_1_1.reg)) {
-            op_2_2 = op_1_1;
-        }
-        
-        else {
-            doLog = false;
-            ++line;
-        }
+        ++line;
     }
     
-    while (!code.empty () && code.back ().operation == TX64Op::end)
+    while (!code.empty () && code.back ().operation == T9900Op::end)
         code.pop_back ();
 }
-
-#endif
 
 /*
 void TX64Generator::replaceLabel (TX64Operation &op, TX64Operand &operand, std::size_t offset) {
@@ -783,7 +260,7 @@ void T9900Generator::setOutput (TCodeSequence *output) {
     currentOutput = output;
 }
 
-void T9900Generator::outputCode (const TX64Operation &l) {
+void T9900Generator::outputCode (const T9900Operation &l) {
     currentOutput->push_back (l);
 }
 
@@ -800,10 +277,11 @@ void T9900Generator::outputGlobal (const std::string &name, const std::size_t si
 }
 
 void T9900Generator::outputComment (const std::string &s) {
-    outputCode (TX64Operation (T9900Op::comment, T9900Operand (), T9900Operand (), s));
+    outputCode (T9900Op::comment, T9900Operand (), T9900Operand (), s);
 }
 
 void T9900Generator::outputLocalJumpTables () {
+/*
     if (!jumpTableDefinitions.empty ()) {
         outputComment ("jump tables for case statements");
         for (const TJumpTable &it: jumpTableDefinitions) {
@@ -813,10 +291,10 @@ void T9900Generator::outputLocalJumpTables () {
         }
         jumpTableDefinitions.clear ();
     }
+*/    
 }
 
 void TX9900Generator::outputGlobalConstants () {
-//    outputCode (TX64Op::aligncode, TX64Operand (16));
     outputComment ("Double Constants");
 /*    
     for (const TConstantDefinition &c: constantDefinitions) {
@@ -866,19 +344,12 @@ void T9900Generator::generateCode (TTypeCast &typeCast) {
           *srcType = expression->getType ();
     
     visit (expression);
-/*    
+    
     if (srcType == &stdType.Int64 && destType == &stdType.Real) {
-        const TX64Reg reg = getSaveXmmReg (xmmScratchReg1);
-        outputCode (TX64Operation (TX64Op::cvtsi2sd, reg, fetchReg (intScratchReg1)));
-        saveXmmReg (reg);
+        //
     }  else if (srcType == &stdType.String && destType->isPointer ()) {
-        loadReg (TX64Reg::rdi);
-        outputCode (TX64Operation (TX64Op::mov, TX64Reg::rsi, 1));
-        outputCode (TX64Op::mov, TX64Reg::rax, TX64Operand ("rt_str_index"));
-        outputCode (TX64Operation (TX64Op::call, TX64Reg::rax));
-        saveReg (TX64Reg::rax);
+        //
     }
-*/    
 }
 
 void T9900Generator::generateCode (TExpression &comparison) {
@@ -886,22 +357,26 @@ void T9900Generator::generateCode (TExpression &comparison) {
 }
 
 void T9900Generator::outputBooleanCheck (TExpressionBase *expr, const std::string &label, bool branchOnFalse) {
-    static const std::map<TToken, TX64Op> intFalseJmp = {
+    static const std::map<TToken, T9900Op> intFalseJmp = {
         {TToken::Equal, TX64Op::jne}, {TToken::GreaterThan, TX64Op::jle}, {TToken::LessThan, TX64Op::jge}, 
         {TToken::GreaterEqual, TX64Op::jl}, {TToken::LessEqual, TX64Op::jg}, {TToken::NotEqual, TX64Op::je}
     };
+/*    
     static const std::map<TToken, TX64Op> realFalseJmp = {
         {TToken::Equal, TX64Op::jne}, {TToken::GreaterThan, TX64Op::jbe}, {TToken::LessThan, TX64Op::jae}, 
         {TToken::GreaterEqual, TX64Op::jb}, {TToken::LessEqual, TX64Op::ja}, {TToken::NotEqual, TX64Op::je}
     };
+*/    
     static const std::map<TToken, TX64Op> intTrueJmp = {
         {TToken::Equal, TX64Op::je}, {TToken::GreaterThan, TX64Op::jg}, {TToken::LessThan, TX64Op::jl}, 
         {TToken::GreaterEqual, TX64Op::jge}, {TToken::LessEqual, TX64Op::jle}, {TToken::NotEqual, TX64Op::jne}
     };
+/*    
     static const std::map<TToken, TX64Op> realTrueJmp = {
         {TToken::Equal, TX64Op::je}, {TToken::GreaterThan, TX64Op::ja}, {TToken::LessThan, TX64Op::jb}, 
         {TToken::GreaterEqual, TX64Op::jae}, {TToken::LessEqual, TX64Op::jbe}, {TToken::NotEqual, TX64Op::jne}
     };
+*/    
     
     if (TPrefixedExpression *prefExpr = dynamic_cast<TPrefixedExpression *> (expr))
         if (prefExpr->getOperation () == TToken::Not) {
@@ -912,6 +387,7 @@ void T9900Generator::outputBooleanCheck (TExpressionBase *expr, const std::strin
     if (expr->isFunctionCall ()) {
         TFunctionCall *functionCall = static_cast<TFunctionCall *> (expr);
         if (static_cast<TRoutineValue *> (functionCall->getFunction ())->getSymbol ()->getExtSymbolName () == "rt_in_set") {
+/*        
             visit (functionCall->getArguments () [0]);
             visit (functionCall->getArguments () [1]);
             const TX64Reg r1 = fetchReg (intScratchReg2);
@@ -926,6 +402,7 @@ void T9900Generator::outputBooleanCheck (TExpressionBase *expr, const std::strin
             outputCode (branchOnFalse ? TX64Op::jnc : TX64Op::jc, label);
             return;
         }
+*/        
     }
     
     TExpression *condition = dynamic_cast<TExpression *> (expr);
@@ -934,36 +411,30 @@ void T9900Generator::outputBooleanCheck (TExpressionBase *expr, const std::strin
         visit (condition->getLeftExpression ());
         TExpressionBase *right = condition->getRightExpression ();
         if (right->isConstant ())
-            // TODO: check for int limit !!!!
-            outputCode (TX64Operation (TX64Op::cmp, fetchReg (intScratchReg1), static_cast<TConstantValue *> (right)->getConstant ()->getInteger ()));
+            outputCode (TX64Operation (T9900Op::ci, fetchReg (intScratchReg1), static_cast<TConstantValue *> (right)->getConstant ()->getInteger ()));
         else {
             visit (condition->getRightExpression ());
-            const TX64Reg r2 = fetchReg (intScratchReg1);
-            const TX64Reg r1 = fetchReg (intScratchReg2);
-            outputCode (TX64Operation (TX64Op::cmp, r1, r2));
+            const T9900Reg r2 = fetchReg (intScratchReg1);
+            const T9900Reg r1 = fetchReg (intScratchReg2);
+            outputCode (T9900Operation (T9900Op::c, r1, r2));
         }
-        outputCode (TX64Operation ((branchOnFalse ? intFalseJmp : intTrueJmp).at (condition->getOperation ()), label));
+        outputCode (T9900Operation ((branchOnFalse ? intFalseJmp : intTrueJmp).at (condition->getOperation ()), label));
     } else if (condition && condition->getLeftExpression ()->getType ()->isReal ()) {
-        visit (condition->getLeftExpression ());
-        visit (condition->getRightExpression ());
-        const TX64Reg r2 = fetchXmmReg (xmmScratchReg1);
-        const TX64Reg r1 = fetchXmmReg (xmmScratchReg2);
-        outputCode (TX64Op::comisd, r1, r2);
-        outputCode (TX64Operation ((branchOnFalse ? realFalseJmp : realTrueJmp).at (condition->getOperation ()), label));
+        //
     } else {
         visit (expr);
-        const TX64Reg reg = fetchReg (intScratchReg1);
-        outputCode (TX64Operation (TX64Op::cmp, reg, 0));;
-        outputCode (TX64Operation (branchOnFalse ? TX64Op::je : TX64Op::jne, label));
+        const T9900Reg reg = fetchReg (intScratchReg1);
+        outputCode (T9900Op::ci, reg, 0));;
+        outputCode (branchOnFalse ? T9900Op::jeq : T9900Op::jne, label);
     }
 }
 
 void T9900Generator::outputBooleanShortcut (TToken operation, TExpressionBase *left, TExpressionBase *right) {
     visit (left);
-    TX64Reg reg = fetchReg (intScratchReg1);
-    outputCode (TX64Operation (TX64Op::cmp, reg, 1));
+    T9900Reg reg = fetchReg (intScratchReg1);
+    outputCode (T9900Op::ci, reg, 1);
     const std::string doneLabel = getNextLocalLabel ();
-    outputCode (TX64Operation (operation == TToken::Or ? TX64Op::je : TX64Op::jne, doneLabel));;
+    outputCode (T9900Operation (operation == TToken::Or ? T9900Op::jeq : T9900Op::jne, doneLabel));;
     visit (right);
     reg = fetchReg (intScratchReg1);
     outputLabel (doneLabel);
@@ -975,39 +446,43 @@ void T9900Generator::outputPointerOperation (TToken operation, TExpressionBase *
     visit (right);   	
     const std::size_t basesize = std::max<std::size_t> (left->getType ()->getBaseType ()->getSize (), 1);
     if (operation == TToken::Add) {
-        const TX64Reg r2 = fetchReg (intScratchReg1),
-                      r1 = fetchReg (intScratchReg2);
-        codeMultiplyConst (r2, basesize);
-        outputCode (TX64Operation (TX64Op::add, r1, r2));
+        loadReg (T9900Reg::r12);
+        const TX9900Reg r1 = fetchReg (intScratchReg1);
+        codeMultiplyConst (T9900Reg::r12, basesize);
+        outputCode (T9900Op::a, r1, T9900Reg::r12));
         saveReg (r1);
     } else {
-        const TX64Reg r2 = fetchReg (intScratchReg1);
-        for (std::size_t i = 1; i < 63; ++i)
+        const T9900RegReg r2 = fetchReg (intScratchReg1);
+        for (std::size_t i = 1; i < 16; ++i)
             if (basesize == 1ull << i) {
                 const TX64Reg r1 = fetchReg (intScratchReg2);
-                outputCode (TX64Operation (TX64Op::sub, r1, r2));
-                outputCode (TX64Operation (TX64Op::shr, r1, i));
+                outputCode (T9900Op::s, r2, r1));
+                outputCode (T9900Op::li, T9900Reg::r0, i);
+                outputCode (T9900Op::shr, r1, T9900Reg::r0));
                 saveReg (r1);
                 return;
             }
-        setRegUsed (TX64Reg::rdx);
-        setRegUsed (TX64Reg::rax);
-        loadReg (TX64Reg::rax);
-        outputCode (TX64Op::sub, TX64Reg::rax, r2);
-        outputCode (TX64Op::cqo);
-        outputCode (TX64Op::mov, r2, basesize);
-        outputCode (TX64Op::idiv, r2);
-        saveReg (TX64Reg::rax);
+        outputCode (T9900Op::clr, T9900Reg::r12)
+        loadReg (T9900Reg::r13);
+        outputCode (T9900Op::s, r2, T9900Reg::r12);
+        outputCode (T9900Op::li, T9900Reg::r14, basesize);
+        outputCode (T9900Op::div, T9900Reg::r14, T9900Reg::r12);
+        saveReg (T9900Reg::r13);
     }
 }
 
 void T9900Generator::outputIntegerCmpOperation (TToken operation, TExpressionBase *left, TExpressionBase *right) {
-    static const std::map<TToken, TX64Op> cmpOperation = {
-        {TToken::Equal, TX64Op::setz}, {TToken::GreaterThan, TX64Op::setg}, {TToken::LessThan, TX64Op::setl}, 
-        {TToken::GreaterEqual, TX64Op::setge}, {TToken::LessEqual, TX64Op::setle}, {TToken::NotEqual, TX64Op::setnz}};
+    static const std::map<TToken, std::vector<T9900Op>> cmpOperation = {
+        {TToken::Equal, {T9900::jne}}, 
+        {TToken::GreaterThan, {T99000p::jlt, T9900Op::jeq}},
+        {TToken::LessThan, {T99000p::jgt, T9900Op::jeq}}, 
+        {TToken::GreaterEqual, {T9900Op::jlt}}, 
+        {TToken::LessEqual, {T9900Op::jgt}}
+        {TToken::NotEqual, {T9900Op::jeq}}
+    };
         
     bool secondFirst = left->isSymbol () || left->isConstant () || left->isLValueDereference ();
-    TX64Reg r1, r2, r3;
+    T9900Reg r1, r2, r3, r4;
     
     if (secondFirst) {
         visit (right);
@@ -1020,124 +495,56 @@ void T9900Generator::outputIntegerCmpOperation (TToken operation, TExpressionBas
         r2 = fetchReg (intScratchReg1);
         r3 = r1 = fetchReg (intScratchReg2);
     }
-    outputCode (TX64Op::cmp, r1, r2);
-    outputCode (cmpOperation.at (operation), TX64Operand (r3, TX64OpSize::bit8));
-    outputCode (TX64Op::movzx, TX64Operand (r3, TX64OpSize::bit32), TX64Operand (r3, TX64OpSize::bit8));
+    r4 = fetchReg (intScratchReg3);
+    outputCode (T9900Op::clr, r4);
+    outputCode (T9900Op::c, r1, r2);
+    for (T9900Op op: cmpOperation.at (operation)
+        outputCode (op, "!");
+    outputCode (cmpOperation.at (operation), "!");
+    outputCode (T9900Op::inc, r4);
+    otuputCode (T9900Op::label_def, "!");
+    outputCode (T9900Op::mov, r4, r3);
     saveReg (r3);
 }
 
-void T9900Generator::outputIntegerDivision (TToken operation, bool secondFirst, bool rightIsConstant, ssize_t n) {
-    for (std::size_t i = 1; i < 63; ++i)
-        if (n == 1LL << i) {
-            TX64Reg reg = fetchReg (intScratchReg1);
-            if (operation == TToken::DivInt) {
-                if (n == 2) {
-                    outputCode (TX64Op::bt, reg, 63);
-                    outputCode (TX64Op::adc, reg, 0);
-                } else {
-                    outputCode (TX64Op::test, reg, reg);
-                    const std::string l = getNextLocalLabel ();
-                    outputCode (TX64Op::jge, l);
-                    outputCode (TX64Op::add, reg, n - 1);
-                    outputLabel (l);
-                }
-                outputCode (TX64Op::sar, reg, i);
-            } else {
-                outputCode (TX64Op::test, reg, reg);
-                const std::string l1 = getNextLocalLabel (), l2 = getNextLocalLabel ();
-                outputCode (TX64Op::jge, l1);
-                outputCode (TX64Op::and_, reg, n - 1);
-                outputCode (TX64Op::je, l2);
-                outputCode (TX64Op::sub, reg, n);
-                outputCode (TX64Op::jmp, l2);
-                outputLabel (l1);
-                outputCode (TX64Op::and_, reg, n - 1);
-                outputLabel (l2);
-            }
-            saveReg (reg);
-            return;
-        }
-
-    TX64Reg reg = intScratchReg1;
-    if (rightIsConstant) {
-        loadReg (TX64Reg::rax);
-        outputCode (TX64Operation (TX64Op::mov, reg, n));
-    } else if (secondFirst) {
-        loadReg (TX64Reg::rax);
-        reg = fetchReg (intScratchReg1);
-    } else {
-        reg = fetchReg (intScratchReg1);
-        loadReg (TX64Reg::rax);
-    }
-    if (reg == intScratchReg1)
-        setRegUsed (intScratchReg1);
-    setRegUsed (TX64Reg::rdx);
-    setRegUsed (TX64Reg::rax);
-    outputCode (TX64Operation (TX64Op::cqo));
-    outputCode (TX64Operation (TX64Op::idiv, reg));
-    saveReg (operation == TToken::DivInt ? TX64Reg::rax : TX64Reg::rdx);
-}
-
 void TX9900Generator::outputIntegerOperation (TToken operation, TExpressionBase *left, TExpressionBase *right) {
-    if (left->isConstant () && (operation == TToken::Add || operation == TToken::Or || operation == TToken::Xor || operation == TToken::Mul || operation == TToken::And))
-        std::swap (left, right);
-
-    bool secondFirst = left->isSymbol () || left->isLValueDereference ();
-    if (operation == TToken::Sub) secondFirst = false;
-
-    TX64Reg r1;
-    bool rightIsConst = right->isConstant ();
-    const ssize_t n = rightIsConst ? static_cast<TConstantValue *> (right)->getConstant ()->getInteger () : 0;
+    visit (left);
+    visit (right);
     
-    if (!is32BitLimit (n))
-        rightIsConst = secondFirst = false;
-
-    if (rightIsConst)
-        visit (left);
-    else if (secondFirst) {
-        visit (right);
-        visit (left);
-    } else {
-        visit (left);
-        visit (right);   	
-    }
     switch (operation) {
         case TToken::DivInt:
         case TToken::Mod: {
-            outputIntegerDivision (operation, secondFirst, rightIsConst, n); 
+            T9900Reg r = fetchReg (intScratchReg0);
+            loadReg (intScratchReg2);
+            outputCode (T9900Op::clr, intScratchReg1);
+            outputCode (T9900Op::div, r, intScratchReg1);
+            saveReg (operation == TToken::DivInt ? intScratchReg1 : intScratchReg2);
+            break; }
+        case TToken::Mul: {
+            loadReg (intScratchReg1);
+            T9900Reg r = fetchReg (intScratchReg0);
+            outputCode (T9900Op::mpy, r, intScratchReg1);
+            saveReg (intScratchReg2);
             break; }
         case TToken::Shl:
         case TToken::Shr: {
-            TX64Op op = operation == TToken::Shl ? TX64Op::shl : TX64Op::shr;
-            if (rightIsConst) {
-                r1 = fetchReg (intScratchReg1);
-                outputCode (TX64Operation (op, r1, n));
-            } else {
-                setRegUsed (TX64Reg::rcx);
-                if (secondFirst) {
-                    r1 = fetchReg (intScratchReg1);
-                    loadReg (TX64Reg::rcx);
-                } else {
-                    loadReg (TX64Reg::rcx);
-                    r1 = fetchReg (intScratchReg1);
-                }
-                outputCode (op, r1, TX64Operand (TX64Reg::rcx, TX64OpSize::bit8));
-            }
-            saveReg (r1);
+            loadReg (T9900Reg::r0);
+            T9900Reg r = fetchReg (intScratchReg2);
+            outputCode (operation == TToken::Shl ? T9900Op::sla : T9900Op::sra, r, T9900Reg::r0);
+            saveReg (r);
             break; }
         default: {
-            TX64Operand right = rightIsConst ? TX64Operand (n) : TX64Operand (fetchReg (intScratchReg1));
-            r1 = fetchReg (intScratchReg1);
-            if (operation == TToken::Mul && rightIsConst && n >= 0)
-                codeMultiplyConst (r1, n);
-            else {
-                static const std::map<TToken, TX64Op> opMap = {
-                    {{TToken::Add, TX64Op::add}, {TToken::Sub, TX64Op::sub}, {TToken::Or, TX64Op::or_}, 
-                     {TToken::Xor, TX64Op::xor_}, {TToken::Mul, TX64Op::imul}, {TToken::And, TX64Op::and_}}
-                };
-                outputCode (opMap.at (operation), r1, right);
-            }
-            saveReg (r1); }
+            T9900Reg right = fetchReg (intScratchReg1).
+                     left = fetchReg (intScratchReg2);
+            static const std::map<TToken, T9900Op> opMap = {
+                {{TToken::Add, T9900Op::a}, {TToken::Sub, T9900Op::s}, {TToken::Or, T9900Op::soc}, 
+                 {TToken::Xor, T9900Op::xor__}, {TToken::And, T9900Op::szc}}
+            };
+            if (operation == TToken::And)
+                outputCode (T9900Op::inv, right);
+            outputCode (opMap.at (operation), right, left);
+            saveReg (left); 
+            break; }
     }
 }
 
@@ -1198,6 +605,7 @@ void T9900Generator::outputBinaryOperation (TToken operation, TExpressionBase *l
 void T9900Generator::generateCode (TPrefixedExpression &prefixed) {
     const TType *type = prefixed.getExpression ()->getType ();
     if (type == &stdType.Real) {
+/*    
         TX64Reg resreg = getSaveXmmReg (xmmScratchReg1);
         outputCode (TX64Operation (TX64Op::pxor, resreg, resreg));
         saveXmmReg (resreg);
@@ -1206,16 +614,18 @@ void T9900Generator::generateCode (TPrefixedExpression &prefixed) {
                       r1 = fetchXmmReg (xmmScratchReg2);
         outputCode (TX64Operation (TX64Op::subsd, r1, r2));
         saveXmmReg (r1);
+*/        
     } else {
         visit (prefixed.getExpression ());
         const TX64Reg reg = fetchReg (intScratchReg1);
         if (prefixed.getOperation () == TToken::Sub)
             outputCode (TX64Operation (TX64Op::neg, reg));
         else if (prefixed.getOperation () == TToken::Not) 
-            if (type == &stdType.Boolean)
-                outputCode (TX64Op::xor_, reg, 1);
-            else
-                outputCode (TX64Op::not_, reg);
+            if (type == &stdType.Boolean) {
+                outputCode (T9900Op::li, intScratchReg2, 1);
+                outputCode (T9900Op::xor_, intScratchReg2,  reg);
+            } else
+                outputCode (T9900Op::not, reg);
         else {
             std::cout << "Internal Error: invalid prefixed expression" << std::endl;
             exit (1);
@@ -1339,33 +749,26 @@ void T9900Generator::generateCode (TFunctionCall &functionCall) {
 
     for (std::size_t i = 0; i < parameterDescriptions.size (); ++i) {
         visit (parameterDescriptions [i].actualParameter);
-        const TX64Reg reg = fetchReg (intScratchReg1);
+        const T9900Reg reg = fetchReg (intScratchReg1);
         codePush (reg);
     }
     
     if (usesReturnValuePointer) {
         visit (returnStorage);
-        const TX64Reg reg = fetchReg (intScratchReg1);
+        const T990Reg reg = fetchReg (intScratchReg1);
         codePush (reg);
     }
     
     visit (function);
-    const TX64Reg reg = fetchReg (intScratchReg1);
+    const T9900Reg reg = fetchReg (intScratchReg1);
     outputCode (T9900Op::bl, T99Operand (reg, TAdressingMode::RegInd));
 
-    intStackCount = savedIntStack;
-    xmmStackCount = savedXmmStack;
-    for (std::size_t i = 0; i < usedXmmStack; ++i)
-        outputCode (TX64Op::movq, xmmStackReg [i], TX64Operand (TX64Reg::rsp, 8 * i));
-    codeModifySP (8 * usedXmmStack);
-    
     if (functionCall.getType () != &stdType.Void && !functionCall.isIgnoreReturn () && !returnStorage) {
         // loadReturnTemp
-        saveReg (TX64Reg::rax);
     }
 }
 
-void TX64Generator::generateCode (TConstantValue &constant) {
+void T9900Generator::generateCode (TConstantValue &constant) {
     if (constant.getType ()->isSet ()) {
         //    
     } else if (constant.getType () == &stdType.Real) {
@@ -1390,7 +793,7 @@ void T9900Generator::generateCode (TRoutineValue &routineValue) {
     saveReg (reg);
 }
 
-void T9900Generator::codeSymbol (const TSymbol *s, const TX64Reg reg) {
+void T9900Generator::codeSymbol (const TSymbol *s, const T9900Reg reg) {
     if (s->getLevel () == 1)	// global
         outputCode (T9900Op::li, reg, s->getOffset (), s->getOverloadName ());
     else if (s->getLevel () == currentLevel) {
@@ -1448,20 +851,23 @@ void T9900Generator::codeLoadMemory (TType *const t, const T9900Reg regDest, con
     }
 }
 
-void T9900Generator::codeMultiplyConst (const TX64Reg reg, const std::size_t n) {
+void T9900Generator::codeMultiplyConst (const T9900Reg reg, const std::size_t n) {
     if (n == 1)
         return;
     else if (n >= 2)
         for (std::size_t i = 1; i < 16; ++i)
             if (n == 1ull << i) {
                 outputCode (T9900Op::li, T9900Reg::r0, n)
-                outputCode (TX64Op::shl, T9900Reg::r0);
+                outputCode (T9900Op::shl, T9900Reg::r0);
                 return;
             }
     if (n == 0) 
         outputCode (T9900Op::clr, reg);
-    else
-        outputCode (T9900Op::imul, reg, n);	// TODO
+    else {
+        outputCode (T9900Op::li, intScratchReg1, n);
+        outputCode (T9900Op::mpy, reg, intScratchReg2);
+        outputCode (T9900Op::mov, intScratchReg3, reg);
+    }
 }
 
 void T9900Generator::codeMove (const std::size_t n) {
@@ -1481,30 +887,30 @@ void T9900Generator::codeRuntimeCall (const std::string &funcname, const TX64Reg
 */    
 }
 
-void T9900Generator::codePush (const TX64Operand op) {
+void T9900Generator::codePush (const T9900Operand op) {
     outputCode (T9900Op::dect, T9900Reg::r10);
     outputCode (T9900Op::mov, op, T9900Operand (T9900Reg::r10, TAddressingMode::RegInd);
 }
 
-void T9900Generator::codePop (const TX64Operand op) {
+void T9900Generator::codePop (const T9900Operand op) {
     outputCode (T9900Op::mov, T9900Operand (T9900Reg::r10, TAddressingMode::RegIndInc), op);
 }
 
-void T9900Generator::saveReg (const TX64Reg reg) {
+void T9900Generator::saveReg (const T9900Reg reg) {
     if (intStackCount < intStackRegs) {
         if (reg != intStackReg [intStackCount])
-            outputCode (TX64Op::mov, reg, intStackReg [intStackCount]);
+            outputCode (T9900Op::mov, reg, intStackReg [intStackCount]);
     } else
         codePush (reg);
     ++intStackCount;
 }
 
-void T9900Generator::loadReg (const TX64Reg reg) {
+void T9900Generator::loadReg (const T9900Reg reg) {
     --intStackCount;
     if (intStackCount >= intStackRegs) 
         codePop (reg);
     else
-        outputCode (TX64Op::mov, intStackReg [intStackCount], reg);
+        outputCode (T9900Op::mov, reg, intStackReg [intStackCount]);
 }
 
 T9900Reg TX64Generator::fetchReg (T9900Reg reg) {
@@ -1536,7 +942,7 @@ bool T9900Generator::isRegUsed (const T9900Reg r) const {
 
 void T9900Generator::codeModifySP (ssize_t n) {
     if (n <> 0)
-        outputCode (T9900Op::ai, TX64Reg::rsp, n);
+        outputCode (T9900Op::ai, T9900Reg::r10, n);
 }
 
 void T9900Generator::generateCode (TVariable &variable) {
@@ -1549,7 +955,7 @@ void T9900Generator::generateCode (TReferenceVariable &referenceVariable) {
     const T9900Reg reg = getSaveReg (intScratchReg1);
     const TSymbol *s = referenceVariable.getSymbol ();
     codeSymbol (referenceVariable.getSymbol (), reg);
-    outputCode (TX64Op::mov, T9900Operand (reg, TAddressingMode::RegInd), reg);
+    outputCode (T9900Op::mov, T9900Operand (reg, TAddressingMode::RegInd), reg);
     saveReg (reg);
 }
 
@@ -1597,12 +1003,12 @@ void T9900Generator::generateCode (TArrayIndex &arrayIndex) {
         if (type->isPointer ()) {
             // TODO: unify with TPointerDereference
             const T9900Reg reg = fetchReg (intScratchReg1);
-            outputCode (TX64Op::mov, TX64Operand (reg, TAddressingMode::RegInd), reg);
+            outputCode (T9900Op::mov, T9900Operand (reg, TAddressingMode::RegInd), reg);
             saveReg (reg);
         } 
             
         visit (index);
-        const TX64Reg indexReg = fetchReg (intScratchReg1);
+        const T9900Reg indexReg = fetchReg (intScratchReg1);
         if (minVal) 
             outputCode (T9900Op::ai, indexReg, -minVal);
         codeMultiplyConst (indexReg, baseSize);
@@ -1633,7 +1039,7 @@ void T9900Generator::generateCode (TPointerDereference &pointerDereference) {
     if (base->isLValue ()) {
         // as in array: should have method deref-stacktop
         const T9900Reg reg = fetchReg (intScratchReg1);
-        outputCode (TX64Op::mov, TX64Operand (reg, TAddressingMode::RegInd), reg);
+        outputCode (T9900Op::mov, T9900Operand (reg, TAddressingMode::RegInd), reg);
         saveReg (reg);
     }
 }
@@ -1643,13 +1049,12 @@ void T9900Generator::codeIncDec (TPredefinedRoutine &predefinedRoutine) {
     const std::vector<TExpressionBase *> &arguments = predefinedRoutine.getArguments ();
     
     TType *type = arguments [0]->getType ();
-    const TX64OpSize opSize = getX64OpSize (getMemoryOperationType (type));
     const std::size_t n = type->isPointer () ? static_cast<const TPointerType *> (type)->getBaseType ()->getSize () : 1;
     
     
-    TX64Operand value;	// TODO: init to -1/1?
+    T9900Operand value;	// TODO: init to -1/1?
     
-    TX64Operand varAddr;
+    T9900Operand varAddr;
     visit (arguments [0]);
     
     if (arguments.size () > 1) {
@@ -1681,7 +1086,7 @@ void T9900Generator::generateCode (TPredefinedRoutine &predefinedRoutine) {
             visit (expression);
 
         bool isIncOp = false;    
-        TX64Reg reg;
+        T9900Reg reg;
         switch (predefinedRoutine.getRoutine ()) {
             case TPredefinedRoutine::Inc:
             case TPredefinedRoutine::Dec:
@@ -1717,7 +1122,7 @@ void T9900Generator::generateCode (TAssignment &assignment) {
     visit (expression);
     visit (lValue);
     if (st != &stdType.UnresOverload) {
-        TX64Operand operand = TX64Operand (fetchReg (intScratchReg1), 0);
+        T9900Operand operand = T9900Operand (fetchReg (intScratchReg1), 0);
         if (st == &stdType.Real || st == &stdType.Single)
         /*
             codeStoreMemory (st, operand, fetchXmmReg (xmmScratchReg1));
@@ -1737,7 +1142,7 @@ void T9900Generator::generateCode (TAssignment &assignment) {
     }
 }
 
-void TX64Generator::generateCode (TRoutineCall &routineCall) {
+void T9900Generator::generateCode (TRoutineCall &routineCall) {
     visit (routineCall.getRoutineCall ());
 }
 
@@ -1844,7 +1249,7 @@ void T9900Generator::generateCode (TStatementSequence &statementSequence) {
         visit (statement);
 }
 
-void T9900Generator::outputCompare (const TX64Operand &var, const std::int64_t n) {
+void T9900Generator::outputCompare (const T9900Operand &var, const std::int64_t n) {
     outputCode (T9900Op::ci, var, n);
 }
 
@@ -1906,7 +1311,7 @@ void T9900Generator::externalRoutine (TSymbol &s) {
 */    
 }
 
-void T9900Generator::beginRoutineBody (const std::string &routineName, std::size_t level, TSymbolList &symbolList, const std::set<TX64Reg> &saveRegs, bool hasStackFrame) {
+void T9900Generator::beginRoutineBody (const std::string &routineName, std::size_t level, TSymbolList &symbolList, const std::set<T9900Reg> &saveRegs, bool hasStackFrame) {
     if (level > 1) {    
         outputComment (std::string ());
         for (const std::string &s: createSymbolList (routineName, level, symbolList, {}))
@@ -1921,8 +1326,8 @@ void T9900Generator::beginRoutineBody (const std::string &routineName, std::size
         codePush (T9900Reg::r11);
         codePush (T9900Reg::r9);
         if (level > 2)
-            outputCode (T9900Op::mov, TX64Reg::rbp, intScratchReg1);
-        outputCode (T99004Op::mov, TX64Reg::r10, TX64Reg::r9);
+            outputCode (T9900Op::mov, T9900Reg::r9, intScratchReg1);
+        outputCode (T99004Op::mov, T9900Reg::r10, T9900Reg::r9);
         
         std::size_t offsetRequired = level > 1 ? symbolList.getLocalSize () : 0;
         if (level > 1) {
@@ -1938,9 +1343,9 @@ void T9900Generator::beginRoutineBody (const std::string &routineName, std::size
         codePush (reg);
 }
 
-void TX64Generator::endRoutineBody (std::size_t level, TSymbolList &symbolList, const std::set<TX64Reg> &saveRegs, bool hasStackFrame) {
-    for (std::set<TX64Reg>::reverse_iterator it = saveRegs.rbegin (); it != saveRegs.rend (); ++it)
-        outputCode (TX64Op::pop, *it);
+void T9900Generator::endRoutineBody (std::size_t level, TSymbolList &symbolList, const std::set<T9900Reg> &saveRegs, bool hasStackFrame) {
+    for (std::set<T9900Reg>::reverse_iterator it = saveRegs.rbegin (); it != saveRegs.rend (); ++it)
+        outputCode (T9900Op::pop, *it);
 
     if (hasStackFrame) {
         outputCode (T9900Op::mov, T9900Reg::r9, T9900Reg::r10);
@@ -1959,7 +1364,7 @@ TCodeGenerator::TParameterLocation T9900Generator::classifyType (const TType *ty
         return TParameterLocation::Stack;
 }
 
-TCodeGenerator::TReturnLocation TX64Generator::classifyReturnType (const TType *type) {
+TCodeGenerator::TReturnLocation T9900Generator::classifyReturnType (const TType *type) {
 //    if (type->isEnumerated () || type->isPointer () || type->isRoutine () || type == &stdType.Real || type == &stdType.Single)
 //        return TReturnLocation::Register;
 //    else
@@ -2003,46 +1408,10 @@ void T9900Generator::assignStackOffsets (TBlock &block) {
     symbolList.setLocalSize (pos);
 }
 
-void TX64Generator::assignRegisters (TSymbolList &blockSymbols) {
-    std::set<TX64Reg> xmmReg, intReg;
-    for (std::size_t i = 0; i < xmmParaRegs; ++i)
-        xmmReg.insert (xmmParaReg [i]);
-    for (std::size_t i = 0; i < intParaRegs; ++i)
-        if (!isRegUsed (intParaReg [i]))
-            intReg.insert (intParaReg [i]);
-        
-    std::size_t xmmParaCount = 0, intParaCount = 0;
-    for (TSymbol *s: blockSymbols)
-        if (s->checkSymbolFlag (TSymbol::Parameter)) {
-            if (s->getType ()->isReal () && xmmParaCount < xmmParaRegs) {
-                if (!s->isAliased ()) {
-                    s->setRegister (static_cast<std::size_t> (xmmParaReg [xmmParaCount]));
-                    xmmReg.erase (xmmParaReg [xmmParaCount]);
-                }
-                ++xmmParaCount;
-            } else if (classifyType (s->getType ()) == TParameterLocation::IntReg && intParaCount < intParaRegs) {
-                if (!isRegUsed (intParaReg [intParaCount]) && (!s->isAliased () || s->getType ()->isReference ())) {
-                    s->setRegister (static_cast<std::size_t> (intParaReg [intParaCount]));
-                    intReg.erase (intParaReg [intParaCount]);
-                }
-                ++intParaCount;
-            }
-        }
-            
-    std::set<TX64Reg>::iterator itXmm = xmmReg.begin (), itInt = intReg.begin ();    
-    for (TSymbol *s: blockSymbols)
-        if (s->checkSymbolFlag (TSymbol::Variable)) {
-            if (s->getType ()->isReal () && !s->isAliased () && itXmm != xmmReg.end ()) {
-                s->setRegister (static_cast<std::size_t> (*itXmm));
-                itXmm = xmmReg.erase (itXmm);
-            } else if (classifyType (s->getType ()) == TParameterLocation::IntReg && !s->isAliased () && itInt != intReg.end ()) {
-                s->setRegister (static_cast<std::size_t> (*itInt));
-                itInt = intReg.erase (itInt);
-            }
-        }
+void T9900Generator::assignRegisters (TSymbolList &blockSymbols) {
 }
 
-void TX64Generator::codeBlock (TBlock &block, bool hasStackFrame, TCodeSequence &blockStatements) {
+void T9900Generator::codeBlock (TBlock &block, bool hasStackFrame, TCodeSequence &blockStatements) {
     TSymbolList &blockSymbols = block.getSymbols ();
     const std::size_t level = blockSymbols.getLevel ();
     
@@ -2063,7 +1432,7 @@ void TX64Generator::codeBlock (TBlock &block, bool hasStackFrame, TCodeSequence 
     setOutput (&blockCode);
     
     if (!globalInits.empty ()) 
-        outputCode (TX64Op::call, TX64Operand ("$init_static"));
+        outputCode (T9900Op::bl, "$init_static");
     visit (block.getStatements ());
     
     outputLabel (endOfRoutineLabel);
@@ -2126,7 +1495,7 @@ void TX64Generator::codeBlock (TBlock &block, bool hasStackFrame, TCodeSequence 
     
 }
 
-void TX64Generator::generateBlock (TBlock &block) {
+void T9900Generator::generateBlock (TBlock &block) {
 //    std::cout << "Entering: " << block.getSymbol ()->getName () << std::endl;
 
     TSymbolList &blockSymbols = block.getSymbols ();
@@ -2159,10 +1528,6 @@ void TX64Generator::generateBlock (TBlock &block) {
                 visit (s->getBlock ());
         }
 
-}
-
-bool TX64Generator::is32BitLimit (std::int64_t n) {
-    return std::numeric_limits<std::int32_t>::min () <= n && n <= std::numeric_limits<std::int32_t>::max ();
 }
 
 } // namespace statpascal

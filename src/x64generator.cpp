@@ -1122,7 +1122,7 @@ void TX64Generator::outputIntegerOperation (TToken operation, TExpressionBase *l
             break; }
         default: {
             TX64Operand right = rightIsConst ? TX64Operand (n) : TX64Operand (fetchReg (intScratchReg1));
-            r1 = fetchReg (intScratchReg1);
+            r1 = fetchReg (intScratchReg2);
             if (operation == TToken::Mul && rightIsConst && n >= 0)
                 codeMultiplyConst (r1, n);
             else {
