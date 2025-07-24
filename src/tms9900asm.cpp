@@ -9,7 +9,8 @@ const std::vector<std::string>
     opname =  {"li", "ai", "andi", "ori", "ci", "stwp", "stst", "lwpi", "limi", "idle", "rset", "rtwp", "ckon", "ckof", "lrex",
                "blwp", "b", "x", "clr", "neg", "inv", "inc", "inct", "dec", "dect", "bl", "swpb", "seto", "abs", "sra", "srl", "sla", "src",
                "jmp", "jlt", "jle", "jeq", "jhe", "jgt", "jne", "jnc", "joc", "jno", "jl", "jh", "jop", "sbo", "sbz", "tb", "coc", "czc",
-               "xor", "xop", "ldcr", "stcr", "mpy", "div", "szc", "szcb", "s", "sb", "c", "cb", "a", "ab", "mov", "movb", "soc", "socb"};
+               "xor", "xop", "ldcr", "stcr", "mpy", "div", "szc", "szcb", "s", "sb", "c", "cb", "a", "ab", "mov", "movb", "soc", "socb",
+               "", "", ""};
 
 T9900Operand::T9900Operand ():
   valid (false) {
@@ -74,12 +75,26 @@ T9900Operation::T9900Operation (T9900Op op, T9900Operand op1, T9900Operand op2, 
 }
 
 std::string T9900Operation::makeString () const {
-    std::string res = opname [static_cast<std::size_t> (operation)];
-    if (operand1.isValid ())
-        res += " " + operand1.makeString ();
-    if (operand2.isValid ())
-        res += ", " + operand2.makeString ();
-    return res;
+    switch (operation) {
+        case T9900Op::def_label:
+            return operand1.makeString () + ":";
+        case T9900Op::comment:
+            return comment.empty () ? comment : "; " + comment;
+        case T9900Op::end:
+            return "";
+        default: {
+            std::string res = std::string (8, ' ') + opname [static_cast<std::size_t> (operation)];
+            res.resize (13, ' ');
+            if (operand1.isValid ())
+                res += " " + operand1.makeString ();
+            if (operand2.isValid ())
+                res += ", " + operand2.makeString ();
+            if (!comment.empty ()) {
+                res.resize (40, ' ');
+                return res + "; " + comment;
+            } else
+                return res;}
+    }
 }
 
 }

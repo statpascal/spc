@@ -3,16 +3,19 @@
 
 #pragma once
 
+#include <list>
+#include <set>
+
 #include "codegenerator.hpp"
+#include "tms9900asm.hpp"
 
 namespace statpascal {
 
-class T9900Operation;
 
 class T9900Generator: public TBaseGenerator {
 using inherited = TBaseGenerator;
 public:
-    TX9900Generator (TRuntimeData &, bool codeRangeCheck = true, bool createCompilerListing = false);
+    T9900Generator (TRuntimeData &, bool codeRangeCheck = true, bool createCompilerListing = false);
     
     void getAssemblerCode (std::vector<std::uint8_t> &, bool generateListing, std::vector<std::string> &);
 
@@ -21,7 +24,6 @@ public:
     virtual void generateCode (TPrefixedExpression &) override;
     virtual void generateCode (TSimpleExpression &) override;
     virtual void generateCode (TTerm &) override;
-    virtual void generateCode (TVectorIndex &) override;
     virtual void generateCode (TFunctionCall &) override;
     virtual void generateCode (TConstantValue &) override;
     virtual void generateCode (TRoutineValue &) override;
@@ -73,14 +75,16 @@ private:
     using TCodeSequence = std::list<T9900Operation>;
     TCodeSequence program, *currentOutput;
 
-    void assignParameterOffsets (ssize_t &pos, TBlock &, std::vector<TSymbol *> &registerParameters);
+
+    void assignParameterOffsets (TBlock &);
     void assignStackOffsets (TBlock &);    
     void assignRegisters (TSymbolList &);
+    void assignGlobalVariables (TSymbolList &);
     void codeBlock (TBlock &block, bool hasStackFrame, TCodeSequence &blockStatements);
     void generateBlock (TBlock &);
     void externalRoutine (TSymbol &);
-    void beginRoutineBody (const std::string &routineName, std::size_t level, TSymbolList &, const std::set<TX64Reg> &saveRegs, bool hasStackFrame);
-    void endRoutineBody (std::size_t level, TSymbolList &, const std::set<TX64Reg> &saveRegs, bool hasStackFrame);
+    void beginRoutineBody (const std::string &routineName, std::size_t level, TSymbolList &, const std::set<T9900Reg> &saveRegs, bool hasStackFrame);
+    void endRoutineBody (std::size_t level, TSymbolList &, const std::set<T9900Reg> &saveRegs, bool hasStackFrame);
 
     void outputBooleanCheck (TExpressionBase *, const std::string &label, bool branchOnFalse = true);
     void outputBooleanShortcut (TToken operation, TExpressionBase *left, TExpressionBase *right);
@@ -90,42 +94,36 @@ private:
     void outputIntegerOperation (TToken operation, TExpressionBase *left, TExpressionBase *right);
     void outputIntegerCmpOperation (TToken operation, TExpressionBase *left, TExpressionBase *right);
     void outputBinaryOperation (TToken operation, TExpressionBase *left, TExpressionBase *right);
-    void outputCompare (const TX64Operand &, const std::int64_t);
+    void outputCompare (const T9900Operand &, const std::int64_t);
     
-    TX64Operand makeOperand (const TSymbol *, TX64OpSize = TX64OpSize::bit_default);	// only for globals and current level
-    void codeSymbol (const TSymbol *, TX64Reg reg);	// address -> regName
-    void codeLoadMemory (TType *, TX64Reg destReg, TX64Operand srcMem);
-    void codeStoreMemory (TType *, TX64Operand destMem, TX64Reg srcReg);
-    void codeMultiplyConst (TX64Reg, std::size_t);
+    void codeSymbol (const TSymbol *, T9900Reg reg);	// address -> regName
+    void codeLoadMemory (TType *, T9900Reg destReg, T9900Operand srcMem);
+    void codeStoreMemory (TType *, T9900Operand destMem, T9900Reg srcReg);
+    void codeMultiplyConst (T9900Reg, std::size_t);
     void codeMove (std::size_t);
     
     void initStaticVariable (char *addr, const TType *t, const TConstant *constant);
     
     // TODO -> make signed args
-    void codeRuntimeCall (const std::string &fn, TX64Reg globalDataReg, const std::vector<std::pair<TX64Reg, std::size_t>> &additionalArgs);
-    void codeSignExtension (TType *, TX64Reg destReg, TX64Operand srcOperand);
+    void codeRuntimeCall (const std::string &fn, T9900Reg globalDataReg, const std::vector<std::pair<T9900Reg, std::size_t>> &additionalArgs);
+    void codeSignExtension (TType *, T9900Reg destReg, T9900Operand srcOperand);
     
     void codeInlinedFunction (TFunctionCall &);
     void codeIncDec (TPredefinedRoutine &);
     
     // keep track of SP for 16 byte stack alignment 
-    void codePush (TX64Operand);
-    void codePop (TX64Operand);
+    void codePush (T9900Operand);
+    void codePop (T9900Operand);
     void codeModifySP (ssize_t);
     
-    void saveReg (TX64Reg);
-    void loadReg (TX64Reg);
-    TX64Reg fetchReg (TX64Reg);
-    TX64Reg getSaveReg (TX64Reg);
-    
-    void saveXmmReg (TX64Reg);
-    void loadXmmReg (TX64Reg);
-    TX64Reg fetchXmmReg (TX64Reg);
-    TX64Reg getSaveXmmReg (TX64Reg);
+    void saveReg (T9900Reg);
+    void loadReg (T9900Reg);
+    T9900Reg fetchReg (T9900Reg);
+    T9900Reg getSaveReg (T9900Reg);
     
     void clearRegsUsed ();
-    void setRegUsed (TX64Reg);
-    bool isRegUsed (TX64Reg) const;
+    void setRegUsed (T9900Reg);
+    bool isRegUsed (T9900Reg) const;
     
     bool is32BitLimit (std::int64_t);
 
@@ -136,7 +134,7 @@ private:
     
     std::size_t intStackCount, xmmStackCount;
     std::size_t stackPositions;		// align RSP on funciton call
-    std::array<bool, static_cast<std::size_t> (TX64Reg::nrRegs)> regsUsed;
+    std::array<bool, static_cast<std::size_t> (T9900Reg::nrRegs)> regsUsed;
     
     std::size_t dblConstCount;
     std::unordered_map<std::string, std::size_t> labelDefinitions, relLabelDefinitions;
@@ -152,8 +150,8 @@ private:
     std::vector<TJumpTable> jumpTableDefinitions;
 
     void setOutput (TCodeSequence *);
-    void outputCode (const TX64Operation &);
-    void outputCode (TX64Op, TX64Operand = TX64Operand (), TX64Operand = TX64Operand (), const std::string &comment = std::string ());
+    void outputCode (const T9900Operation &);
+    void outputCode (T9900Op, T9900Operand = T9900Operand (), T9900Operand = T9900Operand (), const std::string &comment = std::string ());
     void outputLabel (const std::string &label);
     void outputGlobal (const std::string &name, std::size_t size);
     void outputComment (const std::string &);
@@ -167,17 +165,23 @@ private:
     
     void outputLabelDefinition (const std::string &label, std::size_t value);
     
-    bool isCalleeSavedReg (TX64Reg);
-    bool isCalleeSavedReg (const TX64Operand &);
+    bool isCalleeSavedReg (T9900Reg);
+    bool isCalleeSavedReg (const T9900Operand &);
+    bool isCalcStackReg (T9900Reg);
+    bool isCalcStackReg (const T9900Operand &);
+    bool isSameReg (const T9900Operand &op1, const T9900Operand &op2);
+    bool isSameCalcStackReg (const T9900Operand &op1, const T9900Operand &op2);
     
     virtual void initStaticRoutinePtr (std::size_t addr, const TRoutineValue *) override;
     
     // peep hole optimizer
     
     void optimizePeepHole (TCodeSequence &);
-    
-    void replaceLabel (TX64Operation &, TX64Operand &, std::size_t offset);
-    void assemblePass (int pass, std::vector<std::uint8_t> &opcodes, bool generateListing, std::vector<std::string> &listing);
 
+    void removeUnusedLocalLabels (TCodeSequence &code);
+    void removeLines (TCodeSequence &code, TCodeSequence::iterator &line, std::size_t count);    
+    void replaceLabel (T9900Operation &, T9900Operand &, std::size_t offset);
+    void assemblePass (int pass, std::vector<std::uint8_t> &opcodes, bool generateListing, std::vector<std::string> &listing);
+};
 
 }

@@ -363,7 +363,11 @@ std::string TPointerType::getName () const {
 }
 
 std::size_t TPointerType::getSize () const {
+#ifdef CREATE_9900
+    return 2;
+#else
     return sizeof (void *);
+#endif    
 }
 
 bool TPointerType::isSerializable () const {
@@ -449,7 +453,11 @@ std::string TReferenceType::getName () const {
 }
 
 std::size_t TReferenceType::getSize () const {
+#ifdef CREATE_9900
+    return 2;
+#else
     return sizeof (void *);
+#endif    
 }
 
 bool TReferenceType::isSerializable () const {

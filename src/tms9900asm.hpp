@@ -12,11 +12,12 @@ enum class T9900Op {
     li, ai, andi, ori, ci, stwp, stst, lwpi, limi, idle, rset, rtwp, ckon, ckof, lrex, 
     blwp, b, x, clr, neg, inv, inc, inct, dec, dect, bl, swpb, seto, abs, sra, srl, sla, src,
     jmp, jlt, jle, jeq, jhe, jgt, jne, jnc, joc, jno, jl, jh, jop, sbo, sbz, tb, coc, czc,
-    xor_, xop, ldcr, stcr, mpy, div, szc, szcb, s, sb, c, cb, a, ab, mov, movb, soc, socb
+    xor_, xop, ldcr, stcr, mpy, div, szc, szcb, s, sb, c, cb, a, ab, mov, movb, soc, socb,
+    def_label, comment, end
 };
 
 enum class T9900Reg {
-    r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15
+    r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, nrRegs
 };
 
 class T9900Operand {
@@ -31,8 +32,8 @@ public:
 
     std::string makeString () const;
     bool isValid () const { return valid; }
+    bool isReg () const { return valid && !isImm && !isLabel; }	// indexed (R0) ist auch kein Reg
     
-private:
     std::string label;
     T9900Reg reg;
     bool valid, isImm, isLabel;

@@ -10,6 +10,7 @@
 #include "compiler.hpp"
 #include "x64generator.hpp"
 #include "a64gen.hpp"
+#include "tms9900gen.hpp"
 #include "runtime.hpp"
 
 namespace sp = statpascal;
@@ -51,7 +52,31 @@ private:
 };
 
 
+void compile9900 (int argc, char **argv) {
+    sp::TRuntimeData runtimeData;
+    sp::T9900Generator generator (runtimeData);
+    sp::TCompiler compiler (generator);
+    
+    compiler.setFilename (argv [1]);
+    std::filesystem::path exepath = std::filesystem::read_symlink ("/proc/self/exe");
+    compiler.setUnitSearchPathes ({".", exepath.parent_path ().string () + "/../ti99units"});
+    
+    compiler.compile ();
+    
+    std::vector<std::string> listing;
+    std::vector<std::uint8_t> opcodes;
+    generator.getAssemblerCode (opcodes, true, listing);
+    
+    std::ofstream f ("out.a99");
+    std::copy (listing.begin (), listing.end (), std::ostream_iterator<std::string> (f, "\n"));
+}
+
 void compile (int argc, char **argv) {
+#ifdef CREATE_9900
+        compile9900 (argc, argv);
+        return;
+#endif        
+
     bool createListing = haveParameter ("--listing", argc, argv),
          showTimes = haveParameter ("--time", argc, argv);
     
@@ -60,8 +85,8 @@ void compile (int argc, char **argv) {
     runtimeData.appendArgv (argv [0]);
     for (int i = 2; i < argc; ++i)
         runtimeData.appendArgv (argv [i]);
-    
-#ifdef CREATE_X64    
+        
+#ifdef CREATE_X64
     sp::TX64Generator generator (runtimeData);
 #else
     createListing = true;	// asm source required
@@ -91,7 +116,6 @@ void compile (int argc, char **argv) {
         std::ofstream f ("out.asm");
         std::copy (listing.begin (), listing.end (), std::ostream_iterator<std::string> (f, "\n"));
     }
-    
 
 #ifdef CREATE_X64
     if (createListing) {

@@ -87,6 +87,7 @@ bool TX64Generator::isCalleeSavedReg (const TX64Reg reg) {
 }
 
 bool TX64Generator::isCalleeSavedReg (const TX64Operand &op) {
+    // TODO: was it mit anderen Addressierungsarten?
     return op.isReg && isCalleeSavedReg (op.reg);
 }
 
