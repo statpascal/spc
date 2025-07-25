@@ -30,7 +30,7 @@ public:
     T9900Operand (std::uint16_t imm);
     T9900Operand (const std::string &label);
 
-    std::string makeString () const;
+    std::string makeString (bool addAt = false) const;
     bool isValid () const { return valid; }
     bool isReg () const { return valid && !isImm && !isLabel; }	// indexed (R0) ist auch kein Reg
     

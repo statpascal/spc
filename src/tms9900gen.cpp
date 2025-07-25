@@ -811,7 +811,7 @@ void T9900Generator::codeSymbol (const TSymbol *s, const T9900Reg reg) {
         outputCode (T9900Op::mov, T9900Reg::r9, reg), 
         outputCode (T9900Op::ai, reg, s->getOffset (), s->getName ());
     } else {
-        outputCode (T9900Op::mov, T9900Operand (T9900Reg::r9, -(s->getLevel () - 1) * 2), reg);
+        outputCode (T9900Op::mov, T9900Operand (T9900Reg::r9, 2 * (s->getLevel () - currentLevel)), reg);
         outputCode (T9900Op::ai, reg, s->getOffset (), s->getName ());
     }
 }
@@ -1344,7 +1344,7 @@ void T9900Generator::beginRoutineBody (const std::string &routineName, std::size
             if (level > 1) {
                 for (std::size_t i = 1; i < level - 1; ++i)
                     codePush (T9900Operand (intScratchReg2, -2 * i));
-                codePush (T9900Reg::r9);
+//                codePush (T9900Reg::r9);
                 if (symbolList.getLocalSize ())
                     outputCode (T9900Op::ai, T9900Reg::r10, -symbolList.getLocalSize ());
             }

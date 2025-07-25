@@ -47,13 +47,13 @@ T9900Operand::T9900Operand (const std::string &label):
   isLabel (true) {
 }
   
-std::string T9900Operand::makeString () const {
+std::string T9900Operand::makeString (bool addAt) const {
     if (!valid)
         return std::string ();
     if (isLabel)
-        return "@" + label;
+        return addAt ? "@" + label: label;
     if (isImm) 
-        return std::to_string (val);
+        return addAt ? "@" + std::to_string (val) : std::to_string (val);
     switch (t) {
         case TAddressingMode::Reg:
             return regname [static_cast<std::size_t> (reg)];
@@ -86,7 +86,7 @@ std::string T9900Operation::makeString () const {
             std::string res = std::string (8, ' ') + opname [static_cast<std::size_t> (operation)];
             res.resize (13, ' ');
             if (operand1.isValid ())
-                res += " " + operand1.makeString ();
+                res += " " + operand1.makeString (operation == T9900Op::b || operation == T9900Op::blwp);
             if (operand2.isValid ())
                 res += ", " + operand2.makeString ();
             if (!comment.empty ()) {
