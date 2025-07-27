@@ -22,7 +22,7 @@ enum class T9900Reg {
 
 class T9900Operand {
 public:
-    enum class TAddressingMode { Reg, RegInd, RegIndInc, Indexed };
+    enum class TAddressingMode { Invalid, Reg, RegInd, RegIndInc, Indexed, Imm, Label };
     
     T9900Operand ();
     T9900Operand (T9900Reg, TAddressingMode t = TAddressingMode::Reg);
@@ -31,12 +31,16 @@ public:
     T9900Operand (const std::string &label);
 
     std::string makeString (bool addAt = false) const;
-    bool isValid () const { return valid; }
-    bool isReg () const { return valid && !isImm && !isLabel; }	// indexed (R0) ist auch kein Reg
+    bool isValid () const { return t != TAddressingMode::Invalid; }
+    bool isLabel () const { return t == TAddressingMode::Label; }
+    bool isImm () const { return t == TAddressingMode::Imm; }
+    bool isReg () const { return t == TAddressingMode::Reg ||
+                                 t == TAddressingMode::RegInd ||
+                                 t == TAddressingMode::RegIndInc ||
+                                 (t == TAddressingMode::Indexed && reg != T9900Reg::r0); }
     
     std::string label;
     T9900Reg reg;
-    bool valid, isImm, isLabel;
     TAddressingMode t;
     std::uint16_t val;
 };

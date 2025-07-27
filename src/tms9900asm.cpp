@@ -13,46 +13,36 @@ const std::vector<std::string>
                "", "", ""};
 
 T9900Operand::T9900Operand ():
-  valid (false) {
+  t (TAddressingMode::Invalid) {
 }
 
 T9900Operand::T9900Operand (T9900Reg reg, TAddressingMode t):
   reg (reg),
-  valid (true),
-  isImm (false), 
-  isLabel (false),
   t (t) {
 }
 
 T9900Operand::T9900Operand (T9900Reg reg, std::uint16_t offset):
   reg (reg),
-  valid (true),
-  isImm (false),
-  isLabel (false),
   t (TAddressingMode::Indexed),
   val (offset) {
 }
 
 T9900Operand::T9900Operand (std::uint16_t imm):
-  valid (true),
-  isImm (true),
-  isLabel (false),
+  t (TAddressingMode::Imm),
   val (imm) {
 }
 
 T9900Operand::T9900Operand (const std::string &label):
-  label (label),
-  valid (true),
-  isImm (false),
-  isLabel (true) {
+  t (TAddressingMode::Label),
+  label (label) {
 }
   
 std::string T9900Operand::makeString (bool addAt) const {
-    if (!valid)
+    if (!isValid ())
         return std::string ();
-    if (isLabel)
+    if (isLabel ())
         return addAt ? "@" + label: label;
-    if (isImm) 
+    if (isImm ()) 
         return addAt ? "@" + std::to_string (val) : std::to_string (val);
     switch (t) {
         case TAddressingMode::Reg:
@@ -77,7 +67,7 @@ T9900Operation::T9900Operation (T9900Op op, T9900Operand op1, T9900Operand op2, 
 std::string T9900Operation::makeString () const {
     switch (operation) {
         case T9900Op::def_label:
-            return operand1.makeString () + ":";
+            return operand1.makeString () + ": even";	// required for xas99/labels on consecutive lines
         case T9900Op::comment:
             return comment.empty () ? comment : "; " + comment;
         case T9900Op::end:
@@ -86,7 +76,7 @@ std::string T9900Operation::makeString () const {
             std::string res = std::string (8, ' ') + opname [static_cast<std::size_t> (operation)];
             res.resize (13, ' ');
             if (operand1.isValid ())
-                res += " " + operand1.makeString (operation == T9900Op::b || operation == T9900Op::blwp);
+                res += " " + operand1.makeString (operation == T9900Op::b || operation == T9900Op::bl ||  operation == T9900Op::blwp);
             if (operand2.isValid ())
                 res += ", " + operand2.makeString ();
             if (!comment.empty ()) {

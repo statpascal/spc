@@ -125,7 +125,7 @@ bool T9900Generator::isSameCalcStackReg (const T9900Operand &op1, const T9900Ope
 void T9900Generator::removeLines (TCodeSequence &code, TCodeSequence::iterator &line, std::size_t count) {
     for (std::size_t i = 0; i < count && line != code.end (); ++i)
         line = code.erase (line);
-    for (std::size_t i = 0; i < count && line != code.begin (); ++i)
+    for (std::size_t i = 0; i < count + 2 && line != code.begin (); ++i)
         --line;
 }
 
@@ -134,9 +134,9 @@ void T9900Generator::removeUnusedLocalLabels (TCodeSequence &code) {
     std::set<std::string> usedLabels;
     for (T9900Operation &op: code) 
         if (op.operation != T9900Op::def_label) {
-            if (op.operand1.isLabel)
+            if (op.operand1.isLabel ())
                 usedLabels.insert (op.operand1.label);
-            if (op.operand2.isLabel)
+            if (op.operand2.isLabel ())
                 usedLabels.insert (op.operand2.label);
         }
     TCodeSequence::iterator line = code.begin ();
@@ -169,7 +169,7 @@ void T9900Generator::optimizePeepHole (TCodeSequence &code) {
         TCodeSequence::iterator line3 = line2;
         ++line3;
 
-/*        
+        
         T9900Operand &op_1_1 = line->operand1,
                      &op_1_2 = line->operand2;
         T9900Op      &op1 = line->operation;
@@ -179,7 +179,127 @@ void T9900Generator::optimizePeepHole (TCodeSequence &code) {
                      &op_2_2 = line1->operand2;
         T9900Op      &op2 = line1->operation;
         std::string &comm_2 = line1->comment; 
-*/                    
+        
+        T9900Operand &op_3_1 = line2->operand1,
+                     &op_3_2 = line2->operand2;
+        T9900Op      &op3 = line2->operation;
+        std::string &comm_3 = line2->comment; 
+        
+        // li reg, imm
+        // mov|a|s|c op, *reg
+        // ->
+        // mov op, @imm
+        
+        if (op1 == T9900Op::li && (op2 == T9900Op::mov || op2 == T9900Op::a || op2 == T9900Op::s|| op2 == T9900Op::c) && isSameCalcStackReg (op_1_1, op_2_2) && op_2_2.t == T9900Operand::TAddressingMode::RegInd) {
+            op_2_2 = T9900Operand (T9900Reg::r0, op_1_2.val);
+            comm_2 = comm_1 + " " + comm_2;
+            removeLines (code, line, 1);
+        }
+        
+        // li reg, imm
+        // mov *reg, reg
+        // ->
+        // mov @imm, reg
+        
+        if (op1 == T9900Op::li && op2 == T9900Op::mov && isSameCalcStackReg (op_1_1, op_2_1) && op_2_1.t == T9900Operand::TAddressingMode::RegInd) {
+            op_2_1 = T9900Operand (T9900Reg::r0, op_1_2.val);
+            comm_2 = comm_1;
+            removeLines (code, line, 1);
+        }
+        
+        // li reg, label|imm
+        // bl *reg
+        // ->
+        // bl @label|imm
+        if (op1 == T9900Op::li && op2 == T9900Op::bl && isSameCalcStackReg (op_1_1, op_2_1)) {
+            op_2_1 = op_1_2;
+            removeLines (code, line, 1);
+        }
+        
+        // li reg, label|imm
+        // inc/inct/dec/dect *reg
+        // ->
+        // inc/inct/dec/dect @label|imm
+        if (op1 == T9900Op::li && (op2 == T9900Op::inc || op2 == T9900Op::inct || op2 == T9900Op::dec || op2 == T9900Op::dect) && isSameCalcStackReg (op_1_1, op_2_1)) {
+            op_2_1 = T9900Operand (T9900Reg::r0, op_1_2.val);
+            comm_2 = comm_1;
+            removeLines (code, line, 1);
+        }
+        
+        // mov op1, reg
+        // a|s|c reg, op2
+        // ->
+        // a|s|c op1, op2
+        if (op1 == T9900Op::mov && (op2 == T9900Op::a || op2 == T9900Op::s || op2 == T9900Op::c) && isSameCalcStackReg (op_1_2, op_2_1)) {
+            op_2_1 = op_1_1;
+            comm_2 = comm_1 + " " + comm_2;
+            removeLines (code, line, 1);
+        }
+        
+        // mov op1, reg
+        // c op2, reg
+        // ->
+        // a|s|c op2, op1
+        if (op1 == T9900Op::mov && op2 == T9900Op::c && isSameCalcStackReg (op_1_2, op_2_2)) {
+            op_2_2 = op_1_1;
+            comm_2 = comm_1 + " " + comm_2;
+            removeLines (code, line, 1);
+        }
+        
+        // movb op, reg
+        // srl reg, 8
+        // ci reg, 0
+        // ->
+        // movb op, reg
+        if (op1 == T9900Op::movb && op2 == T9900Op::srl && op3 == T9900Op::ci && !op_3_2.val &&
+            isSameCalcStackReg (op_1_2, op_2_1) && isSameCalcStackReg (op_2_1, op_3_1))
+            removeLines (code, line1, 2);
+            
+        // Access via base pointer
+        // mov r9, reg
+        // ai reg, imm
+        // ...
+        if (op1 == T9900Op::mov && op2 == T9900Op::ai && op_1_1.isReg () && op_1_1.reg == T9900Reg::r9 && isSameCalcStackReg (op_1_2, op_2_1)) {
+            // mov|a|s *reg, op | inc/inct/dec/dect *reg
+            // ->
+            // mov|a|s @imm(r9), op | inc/inct/dec/dect @imm(r9)
+            if ((op3 == T9900Op::a || op3 == T9900Op::s || op3 == T9900Op::mov || op3 == T9900Op::inc || op3 == T9900Op::inct || op3 == T9900Op::dec || op3 == T9900Op::dect) && 
+                isSameCalcStackReg (op_2_1, op_3_1) && op_3_1.t == T9900Operand::TAddressingMode::RegInd) {
+                op_3_1 = T9900Operand (T9900Reg::r9, op_2_2.val);
+                comm_3 = comm_2;
+                removeLines (code, line, 2);
+            }
+            // mov|a|s op, *reg
+            // ->
+            // mov|a|s op, @imm(r9)
+            if ((op3 == T9900Op::a || op3 == T9900Op::s || op3 == T9900Op::mov) && op_1_1.isReg () && isSameCalcStackReg (op_2_1, op_3_2) && op_3_2.t == T9900Operand::TAddressingMode::RegInd) {
+                op_3_2 = T9900Operand (T9900Reg::r9, op_2_2.val);
+                comm_3 = comm_2;
+                removeLines (code, line, 2);
+            }
+        }
+        
+        // li reg, imm
+        // mov reg, r0
+        // sla/sra op, r0
+        // ->
+        // sla/sra op, imm
+        if (op1 == T9900Op::li && op2 == T9900Op::mov && (op3 == T9900Op::sla || op3 == T9900Op::sra) && op_3_2.isReg ()) {
+            op_3_2 = op_1_2;
+            removeLines (code, line, 2);
+        }
+        
+        // li reg, 0
+        // mov reg, op
+        // ->
+        // clr @op
+        if (op1 == T9900Op::li && !op_1_2.val && op2 == T9900Op::mov && isSameCalcStackReg (op_1_1, op_2_1)) {
+            op2 = T9900Op::clr;
+            op_2_1 = op_2_2;
+            op_2_2 = T9900Operand ();
+            removeLines (code, line, 1);
+        }
+        
         ++line;
     }
     
@@ -358,7 +478,7 @@ void T9900Generator::generateCode (TExpression &comparison) {
 }
 
 void T9900Generator::outputBooleanCheck (TExpressionBase *expr, const std::string &label, bool branchOnFalse) {
-    static const std::map<TToken, std::vector<T9900Op>> intFalseJmp = {
+    static const std::map<TToken, std::vector<T9900Op>> intTrueJmp = {
         {TToken::Equal, {T9900Op::jne}}, 
         {TToken::GreaterThan, {T9900Op::jlt, T9900Op::jeq}},
         {TToken::LessThan, {T9900Op::jgt, T9900Op::jeq}}, 
@@ -372,7 +492,7 @@ void T9900Generator::outputBooleanCheck (TExpressionBase *expr, const std::strin
         {TToken::GreaterEqual, TX64Op::jb}, {TToken::LessEqual, TX64Op::ja}, {TToken::NotEqual, TX64Op::je}
     };
 */    
-    static const std::map<TToken, std::vector<T9900Op>> intTrueJmp = {
+    static const std::map<TToken, std::vector<T9900Op>> intFalseJmp = {
         {TToken::Equal, {T9900Op::jeq}}, 
         {TToken::GreaterThan, {T9900Op::jgt}},
         {TToken::LessThan, {T9900Op::jlt}}, 
@@ -428,14 +548,18 @@ void T9900Generator::outputBooleanCheck (TExpressionBase *expr, const std::strin
             outputCode (T9900Operation (T9900Op::c, r1, r2));
         }
         for (T9900Op op: (branchOnFalse ? intFalseJmp : intTrueJmp).at (condition->getOperation ()))
-            outputCode (op, label);
+            outputCode (op, T9900Operand ("!"));
+        outputCode (T9900Op::b, label);
+        outputCode (T9900Op::def_label, T9900Operand ("!"));
     } else if (condition && condition->getLeftExpression ()->getType ()->isReal ()) {
         //
     } else {
         visit (expr);
         const T9900Reg reg = fetchReg (intScratchReg1);
         outputCode (T9900Op::ci, reg, 0);
-        outputCode (branchOnFalse ? T9900Op::jeq : T9900Op::jne, label);
+        outputCode (branchOnFalse ? T9900Op::jne : T9900Op::jeq, T9900Operand ("!"));
+        outputCode (T9900Op::b, label);
+        outputCode (T9900Op::def_label, T9900Operand ("!"));
     }
 }
 
@@ -459,7 +583,7 @@ void T9900Generator::outputPointerOperation (TToken operation, TExpressionBase *
         loadReg (T9900Reg::r12);
         const T9900Reg r1 = fetchReg (intScratchReg1);
         codeMultiplyConst (T9900Reg::r12, basesize);
-        outputCode (T9900Op::a, r1, T9900Reg::r12);
+        outputCode (T9900Op::a, T9900Reg::r12, r1);
         saveReg (r1);
     } else {
         const T9900Reg r2 = fetchReg (intScratchReg1);
@@ -505,7 +629,7 @@ void T9900Generator::outputIntegerCmpOperation (TToken operation, TExpressionBas
         r2 = fetchReg (intScratchReg1);
         r3 = r1 = fetchReg (intScratchReg2);
     }
-    r4 = fetchReg (intScratchReg3);
+    r4 = intScratchReg3;
     outputCode (T9900Op::clr, r4);
     outputCode (T9900Op::c, r1, r2);
     for (T9900Op op: cmpOperation.at (operation))
@@ -530,7 +654,7 @@ void T9900Generator::outputIntegerOperation (TToken operation, TExpressionBase *
             saveReg (operation == TToken::DivInt ? intScratchReg2 : intScratchReg3);
             break; }
         case TToken::Mul: {
-            loadReg (intScratchReg1);
+            loadReg (intScratchReg2);
             T9900Reg r = fetchReg (intScratchReg1);
             outputCode (T9900Op::mpy, r, intScratchReg2);
             saveReg (intScratchReg3);
@@ -758,21 +882,28 @@ void T9900Generator::generateCode (TFunctionCall &functionCall) {
     std::cout << std::endl;
 */
 
+    std::size_t stackCount = 0;
     for (std::size_t i = 0; i < parameterDescriptions.size (); ++i) {
         visit (parameterDescriptions [i].actualParameter);
         const T9900Reg reg = fetchReg (intScratchReg1);
+        if (parameterDescriptions [i].type->getSize () == 1)
+            outputCode (T9900Op::swpb, reg);            
         codePush (reg);
+        stackCount += 2;
     }
     
     if (usesReturnValuePointer && returnStorage) {
         visit (returnStorage);
         const T9900Reg reg = fetchReg (intScratchReg1);
         codePush (reg);
+        stackCount += 2;
     }
     
     visit (function);
     const T9900Reg reg = fetchReg (intScratchReg1);
     outputCode (T9900Op::bl, T9900Operand (reg, T9900Operand::TAddressingMode::RegInd));
+    if (stackCount)
+        outputCode (T9900Op::ai, T9900Reg::r10, stackCount);
 
     if (functionCall.getType () != &stdType.Void && !functionCall.isIgnoreReturn () && !functionCall.getReturnStorage ()) {
         visit (functionCall.getReturnTempStorage ());
@@ -819,9 +950,10 @@ void T9900Generator::codeSymbol (const TSymbol *s, const T9900Reg reg) {
 void T9900Generator::codeStoreMemory (TType *const t, T9900Operand destMem, T9900Reg srcReg) {
     if (t == &stdType.Uint8 || t == &stdType.Int8) {
         // WP should always be at 8300 so code direct mov?
-        outputCode (T9900Op::swpb);
-        outputCode (T9900Op::movb, srcReg, destMem);
-        outputCode (T9900Op::swpb);
+        outputCode (T9900Op::movb, T9900Operand (T9900Reg::r0, 0x8300 + 2 * static_cast<int> (srcReg) + 1), destMem);
+//        outputCode (T9900Op::swpb, srcReg);
+//        outputCode (T9900Op::movb, srcReg, destMem);
+//        outputCode (T9900Op::swpb, srcReg);
     } else if (t == &stdType.Uint16 || t == &stdType.Int16) {
         outputCode (T9900Op::mov, srcReg, destMem);
     } else if (t == &stdType.Uint32 || t == &stdType.Int32) {
@@ -837,17 +969,11 @@ void T9900Generator::codeStoreMemory (TType *const t, T9900Operand destMem, T990
 
 void T9900Generator::codeSignExtension (TType *const t, const T9900Reg destReg, T9900Operand srcOperand) {
     if (t == &stdType.Int8) {
-        outputCode (T9900Op::clr, destReg);
         outputCode (T9900Op::movb, srcOperand, destReg);
-        outputCode (T9900Op::jgt, T9900Operand ("!"));
-        outputCode (T9900Op::jeq, T9900Operand ("!"));
-        outputCode (T9900Op::ori, destReg, 0x00ff);
-        outputCode (T9900Op::def_label, T9900Operand ("!"));
-        outputCode (T9900Op::swpb);
+        outputCode (T9900Op::sra, destReg, 8);
     } else if (t == &stdType.Uint8) {
-        outputCode (T9900Op::clr, destReg);
         outputCode (T9900Op::movb, srcOperand, destReg);
-        outputCode (T9900Op::swpb);
+        outputCode (T9900Op::srl, destReg, 8);
     } else
         outputCode (T9900Op::mov, srcOperand, destReg);
 }
@@ -922,7 +1048,7 @@ void T9900Generator::loadReg (const T9900Reg reg) {
     if (intStackCount >= intStackRegs) 
         codePop (reg);
     else
-        outputCode (T9900Op::mov, reg, intStackReg [intStackCount]);
+        outputCode (T9900Op::mov, intStackReg [intStackCount], reg);
 }
 
 T9900Reg T9900Generator::fetchReg (T9900Reg reg) {
@@ -1060,8 +1186,10 @@ void T9900Generator::codeIncDec (TPredefinedRoutine &predefinedRoutine) {
     const std::vector<TExpressionBase *> &arguments = predefinedRoutine.getArguments ();
     
     TType *type = arguments [0]->getType ();
-    const std::size_t n = type->isPointer () ? static_cast<const TPointerType *> (type)->getBaseType ()->getSize () : 1;
     
+    // TODO: check for const value 1, 2 in like inc (a, 2)
+    
+    ssize_t n = type->isPointer () ? static_cast<const TPointerType *> (type)->getBaseType ()->getSize () : 1;
     
     T9900Operand value;	// TODO: init to -1/1?
     
@@ -1070,19 +1198,25 @@ void T9900Generator::codeIncDec (TPredefinedRoutine &predefinedRoutine) {
     if (arguments.size () > 1) {
         visit (arguments [1]);
         const T9900Reg reg = fetchReg (intScratchReg1);
-        codeMultiplyConst (reg, n);
+        if (n > 1)
+            codeMultiplyConst (reg, n);
         value = T9900Operand (reg);
-    } else { // if (n > 1)
+    } else if (n > 2 || n < -2) {
         outputCode (T9900Op::li, intScratchReg1, n);
         value = T9900Operand (intScratchReg1);
+    } else if (n < 0) {
+       isIncOp = !isIncOp;
+       n = -n;
     }
 
     T9900Operand varAddr (fetchReg (intScratchReg2), T9900Operand::TAddressingMode::RegInd);
           
     if (value.isValid ())
         outputCode (isIncOp ? T9900Op::a : T9900Op::s, value, varAddr);
-//    else	// optimize: INCT/DECT
-//        outputCode (TX64Op::add, varAddr, isIncOp ? 1 : - 1);
+    else 
+        outputCode (isIncOp ? 
+                        n == 1 ? T9900Op::inc : T9900Op::inct :
+                        n == 1 ? T9900Op::dec : T9900Op::dect,  varAddr);
     // TODO: range check
         
 }

@@ -51,7 +51,11 @@ TType *TBaseGenerator::getMemoryOperationType (TType *const type) {
         }
     }
     if (type->isPointer () || type->isRoutine ())
+#ifdef CREATE_9900
+        return &stdType.Uint16;
+#else
         return &stdType.Int64;
+#endif
 //    if (type->isVector ())
 //        return &stdType.GenericVector;
         
