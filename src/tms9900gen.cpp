@@ -313,6 +313,21 @@ void T9900Generator::optimizePeepHole (TCodeSequence &code) {
             removeLines (code, line, 1);
         }
         
+        // li reg, imm
+        // a op, reg
+        // . x, *reg
+        // ->
+        // mov op, reg
+        // . x, @imm(reg)
+        if (op1 == T9900Op::li && op2 == T9900Op::a && isSameCalcStackReg (op_1_1, op_2_2) &&
+            isSameCalcStackReg (op_2_2, op_3_2) && op_3_2.t == T9900Operand::TAddressingMode::RegInd) {
+            op2 = T9900Op::mov;
+            op_3_2 = T9900Operand (op_1_1.reg, op_1_2.val);
+            comm_3 = comm_3 + " -> " + comm_1 + " + " + comm_2;
+            removeLines (code, line, 1);
+        }
+        
+        
         ++line;
     }
     

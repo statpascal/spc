@@ -109,9 +109,9 @@ which is included by *ti99units/carts.a99* to produce a cartridge image.
 Additional assembler routines are provided in the file *runtime.a99*.
 
 ```
-user@beelink:~/src/statpascal> obj/sp tests/ti99/sieve.pas 
-user@beelink:~/src/statpascal> ~/ti99/xdt99/xas99.py -R -b -q ti99units/cart.a99 -o cart.bin
-user@beelink:~/src/statpascal> ls -l cart.bin 
+user@host:~/src/statpascal> obj/sp tests/ti99/sieve.pas 
+user@host:~/src/statpascal> ~/ti99/xdt99/xas99.py -R -b -q ti99units/cart.a99 -o cart.bin
+user@host:~/src/statpascal> ls -l cart.bin 
 -rw-r--r--. 1 user user 1088 Jul 28 14:11 cart.bin
 ```
 

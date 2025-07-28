@@ -2,7 +2,7 @@ program sieve (output);
 
 const 
     n = 1000;
-    rep = 1;
+    rep = 20;
 
 var
     prim:  array [0..n] of boolean;

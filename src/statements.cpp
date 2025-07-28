@@ -367,6 +367,7 @@ TStatement *TForStatement::parse (TBlock &declarations) {
     statements.push_back (compiler.createMemoryPoolObject<TAssignment> (controlVariableLValue, begin));
     
     if (!end->isConstant ()) {
+//    if (!isEndConst) {
         TSymbol *endTemp = declarations.getSymbols ().addVariable ("$" + controlVariable->getName (), controlVariable->getType ()).symbol;
         TExpressionBase *endVar = compiler.createMemoryPoolObject<TVariable> (endTemp, declarations);
         statements.push_back (compiler.createMemoryPoolObject<TAssignment> (endVar, end));
