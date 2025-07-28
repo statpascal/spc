@@ -98,14 +98,15 @@ The compiler can produce a ROM cartridge, suitable for use on the TI99/4A.
 Ordinal types and pointer operations are supported; there are
 no strings, floating points or runtime libraries yet.
 
-To enable the TI99 mode, enable the define *-DCREATE_9900* in the makefile.
-This will set the default unit search path to *ti99units* directory. The
-*system.pas* (which is included by default) defines some procedures to
+To enable the TI99 mode, uncommend the define *-DCREATE_9900* in the makefile.
+This will set the default unit search path of the compiler to the *ti99units* directory. The
+*system.pas* in this directory (which is included by default) defines some procedures to
 output integers on the screen. The *tests/ti99* directory shows what is
 already working.
 
 Compiling a program in this mode produces the assembler source *out.a99*,
-which is included by *ti99units/carta.a99* to produce a cartridge image.
+which is included by *ti99units/carts.a99* to produce a cartridge image.
+Additional assembler routines are provided in the file *runtime.a99*.
 
 ```
 user@beelink:~/src/statpascal> obj/sp tests/ti99/sieve.pas 
