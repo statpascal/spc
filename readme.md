@@ -88,7 +88,31 @@ The next steps will be:
 
 - refactoring/unifying the code generators
 - samples/docs for data exchange/callbacks with host applications
-- code generator for the TMS9900 (as toy project)
+
+## Code generation for the TI99/4A
+
+This is work in progress.
+
+The compiler can produce a ROM cartridge, suitable for use on the TI99/4A.
+
+Ordinal types and pointer operations are supported; there are
+no strings, floating points or runtime libraries yet.
+
+To enable the TI99 mode, enable the define *-DCREATE_9900* in the makefile.
+This will set the default unit search path to *ti99units* directory. The
+*system.pas* (which is included by default) defines some procedures to
+output integers on the screen. The *tests/ti99* directory shows what is
+already working.
+
+Compiling a program in this mode produces the assembler source *out.a99*,
+which is included by *ti99units/carta.a99* to produce a cartridge image.
+
+```
+user@beelink:~/src/statpascal> obj/sp tests/ti99/sieve.pas 
+user@beelink:~/src/statpascal> ~/ti99/xdt99/xas99.py -R -b -q ti99units/cart.a99 -o cart.bin
+user@beelink:~/src/statpascal> ls -l cart.bin 
+-rw-r--r--. 1 user user 1088 Jul 28 14:11 cart.bin
+```
 
 ## License
 
