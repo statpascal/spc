@@ -93,12 +93,12 @@ The next steps will be:
 
 This is work in progress.
 
-The compiler can produce a ROM cartridge, suitable for use on the TI99/4A.
+The compiler can produce a ROM cartridge for the TI99/4A.
 
 Ordinal types and pointer operations are supported; there are
 no strings, floating points or runtime libraries yet.
 
-To enable the TI99 mode, uncommend the define *-DCREATE_9900* in the makefile.
+To enable the TI99 mode, uncomment the define *-DCREATE_9900* in the makefile.
 This will set the default unit search path of the compiler to the *ti99units* directory. The
 *system.pas* in this directory (which is included by default) defines some procedures to
 output integers on the screen. The *tests/ti99* directory shows what is

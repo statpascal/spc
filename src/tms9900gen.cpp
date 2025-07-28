@@ -897,7 +897,7 @@ void T9900Generator::generateCode (TFunctionCall &functionCall) {
 */
 
     std::size_t stackCount = 0;
-    for (std::size_t i = 0; i < parameterDescriptions.size (); ++i) {
+    for (ssize_t i = parameterDescriptions.size () - 1; i >= 0; --i) {
         visit (parameterDescriptions [i].actualParameter);
         const T9900Reg reg = fetchReg (intScratchReg1);
         if (parameterDescriptions [i].type->getSize () == 1)
@@ -1215,7 +1215,12 @@ void T9900Generator::codeIncDec (TPredefinedRoutine &predefinedRoutine) {
     }
 
     T9900Operand varAddr (fetchReg (intScratchReg1), T9900Operand::TAddressingMode::RegInd);
-    outputCode (isIncOp ? T9900Op::a : T9900Op::s, value, varAddr);
+    
+    if (arguments [0]->getType ()->getSize () == 1) {
+        outputCode (T9900Op::swpb, value);
+        outputCode (isIncOp ? T9900Op::ab : T9900Op::sb, value, varAddr);
+    } else
+        outputCode (isIncOp ? T9900Op::a : T9900Op::s, value, varAddr);
     // TODO: range check
         
 }

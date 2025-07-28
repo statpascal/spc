@@ -8,6 +8,7 @@ type
 procedure gotoxy (x, y: integer);
 procedure writeint (a: integer);
 procedure writechar (ch: char);
+procedure writelf;
 
 procedure waitkey; external;
     
@@ -18,7 +19,7 @@ const
 
 var 
     vdpWriteAddress: integer;
-    vdprd, vdpsta, vdpwd, vdpwa: ^char;
+    vdprd, vdpsta, vdpwd, vdpwa, gromwa, gromrd: ^char;
     
 procedure setVdpAddress (n: integer);
     begin
@@ -54,7 +55,7 @@ procedure scroll;
         for i := 0 to 31 do
             vdpwd^ := chr (32);
         dec (vdpWriteAddress, 32);
-        setVdpAddress (vdpWriteAddress)
+        setVdpAddress (vdpWriteAddress or WriteAddr)
     end;
     
     
@@ -78,11 +79,38 @@ procedure writechar (ch: char);
         if vdpWriteAddress = 24 * 32 then
             scroll;
     end;
+    
+procedure writelf;
+    begin
+        vdpWriteAddress := (vdpWriteAddress + 32) and not 31;
+        if vdpWriteAddress = 24 * 32 then
+            scroll
+        else 
+            setVdpAddress (vdpWriteAddress or WriteAddr);
+    end;
+    
+procedure loadCharset;
+    var 
+        i, j: integer;
+    begin
+        gromwa^ := #$06;	// >06b0: standard char set
+        gromwa^ := #$b4;
+        setVdpAddress ($0800 + 8 * 32 or WriteAddr);
+        for i := 32 to 127 do
+            begin
+                for j := 1 to 7 do
+                    vdpwd^ := gromrd^;
+                vdpwd^ := chr (0)
+            end
+    end;
 
 begin
     integer (vdprd) := $8800;
     integer (vdpsta) := $8802;
     integer (vdpwd) := $8c00;
     integer (vdpwa) := $8c02;
+    integer (gromwa) := $9c02;
+    integer (gromrd) := $9800;
+    loadCharset;
     gotoxy (0, 0)
 end.
