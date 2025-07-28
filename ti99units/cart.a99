@@ -1,0 +1,32 @@
+; xas99.py -R -b frame.a99 -o cart.bin
+
+	dorg >8300
+ws	bss 32
+
+	aorg >6000
+
+	byte >aa, >01
+        byte >01		Number of programs
+        byte >00
+        data >0000		Power up list
+        data prog_list
+        data >0000		DSR list
+        data >0000		Subprogram list
+        data >0000		ISR list
+
+prog_list:
+	data >0000		Next menu item
+	data prog_start		Program entry point
+        byte >09
+        text 'CART TEST'
+        even
+
+prog_start:
+        lwpi ws
+	limi 0
+	
+	copy "../out.a99"
+	copy "runtime.a99"
+
+	end
+

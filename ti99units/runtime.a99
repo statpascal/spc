@@ -1,0 +1,18 @@
+; Wait for key press
+
+waitkey:
+        clr r14
+	clr r13
+!
+        li r12, >0024
+        ldcr r13, 3
+        li r12, >0006
+        stcr r14, 8
+        ci r14, >ff00
+        jne !
+        ai r13, >0100
+        ci r13, >0600
+        jne -!
+        jmp waitkey
+!
+	b *r11
