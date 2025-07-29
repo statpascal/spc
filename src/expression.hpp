@@ -235,17 +235,17 @@ public:
     TExpressionBase *getFunction () const;
     const std::vector<TExpressionBase *> &getArguments () const;
     
-    const TSymbol *getFunctionReturnTempStorage () const;
-    TExpressionBase *getReturnStorage () const;
-    TExpressionBase *getReturnTempStorage () const;
-    void setReturnStorage (TExpressionBase *returnStorage, TBlock &);
+//    const TSymbol *getFunctionReturnTempStorage () const;
+    TExpressionBase *getReturnStorage () const;		// L-Value
+//    TExpressionBase *getReturnTempStorage () const;
+    void setReturnStorage (TExpressionBase *returnStorage, TBlock &);	// L-value
     
 private:
     TExpressionBase *function;
     std::vector<TExpressionBase *> args;
     bool ignoreReturn;
-    TSymbol *functionReturnTempStorage;
-    TExpressionBase *returnStorage, *returnTempStorage;
+    TSymbol *returnSymbol;
+    TExpressionBase *returnStorage;
 };
 
 inline TExpressionBase *TFunctionCall::getFunction () const {
@@ -254,14 +254,6 @@ inline TExpressionBase *TFunctionCall::getFunction () const {
 
 inline const std::vector<TExpressionBase *> &TFunctionCall::getArguments () const {
     return args;
-}
-
-inline const TSymbol *TFunctionCall::getFunctionReturnTempStorage () const {
-    return functionReturnTempStorage;
-}
-
-inline TExpressionBase *TFunctionCall::getReturnTempStorage () const {
-    return returnTempStorage;
 }
 
 

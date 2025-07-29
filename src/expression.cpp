@@ -1058,7 +1058,7 @@ TExpressionBase *TFactor::parseAddressOperator (TBlock &block) {
 
 
 TFunctionCall::TFunctionCall (TExpressionBase *function, std::vector<TExpressionBase *> &&args_para, TBlock &block, bool checkParameter):
-  function (function), args (std::move (args_para)), ignoreReturn (false), functionReturnTempStorage (nullptr), returnStorage (nullptr), returnTempStorage (nullptr) {
+  function (function), args (std::move (args_para)), ignoreReturn (false), returnSymbol (nullptr), returnStorage (nullptr) {
     TCompilerImpl &compiler = block.getCompiler ();
     
     TRoutineType *routineType = static_cast<TRoutineType *> (function->getType ());
@@ -1091,8 +1091,8 @@ TFunctionCall::TFunctionCall (TExpressionBase *function, std::vector<TExpression
     if (returnType != &stdType.Void && compiler.getCodeGenerator ().classifyReturnType (returnType) == TCodeGenerator::TReturnLocation::Reference) {
         static std::size_t callCount = 0;
         TSymbolList::TAddSymbolResult result = block.getSymbols ().addVariable ("$rettmp_" +  std::to_string (callCount++), routineType->getReturnType ());
-        functionReturnTempStorage = result.symbol;
-        returnTempStorage = compiler.createMemoryPoolObject<TLValueDereference> (compiler.createMemoryPoolObject<TVariable> (functionReturnTempStorage, block));
+        returnSymbol = result.symbol;
+        returnStorage = compiler.createMemoryPoolObject<TVariable> (returnSymbol, block);
     }
 }
 
@@ -1114,8 +1114,9 @@ void TFunctionCall::acceptCodeGenerator (TCodeGenerator &codeGenerator) {
 
 void TFunctionCall::setReturnStorage (TExpressionBase *expr, TBlock &block) {
     returnStorage = expr;
-    block.getSymbols ().removeSymbol (functionReturnTempStorage);
-//    functionReturnTempStorage = nullptr;
+    block.getSymbols ().removeSymbol (returnSymbol);
+    ignoreReturn = true;
+    returnSymbol = nullptr;
 }
 
 TExpressionBase *TFunctionCall::getReturnStorage () const {

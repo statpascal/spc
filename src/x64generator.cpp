@@ -1307,13 +1307,9 @@ void TX64Generator::generateCode (TFunctionCall &functionCall) {
     }
 */    
     std::size_t intCount = 0, xmmCount = 0, stackCount = 0;
-    bool usesReturnValuePointer = false;
-    const TSymbol *functionReturnTempStorage = functionCall.getFunctionReturnTempStorage ();
     TExpressionBase *returnStorage = functionCall.getReturnStorage ();
-    if ((returnStorage || functionReturnTempStorage) && classifyReturnType (functionReturnTempStorage->getType ()) == TReturnLocation::Reference) {
-        usesReturnValuePointer = true;
+    if (returnStorage)
         intCount = 1;
-    }
     
 //    for (std::vector<TExpressionBase *>::const_iterator it = args.begin (); it != args.end (); ++it) {
 
@@ -1410,12 +1406,9 @@ void TX64Generator::generateCode (TFunctionCall &functionCall) {
                 outputCode (TX64Op::cvtsd2ss, xmmParaReg [parameterDescriptions [i].xmmRegNr], xmmParaReg [parameterDescriptions [i].xmmRegNr]);
         }
     }
-    if (usesReturnValuePointer) {
-        if (returnStorage) {
-            visit (returnStorage);
-            loadReg (TX64Reg::rdi);
-        } else
-            codeSymbol (functionReturnTempStorage, TX64Reg::rdi);
+    if (returnStorage) {
+        visit (returnStorage);
+        loadReg (TX64Reg::rdi);
     }
         
     if (!functionIsExpr)
@@ -1430,7 +1423,7 @@ void TX64Generator::generateCode (TFunctionCall &functionCall) {
         outputCode (TX64Op::movq, xmmStackReg [i], TX64Operand (TX64Reg::rsp, 8 * i));
     codeModifySP (8 * usedXmmStack);
     
-    if (functionCall.getType () != &stdType.Void && !functionCall.isIgnoreReturn () && !returnStorage) {
+    if (functionCall.getType () != &stdType.Void && !functionCall.isIgnoreReturn ()) {
         TType *st = getMemoryOperationType (functionCall.getType ());
         if (st == &stdType.Single) {
             const TX64Reg reg = getSaveXmmReg (xmmScratchReg1);

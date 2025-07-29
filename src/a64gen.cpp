@@ -1215,11 +1215,7 @@ void TA64Generator::generateCode (TFunctionCall &functionCall) {
     }
 */    
     std::size_t intCount = 0, dblCount = 0, stackCount = 0, stackCopyCount = 0;
-    bool usesReturnValuePointer = false;
-    const TSymbol *functionReturnTempStorage = functionCall.getFunctionReturnTempStorage ();
     TExpressionBase *returnStorage = functionCall.getReturnStorage ();
-    if ((returnStorage || functionReturnTempStorage) && classifyReturnType (functionReturnTempStorage->getType ()) == TReturnLocation::Reference) 
-        usesReturnValuePointer = true;
     
     /* The actual parameter may be a string or set constant; which is replaced with an integer by the
        code generator. We therefore use the type provided in the routine declaration. 
@@ -1331,12 +1327,9 @@ void TA64Generator::generateCode (TFunctionCall &functionCall) {
                 outputCode (TA64Op::fcvt, {TA64Operand (dblParaReg [parameterDescriptions [i].dblRegNr], TA64OpSize::bit32), dblParaReg [parameterDescriptions [i].dblRegNr]});
         }
     }
-    if (usesReturnValuePointer) {
-        if (returnStorage) {
-            visit (returnStorage);
-            loadReg (TA64Reg::x8);
-        } else
-            codeSymbol (functionReturnTempStorage, TA64Reg::x8);
+    if (returnStorage) {
+        visit (returnStorage);
+        loadReg (TA64Reg::x8);
     }
         
     if (!functionIsExpr)
@@ -1351,12 +1344,10 @@ void TA64Generator::generateCode (TFunctionCall &functionCall) {
     for (std::size_t i = usedDblStackPairs; i > 0; --i)
         codePop (dblStackReg [2 * i - 2], dblStackReg [2 * i - 1]);
     
-    if (functionCall.getType () != &stdType.Void && !functionCall.isIgnoreReturn () && !returnStorage) {
-        if (usesReturnValuePointer) {
-            TA64Reg r = getSaveReg (intScratchReg1);
-            codeSymbol (functionReturnTempStorage, r);
-            saveReg (r);
-        } else {
+    if (functionCall.getType () != &stdType.Void && !functionCall.isIgnoreReturn ()) {
+        if (returnStorage)
+            visit (returnStorage);
+        else {
             TType *st = getMemoryOperationType (functionCall.getType ());
             if (st == &stdType.Single) {
                 const TA64Reg reg = getSaveDblReg (dblScratchReg1);

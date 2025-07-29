@@ -884,10 +884,7 @@ void T9900Generator::generateCode (TFunctionCall &functionCall) {
     }
 */    
     bool usesReturnValuePointer = true;
-    const TSymbol *functionReturnTempStorage = functionCall.getFunctionReturnTempStorage ();
     TExpressionBase *returnStorage = functionCall.getReturnStorage ();
-    if (!returnStorage && functionCall.getReturnTempStorage ())  
-        returnStorage = static_cast<TLValueDereference *> (functionCall.getReturnTempStorage ())->getLValue ();
     
     std::vector<TExpressionBase *>::const_iterator it = args.begin ();
     for (const TSymbol *s: static_cast<TRoutineType *> (function->getType ())->getParameter ()) {
@@ -934,9 +931,8 @@ void T9900Generator::generateCode (TFunctionCall &functionCall) {
     if (stackCount)
         outputCode (T9900Op::ai, T9900Reg::r10, stackCount);
 
-    if (functionCall.getType () != &stdType.Void && !functionCall.isIgnoreReturn () && !functionCall.getReturnStorage ()) {
-        visit (functionCall.getReturnTempStorage ());
-    }
+    if (functionCall.getType () != &stdType.Void && !functionCall.isIgnoreReturn ())
+        visit (returnStorage);
 }
 
 void T9900Generator::generateCode (TConstantValue &constant) {
