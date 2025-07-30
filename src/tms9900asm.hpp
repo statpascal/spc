@@ -34,6 +34,7 @@ public:
     bool isValid () const { return t != TAddressingMode::Invalid; }
     bool isLabel () const { return t == TAddressingMode::Label; }
     bool isImm () const { return t == TAddressingMode::Imm; }
+    bool isIndexed () const { return t == TAddressingMode::Indexed; }
     bool isReg () const { return t == TAddressingMode::Reg ||
                                  t == TAddressingMode::RegInd ||
                                  t == TAddressingMode::RegIndInc ||

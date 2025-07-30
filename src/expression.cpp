@@ -793,7 +793,7 @@ TExpressionBase *TFactor::parseIdentifier (TBlock &block) {
                 expr = compiler.createMemoryPoolObject<TRoutineValue> (identifier, block);
             else if (symbol->getType () && symbol->getType ()->isReference ())
                 expr = compiler.createMemoryPoolObject<TReferenceVariable> (symbol, block);
-            else if (symbol->checkSymbolFlag (TSymbol::Variable) || symbol->checkSymbolFlag (TSymbol::Parameter) || symbol->checkSymbolFlag (TSymbol::Alias))
+            else if (symbol->checkSymbolFlag (TSymbol::Variable) || symbol->checkSymbolFlag (TSymbol::Parameter) || symbol->checkSymbolFlag (TSymbol::Alias) || symbol->checkSymbolFlag (TSymbol::Absolute))
                 expr = compiler.createMemoryPoolObject<TVariable> (symbol, block);
             else if (symbol->checkSymbolFlag (TSymbol::NamedType))
                 expr = parseTypeConversion (symbol, block);
@@ -1093,19 +1093,12 @@ TFunctionCall::TFunctionCall (TExpressionBase *function, std::vector<TExpression
         TSymbolList::TAddSymbolResult result = block.getSymbols ().addVariable ("$rettmp_" +  std::to_string (callCount++), routineType->getReturnType ());
         returnSymbol = result.symbol;
         returnStorage = compiler.createMemoryPoolObject<TVariable> (returnSymbol, block);
+        returnStorageDeref = compiler.createMemoryPoolObject<TLValueDereference> (returnStorage);
     }
 }
 
 bool TFunctionCall::isFunctionCall () const {
     return true;
-}
-
-void TFunctionCall::ignoreReturnValue (bool f) {
-    ignoreReturn = f;
-}
-
-bool TFunctionCall::isIgnoreReturn () const {
-    return ignoreReturn;
 }
 
 void TFunctionCall::acceptCodeGenerator (TCodeGenerator &codeGenerator) {
@@ -1114,13 +1107,10 @@ void TFunctionCall::acceptCodeGenerator (TCodeGenerator &codeGenerator) {
 
 void TFunctionCall::setReturnStorage (TExpressionBase *expr, TBlock &block) {
     returnStorage = expr;
+    returnStorageDeref = block.getCompiler ().createMemoryPoolObject<TLValueDereference> (returnStorage);
     block.getSymbols ().removeSymbol (returnSymbol);
     ignoreReturn = true;
     returnSymbol = nullptr;
-}
-
-TExpressionBase *TFunctionCall::getReturnStorage () const {
-    return returnStorage;
 }
 
 

@@ -584,16 +584,28 @@ void TBlock::parseVarParameterDeclaration (TSymbolList &symbolList, bool createR
             type = compiler.createMemoryPoolObject<TReferenceType> (type);
             
         TSymbol *aliasSymbol = nullptr;
+        const TSimpleConstant *absoluteAddress = nullptr;
         if (lexer.checkToken (TToken::Absolute)) {
             if (isParameter)
                 compiler.errorMessage (TCompilerImpl::InvalidUseOfSymbol, "'absolute' cannot be used in parameter declaration");
-            else
+            else if (lexer.getToken () == TToken::Identifier)
                 aliasSymbol = checkVariable ();
+            else {
+                absoluteAddress = parseConstExpression ();
+                if (absoluteAddress) {
+                    if (absoluteAddress->getType () != &stdType.Int64)
+                        compiler.errorMessage (TCompilerImpl::InvalidUseOfSymbol, "'absolute' required variable or integer constant");
+                    else if (symbolList.getLevel () != 1)
+                        compiler.errorMessage (TCompilerImpl::InvalidUseOfSymbol, "'absolute' address can only be used with global variable");
+                }
+            }                
         }
         for (const std::string &s: identifiers) {
             TSymbolList::TAddSymbolResult result;
             if (aliasSymbol)
                 result = symbolList.addAlias (s, type, aliasSymbol);
+            else if (absoluteAddress)
+                result = symbolList.addAbsolute (s, type, absoluteAddress->getInteger ());
             else if (isParameter)
                 result = symbolList.addParameter (s, type);
             else

@@ -26,10 +26,11 @@ public:
         External = 32,
         Export = 64,
         Alias = 128, 
-        Label = 256,
-        NamedType = 512,
-        Routine = 1024,
-        AllSymbols = 2048 - 1
+        Absolute = 256,
+        Label = 512,
+        NamedType = 1024,
+        Routine = 2048,
+        AllSymbols = 4096 - 1
     };
     
     TSymbol (const std::string &name, TType *type, std::size_t level, TFlags flags, TSymbol *alias);
@@ -115,6 +116,7 @@ public:
     TAddSymbolResult addParameter (const std::string &name, TType *type);
     TAddSymbolResult addConstant (const std::string &name, const TSimpleConstant *);
     TAddSymbolResult addAlias (const std::string &name, TType *type, TSymbol *alias);
+    TAddSymbolResult addAbsolute (const std::string &name, TType *type, std::int64_t addr);
     TAddSymbolResult addLabel (const std::string &name);
     TAddSymbolResult addNamedType (const std::string &name, TType *type);
     

@@ -1,10 +1,10 @@
 program byteop;
 
 type
-    tinyint = integer;
+    tinyint = 0..10;
 
 var 
-    i,  j: 0..10;
+    i,  j: tinyint;
     
 begin
     for i := 1 to 10 do

@@ -275,7 +275,7 @@ void TBaseGenerator::assignGlobals (TSymbolList &blockSymbols) {
     bool firstSymbol = true;
     std::uint64_t firstSymbolOffset = 0;
     for (TSymbol *s: blockSymbols)
-        if (s->checkSymbolFlag (TSymbol::Variable) || s->checkSymbolFlag (TSymbol::StaticVariable) || s->checkSymbolFlag (TSymbol::Alias)) {
+        if ((s->checkSymbolFlag (TSymbol::Variable) || s->checkSymbolFlag (TSymbol::StaticVariable) || s->checkSymbolFlag (TSymbol::Alias)) && !s->checkSymbolFlag (TSymbol::Absolute)) {
             if (firstSymbol) {
                 firstSymbolOffset = s->getOffset ();
                 firstSymbol = false;

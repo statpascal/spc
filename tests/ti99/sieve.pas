@@ -1,15 +1,15 @@
 program sieve (output);
 
 const 
-    n = 1000;
-    rep = 20;
+    n = 10000;
+    rep = 1;
 
 var
     prim:  array [0..n] of boolean;
     i, j, k: integer;
 
 begin
-    writechar ('S'); writechar (' ');
+    writeint (-100); writechar (' ');
     for k := 1 to rep do begin
         for i := 0 to n do
             prim [i] := true;
