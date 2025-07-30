@@ -937,15 +937,22 @@ void T9900Generator::generateCode (TFunctionCall &functionCall) {
     std::size_t stackCount = 0;
     for (ssize_t i = parameterDescriptions.size () - 1; i >= 0; --i) {
         visit (parameterDescriptions [i].actualParameter);
-        const T9900Reg reg = fetchReg (intScratchReg1);
-        if (parameterDescriptions [i].type->getSize () == 1)
-            outputCode (T9900Op::swpb, reg);            
-//        codePush (reg);
-        if (parameterDescriptions [i].offset)
-            outputCode (T9900Op::mov, reg, T9900Operand (T9900Reg::r10, parameterDescriptions [i].offset));
-        else
-            outputCode (T9900Op::mov, reg, T9900Operand (T9900Reg::r10, T9900Operand::TAddressingMode::RegInd));
-        stackCount += 2;
+        if (parameterDescriptions [i].isInteger) {
+            const T9900Reg reg = fetchReg (intScratchReg1);
+            if (parameterDescriptions [i].type->getSize () == 1)
+                outputCode (T9900Op::swpb, reg);            
+            if (parameterDescriptions [i].offset)
+                outputCode (T9900Op::mov, reg, T9900Operand (T9900Reg::r10, parameterDescriptions [i].offset));
+            else
+                outputCode (T9900Op::mov, reg, T9900Operand (T9900Reg::r10, T9900Operand::TAddressingMode::RegInd));
+            stackCount += 2;
+        } else {
+            T9900Reg reg = getSaveReg (intScratchReg1);
+            outputCode (T9900Op::mov, T9900Reg::r10, reg);
+            outputCode (T9900Op::ai, reg, parameterDescriptions [i].offset);
+            saveReg (reg);
+            codeMove (parameterDescriptions [i].type->getSize ());
+        }
     }
     
     if (usesReturnValuePointer && returnStorage) {
@@ -1066,7 +1073,10 @@ void T9900Generator::codeMultiplyConst (const T9900Reg reg, const std::size_t n)
 
 void T9900Generator::codeMove (const std::size_t n) {
     if (n) {
-        //
+        loadReg (intScratchReg3);
+        loadReg (intScratchReg2);
+        outputCode (T9900Op::li, intScratchReg4, n);
+        outputCode (T9900Op::bl, T9900Operand ("_rt_copy_mem"));
     }
 }
 
@@ -1320,17 +1330,8 @@ void T9900Generator::generateCode (TAssignment &assignment) {
         */            
         } else
             codeStoreMemory (st, operand, fetchReg (intScratchReg1));
-    } else {
-    /*
-        TTypeAnyManager typeAnyManager = lookupAnyManager (type);
-        loadReg (TX64Reg::rdi);
-        loadReg (TX64Reg::rsi);
-        if (typeAnyManager.anyManager)
-            codeRuntimeCall ("rt_copy_mem", TX64Reg::r9, {{TX64Reg::rdx, type->getSize ()}, {TX64Reg::rcx, typeAnyManager.runtimeIndex}, {TX64Reg::r8, 1}});
-        else 
-            codeMove (type->getSize ());
-    */            
-    }
+    } else 
+        codeMove (type->getSize ());
 }
 
 void T9900Generator::generateCode (TRoutineCall &routineCall) {
