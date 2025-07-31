@@ -71,6 +71,9 @@ private:
         std::string name;
         std::size_t size;
     };
+    struct TStringDefinition {
+        std::string label, val;
+    };
     
     using TCodeSequence = std::list<T9900Operation>;
     TCodeSequence program, *currentOutput;
@@ -100,7 +103,7 @@ private:
     void codeLoadMemory (TType *, T9900Reg destReg, T9900Operand srcMem);
     void codeStoreMemory (TType *, T9900Operand destMem, T9900Reg srcReg);
     void codeMultiplyConst (T9900Reg, std::size_t);
-    void codeMove (std::size_t);
+    void codeMove (const TType *);
     
     void initStaticVariable (char *addr, const TType *t, const TConstant *constant);
     
@@ -141,6 +144,7 @@ private:
     std::vector<TGlobalDefinition> globalDefinitions;
     std::vector<TConstantDefinition> constantDefinitions;
     std::vector<TSetDefinition> setDefinitions;
+    std::vector<TStringDefinition> stringDefinitions;
     std::string endOfRoutineLabel;
     
     struct TJumpTable {
@@ -161,6 +165,7 @@ private:
     
     std::string registerConstant (double);
     std::string registerConstant (const std::array<std::uint64_t, TConfig::setwords> &);
+    std::string registerConstant (const std::string &);
     void registerLocalJumpTable (const std::string &tableLabel, const std::string &defaultLabel, std::vector<std::string> &&jumpLabels);
     
     void outputLabelDefinition (const std::string &label, std::size_t value);

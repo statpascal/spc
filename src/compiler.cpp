@@ -365,6 +365,22 @@ TType *TBlock::parseArrayType () {
     return type;
 }
 
+TType *TBlock::parseShortString () {
+    std::size_t length = 255;
+    lexer.getNextToken ();
+    if (lexer.checkToken (TToken::SquareBracketOpen)) {
+        const TSimpleConstant *size = parseConstExpression ();
+        compiler.checkToken (TToken::SquareBracketClose, "']' required in shortstring declaration");
+        if (size->getType () != &stdType.Int64)
+            compiler.errorMessage (TCompilerImpl::InvalidType, "Need integer constant for shortstring length");
+        length = size->getInteger ();
+        if (length < 1 || length > 255)
+            compiler.errorMessage (TCompilerImpl::InvalidType, "Invalid shortstring length (must be 1..255)");
+    }
+    return compiler.createMemoryPoolObject<TShortStringType> (
+        compiler.createMemoryPoolObject<TSubrangeType> (std::string (), &stdType.Int64, 0, length));
+}
+
 void TBlock::parseRecordFieldList (TRecordType *recordType) {
     std::vector<std::string> identifiers;
     do {
@@ -549,6 +565,7 @@ TType *TBlock::parseType () {
     static const TDispatcherMap dispatcher = {
       { TToken::BracketOpen,	&TBlock::parseEnumerationType },
       { TToken::Array,		&TBlock::parseArrayType },
+      { TToken::ShortString,    &TBlock::parseShortString },
       { TToken::Record,		&TBlock::parseRecordType },
       { TToken::Set,		&TBlock::parseSetType },
       { TToken::File,           &TBlock::parseFileType },

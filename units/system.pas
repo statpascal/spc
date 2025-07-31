@@ -9,6 +9,8 @@ const
     MaxInt = $7fffffff;
 
 type
+    string = AnsiString;
+
     shortint = int8;
     smallint = int16;
     longint = int32;

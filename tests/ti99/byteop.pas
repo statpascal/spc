@@ -11,7 +11,7 @@ begin
         for j := 1 to 10 do
             begin
                 gotoxy (3 * pred (i), pred (j));
-                writeint (i * j)
+                write (i * j)
             end;
     waitkey
 end.

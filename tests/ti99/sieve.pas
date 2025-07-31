@@ -6,10 +6,10 @@ const
 
 var
     prim:  array [0..n] of boolean;
-    i, j, k: integer;
+    i, j, k, count: integer;
 
 begin
-    writeint (-100); writechar (' ');
+    writeln ('Starting sieve');
     for k := 1 to rep do begin
         for i := 0 to n do
             prim [i] := true;
@@ -28,12 +28,15 @@ begin
                 inc (i)
             end;
     end;
+    count := 0;
     for i := 2 to n do
         if prim [i] then
             begin
-  	        writeint (i);
-	        writechar (' ')
-	    end;
+                write (i:8);
+                inc (count)
+            end;
+    writeln; writeln;
+    writeln ('Found ', count, ' primes below ', n);
     waitkey
 end.
 

@@ -13,7 +13,8 @@ enum class T9900Op {
     blwp, b, x, clr, neg, inv, inc, inct, dec, dect, bl, swpb, seto, abs, sra, srl, sla, src,
     jmp, jlt, jle, jeq, jhe, jgt, jne, jnc, joc, jno, jl, jh, jop, sbo, sbz, tb, coc, czc,
     xor_, xop, ldcr, stcr, mpy, div, szc, szcb, s, sb, c, cb, a, ab, mov, movb, soc, socb,
-    def_label, comment, end
+    // Pseude ops 
+    def_label, comment, stri, end
 };
 
 enum class T9900Reg {

@@ -63,6 +63,7 @@ private:
 
     TType *parseEnumerationType ();
     TType *parseArrayType ();
+    TType *parseShortString ();
     TType *parseRecordType ();
     TType *parseSetType ();
     TType *parseFileType ();

@@ -208,6 +208,7 @@ void TWriteRoutine::checkArguments (TBlock &block, std::vector<TRuntimeRoutine::
         {{&stdType.Boolean, false}, "__write_boolean"},
         {{&stdType.Real, false}, "__write_dbl"},
         {{&stdType.String, false}, "__write_string"},
+        {{&stdType.ShortString, false}, "__write_string"},
         
         {{&stdType.Int64, true}, "__write_vint64"},
         {{&stdType.Char, true}, "__write_vchar"},
@@ -227,9 +228,11 @@ void TWriteRoutine::checkArguments (TBlock &block, std::vector<TRuntimeRoutine::
             bool isVector = basetype->isVector ();
             if (isVector)
                 basetype = getVectorBaseType (argument.expression, block);
+            else if (basetype->isShortString ())
+                basetype = &stdType.ShortString;	// generic version
             else
                 basetype = convertBaseType (argument.expression, block);
-            bool typeOk = basetype == &stdType.Real || basetype == &stdType.String || basetype == &stdType.Char || basetype == &stdType.Int64 || basetype == &stdType.Boolean;
+            bool typeOk = basetype == &stdType.Real || basetype == &stdType.ShortString || basetype == &stdType.String || basetype == &stdType.Char || basetype == &stdType.Int64 || basetype == &stdType.Boolean;
             if (!typeOk) 
                 compiler.errorMessage (TCompilerImpl::InvalidType, "Cannot output value of type " + basetype->getName ());
             else {                

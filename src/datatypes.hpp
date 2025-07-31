@@ -27,6 +27,7 @@ public:
     virtual bool isReal () const;
     virtual bool isSingle () const;
     virtual bool isString () const;
+    virtual bool isShortString () const;
     virtual bool isEnumerated () const;
     virtual bool isSubrange () const;
     virtual bool isArray () const;
@@ -291,6 +292,15 @@ private:
     TType *returnType;
 };
 
+class TShortStringType: public TArrayType {
+typedef TArrayType inherited;
+public:
+    TShortStringType (TEnumeratedType *length);
+    
+    virtual std::string getName () const override;
+    virtual bool isShortString () const override;
+};
+
 // standard data types as global constants
 
 class TStdType {
@@ -303,6 +313,7 @@ public:
     TRealType Real;
     TSingleType Single;
     TStringType String;
+    TShortStringType ShortString;
     TSetType GenericSet;
     TPointerType GenericPointer;
     TUnresOverloadType UnresOverload;

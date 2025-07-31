@@ -13,10 +13,7 @@ procedure test;
         i: 1..7;
     begin
         for i := 1 to 7 do
-            begin
-                writeint (i); writechar ('!'); writechar ('='); writeint (fac (i));
-                writelf
-            end
+            writeln (i, '!', '=', fac (i))
     end;
     
 begin

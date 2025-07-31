@@ -17,7 +17,7 @@ std::ostream &operator << (std::ostream &os, TToken token) {
     static std::array<std::string, static_cast<std::size_t> (TToken::Error) + 1> tokens = {
         // program symbols        
         "Begin", "End", "If", "Then", "Else", "For", "To", "Downto", "Do", "Const", 				
-        "Type", "Var", "Absolute", "While", "Repeat", "Until", "Record", "Array", "Set", "File",
+        "Type", "Var", "Absolute", "While", "Repeat", "Until", "Record", "Array", "Set", "File", "shortstring",
         "Vector", "Matrix", 
         "Of", "Procedure", "Function", "Case", "With", "Nil", "Forward", "External", "Export", "CDecl", "Overload", "Unit", 
         "Interface", "Implementation", "Initialization", "Finalization", "Uses", "Label", "Goto", "Program",
@@ -127,6 +127,7 @@ TLexer::TLexerImpl::TLexerImpl ():
     {"overload",	TToken::Overload},
     {"export",		TToken::Export},
     {"file",		TToken::File},
+    {"shortstring",     TToken::ShortString},
     {"finalization",    TToken::Finalization},
     {"function", 	TToken::Function}, 
     {"goto", 		TToken::Goto},

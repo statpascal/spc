@@ -10,7 +10,7 @@ const std::vector<std::string>
                "blwp", "b", "x", "clr", "neg", "inv", "inc", "inct", "dec", "dect", "bl", "swpb", "seto", "abs", "sra", "srl", "sla", "src",
                "jmp", "jlt", "jle", "jeq", "jhe", "jgt", "jne", "jnc", "joc", "jno", "jl", "jh", "jop", "sbo", "sbz", "tb", "coc", "czc",
                "xor", "xop", "ldcr", "stcr", "mpy", "div", "szc", "szcb", "s", "sb", "c", "cb", "a", "ab", "mov", "movb", "soc", "socb",
-               "", "", ""};
+               "", "", "", ""};
 
 T9900Operand::T9900Operand ():
   t (TAddressingMode::Invalid) {
@@ -70,6 +70,8 @@ std::string T9900Operation::makeString () const {
             return operand1.makeString () + ": even";	// required for xas99/labels on consecutive lines
         case T9900Op::comment:
             return comment.empty () ? comment : "; " + comment;
+        case T9900Op::stri:
+            return operand1.makeString () + " stri '" + operand2.makeString () + "'";	// TODO: esc "'"
         case T9900Op::end:
             return "";
         default: {

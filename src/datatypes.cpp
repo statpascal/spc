@@ -40,6 +40,10 @@ bool TType::isString () const {
     return false;
 }
 
+bool TType::isShortString () const {
+    return false;
+}
+
 bool TType::isEnumerated () const {
     return false;
 }
@@ -135,7 +139,7 @@ bool TSingleType::isSingle () const {
 
 
 std::string TStringType::getName () const {
-    return "string";
+    return "ansistring";
 }
 
 std::size_t TStringType::getSize () const {
@@ -147,6 +151,19 @@ bool TStringType::isSerializable () const {
 }
 
 bool TStringType::isString () const {
+    return true;
+}
+
+
+TShortStringType::TShortStringType (TEnumeratedType *length):
+  inherited (&stdType.Char, length) {
+}
+
+std::string TShortStringType::getName () const {
+    return "string [" + std::to_string (getIndexType ()->getMaxVal ())  + "]";
+}
+    
+bool TShortStringType::isShortString () const {
     return true;
 }
 
@@ -313,10 +330,14 @@ void TRecordType::setSize (std::size_t n) {
 TFileType::TFileType (TType *baseType, TSymbolList *components):
   inherited (components),
   baseType (baseType) {
+#ifdef CREATE_9900
+    addComponent ("idx", &stdType.Int16);
+#else  
     addComponent ("idx", &stdType.Int64);
     addComponent ("fn", &stdType.String);
     addComponent ("blksize", &stdType.Int64);
     addComponent ("binary", &stdType.Boolean);
+#endif    
 }
 
 std::string TFileType::getName () const {
@@ -557,6 +578,7 @@ TStdType::TStdType ():
   Real (),
   Single (),
   String (),
+  ShortString (&Uint8),
   GenericSet (nullptr),
   GenericPointer (&Void),
   UnresOverload (),

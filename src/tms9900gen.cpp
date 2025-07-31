@@ -285,7 +285,7 @@ void T9900Generator::optimizePeepHole (TCodeSequence &code) {
             op_2_2 = T9900Operand ();
             op2 = op2 == T9900Op::a ? 
                             op_1_2.val == 1 ? T9900Op::inc : T9900Op::inct :
-                            op_2_2.val == 1 ? T9900Op::dec : T9900Op::dect;
+                            op_1_2.val == 1 ? T9900Op::dec : T9900Op::dect;
             removeLines (code, line, 1);
         }
         
@@ -464,7 +464,11 @@ void T9900Generator::outputLocalJumpTables () {
 }
 
 void T9900Generator::outputGlobalConstants () {
-    outputComment ("Double Constants");
+    if (!stringDefinitions.empty ()) {
+        outputComment ("Double Constants");
+        for (const TStringDefinition &s: stringDefinitions)
+            outputCode (T9900Op::stri, T9900Operand (s.label), T9900Operand (s.val));
+    }
 /*    
     for (const TConstantDefinition &c: constantDefinitions) {
         union {
@@ -497,6 +501,14 @@ std::string T9900Generator::registerConstant (double v) {
 std::string T9900Generator::registerConstant (const std::array<std::uint64_t, TConfig::setwords> &v) {
     setDefinitions.push_back ({"__set_cnst_" + std::to_string (dblConstCount++), v});
     return setDefinitions.back ().label;
+}
+
+std::string T9900Generator::registerConstant (const std::string &s) {
+    for (TStringDefinition &c: stringDefinitions)
+        if (c.val == s)
+            return c.label;
+    stringDefinitions.push_back ({"__str_cnst_" + std::to_string (dblConstCount++), s});
+    return stringDefinitions.back ().label;
 }
 
 //void TX64Generator::registerLocalJumpTable (const std::string &tableLabel, const std::string &defaultLabel, std::vector<std::string> &&jumpLabels) {
@@ -951,7 +963,7 @@ void T9900Generator::generateCode (TFunctionCall &functionCall) {
             outputCode (T9900Op::mov, T9900Reg::r10, reg);
             outputCode (T9900Op::ai, reg, parameterDescriptions [i].offset);
             saveReg (reg);
-            codeMove (parameterDescriptions [i].type->getSize ());
+            codeMove (parameterDescriptions [i].type);
         }
     }
     
@@ -979,7 +991,10 @@ void T9900Generator::generateCode (TConstantValue &constant) {
     } else if (constant.getType () == &stdType.Real) {
         //
     } else if (constant.getConstant ()->getType () == &stdType.String) {
-        //
+        T9900Reg reg = getSaveReg (intScratchReg1);
+        const std::string label = registerConstant (constant.getConstant ()->getString ());
+        outputCode (T9900Op::li, reg, T9900Operand (label));
+        saveReg (reg);
     } else {
         T9900Reg reg = getSaveReg (intScratchReg1);
         const std::int16_t n = constant.getConstant ()->getInteger ();
@@ -1071,12 +1086,16 @@ void T9900Generator::codeMultiplyConst (const T9900Reg reg, const std::size_t n)
     }
 }
 
-void T9900Generator::codeMove (const std::size_t n) {
+void T9900Generator::codeMove (const TType *type) {
+    std::size_t n = type->getSize ();
     if (n) {
         loadReg (intScratchReg3);
         loadReg (intScratchReg2);
         outputCode (T9900Op::li, intScratchReg4, n);
-        outputCode (T9900Op::bl, T9900Operand ("_rt_copy_mem"));
+        if (type->isShortString ())
+            outputCode (T9900Op::bl, T9900Operand ("_rt_copy_str"));
+        else
+            outputCode (T9900Op::bl, T9900Operand ("_rt_copy_mem"));
     }
 }
 
@@ -1331,7 +1350,7 @@ void T9900Generator::generateCode (TAssignment &assignment) {
         } else
             codeStoreMemory (st, operand, fetchReg (intScratchReg1));
     } else 
-        codeMove (type->getSize ());
+        codeMove (type);
 }
 
 void T9900Generator::generateCode (TRoutineCall &routineCall) {

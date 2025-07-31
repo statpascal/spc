@@ -170,6 +170,12 @@ bool TExpressionBase::checkTypeConversion (TType *required, TExpressionBase *&ex
     if (required == expr->getType ())
         return true;
         
+    if (required->isShortString () && expr->getType ()->isShortString ())
+        return true;
+        
+    if (required->isPointer () && expr->getType ()->isShortString ())
+        return true;
+        
     if (expr->getType () == &stdType.UnresOverload && expr->isRoutine () && required->isRoutine ())
         return static_cast<TRoutineValue *> (expr)->resolveConversion (static_cast<TRoutineType *> (required));
 
@@ -759,8 +765,10 @@ TExpressionBase *TFactor::parse (TBlock &block) {
         expr = parseIdentifier (block);
     else if (token == TToken::IntegerConst || token == TToken::RealConst || token == TToken::CharConst || token == TToken::StringConst || token == TToken::SizeOf) {
         expr = compiler.createMemoryPoolObject<TConstantValue> (block.parseConstantLiteral ());
+#ifndef CREATE_9900        
         if (token == TToken::StringConst)
             expr = createRuntimeCall ("__str_make", nullptr, {expr, TExpressionBase::createVariableAccess (TConfig::globalRuntimeDataPtr, block)}, block, false);
+#endif            
     } else if (lexer.checkToken (TToken::BracketOpen)) {
         expr = TExpression::parse (block);
         compiler.checkToken (TToken::BracketClose, "Bracketed expression missing ')'");
@@ -1219,7 +1227,11 @@ void TPointerDereference::acceptCodeGenerator (TCodeGenerator &codeGenerator) {
 TConstantValue::TConstantValue (const TSimpleConstant *constant):
   constant (constant), symbol (nullptr) {
     TType *type = constant->getType ();
+#ifdef CREATE_9900
+    setType (type == &stdType.String ? &stdType.ShortString : type);
+#else    
     setType (type == &stdType.String ? &stdType.Int64 : type);
+#endif    
 }
 
 TConstantValue::TConstantValue (TSymbol *symbol):
