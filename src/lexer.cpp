@@ -127,7 +127,11 @@ TLexer::TLexerImpl::TLexerImpl ():
     {"overload",	TToken::Overload},
     {"export",		TToken::Export},
     {"file",		TToken::File},
+#ifdef CREATE_9900
+    {"string",     	TToken::ShortString},
+#else    
     {"shortstring",     TToken::ShortString},
+#endif    
     {"finalization",    TToken::Finalization},
     {"function", 	TToken::Function}, 
     {"goto", 		TToken::Goto},

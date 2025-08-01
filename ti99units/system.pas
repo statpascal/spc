@@ -4,8 +4,6 @@ interface
 
 type
     integer = int16;
-    string = array [0..80] of char;
-    
     PChar = ^char;
     
 var
@@ -148,7 +146,7 @@ procedure loadCharset;
     var 
         i, j: integer;
     begin
-        gromwa := #$06;	// >06b0: standard char set
+        gromwa := #$06;	// >06b4: standard char set
         gromwa := #$b4;
         setVdpAddress ($0800 + 8 * 32 or WriteAddr);
         for i := 32 to 127 do

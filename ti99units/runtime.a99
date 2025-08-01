@@ -17,18 +17,6 @@ waitkey:
 !
 	b *r11
 
-; Copy block of memory
-;
-; R12: source address
-; R13: dest address
-; R14: count != 0
-
-_rt_copy_mem:
-	movb *r12+, *r13+
-	dec r14
-	jne _rt_copy_mem
-	b *r11
-
 ; Copy string
 ;
 ; R12: source address
@@ -41,18 +29,22 @@ _rt_copy_str:
 	srl r15, 8
 	c r14, r15
 	jl !
-	mov r15, r14	; use length of shorter src
+	mov r15, r14		; use length of shorter src
 !
-	swpb r14
-	movb r14, *r13+
-	jeq !!
+	movb @>831d, *r13+	; r14 low
+	jeq !
 
-	swpb r14
-!
+; Copy block of memory
+;
+; R12: source address
+; R13: dest address
+; R14: count != 0
+
+_rt_copy_mem:
 	movb *r12+, *r13+
 	dec r14
-	jne -!
-!	
+	jne _rt_copy_mem
+!
 	b *r11
 
 

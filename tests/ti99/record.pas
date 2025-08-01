@@ -3,7 +3,8 @@ program test;
 type
     rec = record
         a, b: integer;
-        c, d: char
+        c, d: char;
+        e: string [10];
     end;
     
 function makeit: rec;
@@ -14,15 +15,16 @@ function makeit: rec;
             a := 5;
             b := 9;
             c := 'A';
-            d := 'F'
+            d := 'F';
+            e := 'Hello'
         end;
         makeit := r
     end;
     
 procedure printit (r: rec);
     begin
-        writeint (r.a); writeint (r.b);
-        writechar (r.c); writechar (r.d)
+        with r do
+            write (a:3, b:3, c:3, d:3, ' ', e)
     end;
     
 begin

@@ -29,10 +29,8 @@ procedure printit (a: field);
         i: integer;
     begin
         for i := 1 to 10 do
-            begin
-                writeint (a [i]);
-                writechar (' ')
-            end
+            write (a [i], ' ');
+        writeln
     end;
     
 function addit (a, b: field): field;
@@ -51,11 +49,9 @@ var
 begin
     fillit1 (a);
     printit (a);
-    writelf;
     a := fillit2;
     b := a;
     printit (b);
-    writelf;
     printit (addit (fillit2, fillit2));
     waitkey
 end.

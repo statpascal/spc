@@ -17,8 +17,7 @@ ws	bss 32
 prog_list:
 	data >0000		Next menu item
 	data prog_start		Program entry point
-        byte >09
-        text 'CART TEST'
+	stri 'CART TEST'
         even
 
 prog_start:
