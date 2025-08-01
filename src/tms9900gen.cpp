@@ -349,7 +349,7 @@ void T9900Generator::optimizePeepHole (TCodeSequence &code) {
         // mov r9, reg
         // ai reg, imm
         // ...
-        else if (op1 == T9900Op::mov && op2 == T9900Op::ai && op_1_1.isReg () && op_1_1.reg == T9900Reg::r9 && isSameCalcStackReg (op_1_2, op_2_1)) {
+        else if (op1 == T9900Op::mov && op2 == T9900Op::ai && op_1_1.t == T9900Operand::TAddressingMode::Reg && op_1_1.reg == T9900Reg::r9 && isSameCalcStackReg (op_1_2, op_2_1)) {
             // mov|a|s *reg, op | inc/inct/dec/dect *reg
             // ->
             // mov|movb|a|s @imm(r9), op | inc/inct/dec/dect @imm(r9)
@@ -1042,7 +1042,7 @@ void T9900Generator::codeSymbol (const TSymbol *s, const T9900Reg reg) {
         outputCode (T9900Op::mov, T9900Reg::r9, reg), 
         outputCode (T9900Op::ai, reg, s->getOffset (), s->getName ());
     } else {
-        outputCode (T9900Op::mov, T9900Operand (T9900Reg::r9, 2 * (s->getLevel () - currentLevel)), reg);
+        outputCode (T9900Op::mov, T9900Operand (T9900Reg::r9, 2 * (s->getLevel () - currentLevel + 1)), reg);
         outputCode (T9900Op::ai, reg, s->getOffset (), s->getName ());
     }
 }
@@ -1564,7 +1564,7 @@ void T9900Generator::beginRoutineBody (const std::string &routineName, std::size
             outputCode (T9900Op::mov, T9900Reg::r10, T9900Reg::r9);
             
             if (level > 1) {
-                for (std::size_t i = 1; i < level - 1; ++i)
+                for (std::size_t i = 0; i < level - 2; ++i)
                     codePush (T9900Operand (intScratchReg2, -2 * i));
 //                codePush (T9900Reg::r9);
                 if (symbolList.getLocalSize ())

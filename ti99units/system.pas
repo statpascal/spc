@@ -15,11 +15,15 @@ procedure gotoxy (x, y: integer);
 
 procedure move (var src, dest; length: integer); external;
 
+function min (a, b: integer): integer;
+function max (a, b: integer): integer;
+function sqr (a: integer): integer;
+
 procedure __write_lf (var f: text; runtimeData: pointer); 
 procedure __write_int64 (var f: text; n, length, precision: integer; runtimeData: pointer); 
 procedure __write_char (var f: text; ch: char; length, precision: integer; runtimeData: pointer);
 procedure __write_string (var f: text; p: PChar; length, precision: integer; runtimeData: pointer);
-//procedure __write_boolean (var f: text; b: boolean; length, precision: integer; runtimeData: pointer);
+procedure __write_boolean (var f: text; b: boolean; length, precision: integer; runtimeData: pointer);
 
 function __short_str_char (ch: char): string1;
 function __short_str_concat (a, b: PChar): string;
@@ -141,9 +145,11 @@ procedure __write_char (var f: text; ch: char; length, precision: integer; runti
     
 procedure __write_string (var f: text; p: PChar; length, precision: integer; runtimeData: pointer);
     var
-        len: integer;
+        len, i: integer;
     begin
         len := ord (p^);
+        for i := len + 1 to length do
+            writechar (' ');
         while len > 0 do 
             begin
                 inc (p);
@@ -152,6 +158,14 @@ procedure __write_string (var f: text; p: PChar; length, precision: integer; run
             end
     end;
     
+procedure __write_boolean (var f: text; b: boolean; length, precision: integer; runtimeData: pointer);
+    begin
+        if b then
+            __write_string (f, 'true', length, precision, runtimeData)
+        else
+            __write_string (f, 'false', length, precision, runtimeData)
+    end;
+
 function min (a, b: integer): integer;
     begin
         if a < b then
@@ -159,7 +173,19 @@ function min (a, b: integer): integer;
         else
             min := b
     end;
-    
+
+function max (a, b: integer): integer;
+    begin
+        if a < b then
+            max := b
+        else
+            max := a
+    end;
+
+function sqr (a: integer): integer;
+    begin
+        sqr := a * a
+    end;
 
 function __short_str_char (ch: char): string1;
     var

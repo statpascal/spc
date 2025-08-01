@@ -40,4 +40,3 @@ begin
     writeln ('Found ', count, ' primes below ', n);
     waitkey
 end.
-
