@@ -95,13 +95,20 @@ This is work in progress.
 
 The compiler can produce a ROM cartridge for the TI99/4A.
 
-Ordinal types and pointer operations are supported; there are
-no strings, floating points or runtime libraries yet.
+There are no floating point, file operations or heap allocated values yet (but one
+can obtain pointers with the addr operator), the case statement is still
+missing and the runtime library is rather limited.
 
-To enable the TI99 mode, uncomment the define *-DCREATE_9900* in the makefile.
+To enable the TI99 mode, execute the makefile with the option *ti99=1*:
+
+```
+make clean
+make ti99=1 -j 4
+```
+
 This will set the default unit search path of the compiler to the *ti99units* directory. The
-*system.pas* in this directory (which is included by default) defines some procedures to
-output integers on the screen. The *tests/ti99* directory shows what is
+*system.pas* in this directory (which is included by default) containes the
+runtime library. The *tests/ti99* directory shows what is
 already working.
 
 Compiling a program in this mode produces the assembler source *out.a99*,
@@ -114,6 +121,15 @@ user@host:~/src/statpascal> ~/ti99/xdt99/xas99.py -R -b -q ti99units/cart.a99 -o
 user@host:~/src/statpascal> ls -l cart.bin 
 -rw-r--r--. 1 user user 1088 Jul 28 14:11 cart.bin
 ```
+
+The following steps are planned:
+
+- add missing language features (case statement, initialized variables)
+- simple UCSD-like heap management (mark/release)
+- a standard runtime library
+- floating point operations (probably IEEE-754 binary32)
+- bank switched code in cartridge address range
+- file operations
 
 ## License
 

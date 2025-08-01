@@ -14,7 +14,7 @@ SRC = compiler.cpp anymanager.cpp expression.cpp predefined.cpp constant.cpp \
 OBJ = $(patsubst %.cpp,$(OBJDIR)/%.o,$(SRC))
 
 LIBS = -ldl -lffi -lm -lstdc++ -lstdc++fs -pthread
-CPPFLAGS = -g -std=c++20 -pthread -Wall -pedantic -DCREATE_9900
+CPPFLAGS = -g -std=c++20 -pthread -Wall -pedantic 
 # CPPFLAGS += -g -std=c++20 -O3 -fomit-frame-pointer -falign-functions=16 -march=native -funroll-loops 
 ifeq ($(CXX),clang++)
     CPPFLAGS += -Wno-return-type-c-linkage -Wno-logical-op-parentheses
@@ -22,15 +22,20 @@ else
     CPPFLAGS += -falign-loops=16
 endif
 
+ifeq ($(ti99),1)
+	CPPFLAGS += -DCREATE_9900
+endif
+
 
 LDFLAGS = -Wl,--export-dynamic
 
 
-.PHONY: directories tests
+.PHONY: directories tests 
 
 all: | directories $(TARGET)
 
 directories: $(OBJDIR)
+
 
 $(OBJDIR):
 	mkdir -p $(OBJDIR)

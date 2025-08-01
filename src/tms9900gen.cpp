@@ -196,11 +196,11 @@ void T9900Generator::optimizePeepHole (TCodeSequence &code) {
             removeLines (code, line, 1);
         }
         
-        // mov op, reg
+        // mov|szc op, reg
         // ci reg, 0
         // ->
         // mov op, reg
-        else if (op1 == T9900Op::mov && op2 == T9900Op::ci && isSameCalcStackReg (op_1_2, op_2_1) && op_2_2.val == 0) {
+        else if ((op1 == T9900Op::mov || op1 == T9900Op::szc) && op2 == T9900Op::ci && isSameCalcStackReg (op_1_2, op_2_1) && op_2_2.val == 0) {
             removeLines (code, line1, 1);
             if (line != code.begin ()) --line;
         }
@@ -322,6 +322,27 @@ void T9900Generator::optimizePeepHole (TCodeSequence &code) {
             op_3_2 = T9900Operand (op_1_1.reg, op_1_2.val);
             comm_3 = comm_3 + " -> " + comm_1 + " + " + comm_2;
             removeLines (code, line, 1);
+        }
+        
+        // li reg1, imm
+        // inv reg1
+        // szc reg1, reg2
+        // ->
+        // andi reg2, imm
+        else if (op1 == T9900Op::li && op2 == T9900Op::inv && op3 == T9900Op::szc && isSameCalcStackReg (op_1_1, op_2_1) &&
+                 isSameCalcStackReg (op_2_1, op_3_1) && op_3_2.t == T9900Operand::TAddressingMode::Reg) {
+            op3 = T9900Op::andi;
+            op_3_1 = op_3_2;
+            op_3_2 = op_1_2;
+            removeLines (code, line, 2);
+        }
+        
+        // inv reg
+        // inv reg
+        // ->
+        // remove instructions
+        else if (op1 == T9900Op::inv && op1 == op2 && isSameCalcStackReg (op_1_1, op_2_1)) {
+            removeLines (code, line, 2);
         }
         
         // Access via base pointer
@@ -465,7 +486,8 @@ void T9900Generator::outputLocalJumpTables () {
 
 void T9900Generator::outputGlobalConstants () {
     if (!stringDefinitions.empty ()) {
-        outputComment ("Double Constants");
+        outputComment (std::string ());
+        outputComment ("String Constants");
         for (const TStringDefinition &s: stringDefinitions)
             outputCode (T9900Op::stri, T9900Operand (s.label), T9900Operand (s.val));
     }

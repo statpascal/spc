@@ -5,6 +5,7 @@ interface
 type
     integer = int16;
     PChar = ^char;
+    string1 = string [1];
     
 var
     input, output: text;
@@ -12,11 +13,17 @@ var
     
 procedure gotoxy (x, y: integer);
 
+procedure move (var src, dest; length: integer); external;
+
 procedure __write_lf (var f: text; runtimeData: pointer); 
 procedure __write_int64 (var f: text; n, length, precision: integer; runtimeData: pointer); 
 procedure __write_char (var f: text; ch: char; length, precision: integer; runtimeData: pointer);
 procedure __write_string (var f: text; p: PChar; length, precision: integer; runtimeData: pointer);
 //procedure __write_boolean (var f: text; b: boolean; length, precision: integer; runtimeData: pointer);
+
+function __short_str_char (ch: char): string1;
+function __short_str_concat (a, b: PChar): string;
+function length (s: PChar): integer;
 
 procedure waitkey; external;
     
@@ -25,6 +32,8 @@ implementation
 const
     WriteAddr = $4000;
 
+type
+    PPChar = ^PChar;
 var 
     vdpWriteAddress: integer;
     vdprd:  char absolute $8800;
@@ -47,7 +56,8 @@ procedure scroll;
         i: integer;
         p, q: ^char;
     begin
-        q := addr (line) + 32;
+        q := addr (line);
+        inc (q, 32);
         for i := 1 to 23 do 
             begin
                 setVdpAddress (i shl 5);
@@ -140,6 +150,39 @@ procedure __write_string (var f: text; p: PChar; length, precision: integer; run
                 writechar (p^);
                 dec (len)
             end
+    end;
+    
+function min (a, b: integer): integer;
+    begin
+        if a < b then
+            min := a
+        else
+            min := b
+    end;
+    
+
+function __short_str_char (ch: char): string1;
+    var
+        res: PChar;
+    begin
+        res := PPChar (addr (ch) + (-1))^;	// addr of result is on stack before a
+        res [0] := #1;
+        res [1] := ch
+    end;
+
+function __short_str_concat (a, b: PChar): string;
+    var
+        res: PChar;
+    begin
+        res := PPChar (addr (a) + (-1))^;	// addr of result is on stack before a
+        move (a^, res^, ord (a^) + 1);
+        move (b [1], res [ord (a^) + 1], min (ord (b^), 255 - ord (a^)));
+        res^ := chr (min (255, ord (a^) + ord (b^)))
+    end;
+    
+function length (s: PChar): integer;
+    begin
+        length := ord (s^)
     end;
     
 procedure loadCharset;

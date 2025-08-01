@@ -1,6 +1,8 @@
 #include "tms9900asm.hpp"
 
 #include <vector>
+#include <sstream>
+#include <iomanip>
 
 namespace statpascal {
 
@@ -70,8 +72,15 @@ std::string T9900Operation::makeString () const {
             return operand1.makeString () + ": even";	// required for xas99/labels on consecutive lines
         case T9900Op::comment:
             return comment.empty () ? comment : "; " + comment;
-        case T9900Op::stri:
-            return operand1.makeString () + " stri '" + operand2.makeString () + "'";	// TODO: esc "'"
+        case T9900Op::stri: {
+            std::stringstream res;
+            auto append = [&res] (char c) {
+                res << std::hex << std::setfill ('0') << std::setw (2) << std::nouppercase << static_cast<unsigned> (c);
+            };
+            append (operand2.label.length ());
+            for (const char c: operand2.label)
+                append (c);
+            return operand1.makeString () + " text >" + res.str () + "    ; " + operand2.label; }
         case T9900Op::end:
             return "";
         default: {

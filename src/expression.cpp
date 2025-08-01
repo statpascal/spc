@@ -215,10 +215,13 @@ bool TExpressionBase::checkTypeConversion (TType *required, TExpressionBase *&ex
         return true;
     }
 
-    // ???? used TODO
-    
     if (required == &stdType.String && expr->getType () == &stdType.Char) {
         expr = createRuntimeCall ("__str_char", required, {expr}, block, false);
+        return true;
+    }
+    
+    if (required->isShortString () && expr->getType () == &stdType.Char) {
+        expr = createRuntimeCall ("__short_str_char", required, {expr}, block, false);
         return true;
     }
     
@@ -466,13 +469,13 @@ TType *TExpressionBase::checkOperatorTypes (TExpressionBase *&left, TExpressionB
         right = block.getCompiler ().createMemoryPoolObject<TTypeCast> (&stdType.Real, right);
         rtype = &stdType.Real;
     }
-    if (ltype == &stdType.String && rtype == &stdType.Char) {
-        checkTypeConversion (&stdType.String, right, block);
-        rtype = &stdType.String;
+    if ((ltype->isShortString () || ltype == &stdType.String) && rtype == &stdType.Char) {
+        checkTypeConversion (ltype, right, block);
+        rtype = ltype;
     }
-    if (ltype == &stdType.Char && rtype == &stdType.String) {
-        checkTypeConversion (&stdType.String, left, block);
-        ltype = &stdType.String;
+    if (ltype == &stdType.Char && (rtype->isShortString () || rtype == &stdType.String)) {
+        checkTypeConversion (rtype, left, block);
+        ltype = rtype;
     }
 
     switch (operation) {
@@ -492,6 +495,8 @@ TType *TExpressionBase::checkOperatorTypes (TExpressionBase *&left, TExpressionB
                 return ltype;
             break;
         case TToken::Add:
+            if (ltype->isShortString () && rtype->isShortString ())
+                return &stdType.ShortString;
             if (ltype == rtype && (ltype == &stdType.Int64 || ltype == &stdType.Real || ltype == &stdType.String))
                 return ltype;
             if (ltype->isPointer () && rtype == &stdType.Int64)
@@ -691,6 +696,8 @@ TExpressionBase *TSimpleExpression::parse (TBlock &block) {
                     left = createRuntimeCall (vecRuntimeFunc.at (operation), type, {left, right, createInt64Constant (tca, block), createInt64Constant (tcb, block)}, block, false);
                 } else if (type->isString ()) 
                     left = createRuntimeCall ("__str_concat", type, {left, right}, block, false);
+                else if (type->isShortString ())
+                    left = createRuntimeCall ("__short_str_concat", type, {left, right}, block, false);
                 else if (!mergeConstants (left, right, type, operation, block))
                     left = compiler.createMemoryPoolObject<TSimpleExpression> (left, right, operation, type);
             }
@@ -795,8 +802,11 @@ TExpressionBase *TFactor::parseIdentifier (TBlock &block) {
                 expr = compiler.createMemoryPoolObject<TConstantValue> (symbol);
                 if (false && symbol->getType ()->isSet ())
                     expr = createRuntimeCall ("__set_const", symbol->getType (), {expr, TExpressionBase::createVariableAccess (TConfig::globalRuntimeDataPtr, block)}, block, false);
-                else if (symbol->getType () == &stdType.String)
+                else if (symbol->getType () == &stdType.String) {
+#ifndef CREATE_9900                
                     expr = createRuntimeCall ( "__str_make", symbol->getType (), {expr, TExpressionBase::createVariableAccess (TConfig::globalRuntimeDataPtr, block)}, block, false);
+#endif
+                }
             } else if (symbol->checkSymbolFlag (TSymbol::Routine))
                 expr = compiler.createMemoryPoolObject<TRoutineValue> (identifier, block);
             else if (symbol->getType () && symbol->getType ()->isReference ())

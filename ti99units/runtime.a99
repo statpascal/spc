@@ -47,4 +47,11 @@ _rt_copy_mem:
 !
 	b *r11
 
+; move expects 3 words on the stack: src, dest, length
 
+move:
+	mov *r10+, r12
+	mov *r10+, r13
+	mov *r10+, r14
+	jeq -!			; return if zero bytes
+	jmp _rt_copy_mem

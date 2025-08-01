@@ -377,8 +377,11 @@ TType *TBlock::parseShortString () {
         if (length < 1 || length > 255)
             compiler.errorMessage (TCompilerImpl::InvalidType, "Invalid shortstring length (must be 1..255)");
     }
-    return compiler.createMemoryPoolObject<TShortStringType> (
-        compiler.createMemoryPoolObject<TSubrangeType> (std::string (), &stdType.Int64, 0, length));
+    if (length == 255)
+        return &stdType.ShortString;
+    else
+        return compiler.createMemoryPoolObject<TShortStringType> (
+            compiler.createMemoryPoolObject<TSubrangeType> (std::string (), &stdType.Int64, 0, length));
 }
 
 void TBlock::parseRecordFieldList (TRecordType *recordType) {
