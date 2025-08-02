@@ -9,7 +9,6 @@ type
     
 var
     input, output: text;
-    __globalruntimedata: pointer;
     
 procedure gotoxy (x, y: integer);
 
@@ -19,11 +18,11 @@ function min (a, b: integer): integer;
 function max (a, b: integer): integer;
 function sqr (a: integer): integer;
 
-procedure __write_lf (var f: text; runtimeData: pointer); 
-procedure __write_int64 (var f: text; n, length, precision: integer; runtimeData: pointer); 
-procedure __write_char (var f: text; ch: char; length, precision: integer; runtimeData: pointer);
-procedure __write_string (var f: text; p: PChar; length, precision: integer; runtimeData: pointer);
-procedure __write_boolean (var f: text; b: boolean; length, precision: integer; runtimeData: pointer);
+procedure __write_lf (var f: text);
+procedure __write_int (var f: text; n, length, precision: integer);
+procedure __write_char (var f: text; ch: char; length, precision: integer);
+procedure __write_string (var f: text; p: PChar; length, precision: integer);
+procedure __write_boolean (var f: text; b: boolean; length, precision: integer);
 
 function __short_str_char (ch: char): string1;
 function __short_str_concat (a, b: PChar): string;
@@ -53,42 +52,19 @@ procedure setVdpAddress (n: integer);
         vdpwa := chr (n and 255);
         vdpwa := chr (n shr 8)
     end;
+    
+procedure _rt_scroll_up; external;    
 
-procedure scroll;
-    var    
-        line: array [0..31] of char;
-        i: integer;
-        p, q: ^char;
-    begin
-        q := addr (line);
-        inc (q, 32);
-        for i := 1 to 23 do 
-            begin
-                setVdpAddress (i shl 5);
-                p := addr (line);
-                while p <> q do
-                    begin
-                        p^ := vdprd;
-                        inc (p)
-                    end;
-                p := addr (line);
-                setVdpAddress (pred (i) shl 5 or WriteAddr);
-                while p <> q do
-                    begin
-                        vdpwd := p^;
-                        inc (p)
-                end;
-            end;
-        for i := 0 to 31 do
-            vdpwd := chr (32);
-        dec (vdpWriteAddress, 32);
-        setVdpAddress (vdpWriteAddress or WriteAddr)
-    end;
-    
-    
 procedure gotoxy (x, y: integer);
     begin
         vdpWriteAddress := y shl 5 + x;
+        setVdpAddress (vdpWriteAddress or WriteAddr)
+    end;
+    
+procedure scroll;
+    begin
+       _rt_scroll_up;
+        dec (vdpWriteAddress, 32);
         setVdpAddress (vdpWriteAddress or WriteAddr)
     end;
     
@@ -100,27 +76,7 @@ procedure writechar (ch: char);
             scroll
     end;
     
-procedure writeint (a, len: integer);
-    var
-        i: integer;
-    begin
-        if a < 0 then
-            begin
-                writechar ('-');
-                writeint (-a, pred (len))
-            end
-        else
-            begin
-                if a >= 10 then
-                    writeint (a div 10, pred (len))
-                else
-                    for i := 2 to len do 
-                        writechar (' ');
-                writechar (chr (a mod 10 + 48))
-            end
-    end;
-    
-procedure __write_lf (var f: text; runtimeData: pointer); 
+procedure __write_lf (var f: text);
     begin
         vdpWriteAddress := (vdpWriteAddress + 32) and not 31;
         if vdpWriteAddress = 24 * 32 then
@@ -129,12 +85,37 @@ procedure __write_lf (var f: text; runtimeData: pointer);
             setVdpAddress (vdpWriteAddress or WriteAddr);
     end;
     
-procedure __write_int64 (var f: text; n, length, precision: integer; runtimeData: pointer); 
+procedure __write_int (var f: text; n, length, precision: integer);
+    var
+        buf: string [6];
+        neg: boolean;
+        p: PChar;
     begin
-        writeint (n, length)
+        if n = -32768 then
+            __write_string (f, '-32768', length, precision)
+        else
+            begin
+                p := addr (buf [6]);
+                neg := n < 0;
+                if neg then
+                    n := -n;
+                repeat
+                    p^ := char (n mod 10 + 48);
+                    dec (p);
+                    if n > 0 then
+                        n := n div 10
+                until n = 0;
+                if neg then
+                    begin
+                        p^ := '-';
+                        dec (p)
+                    end;
+                p^ := chr (integer (addr (buf [6])) - integer (p));
+                __write_string (f, p, length, precision)
+            end
     end;
     
-procedure __write_char (var f: text; ch: char; length, precision: integer; runtimeData: pointer);
+procedure __write_char (var f: text; ch: char; length, precision: integer);
     var
         i: integer;
     begin
@@ -143,27 +124,30 @@ procedure __write_char (var f: text; ch: char; length, precision: integer; runti
         writechar (ch)
     end;
     
-procedure __write_string (var f: text; p: PChar; length, precision: integer; runtimeData: pointer);
+procedure __write_string (var f: text; p: PChar; length, precision: integer);
     var
         len, i: integer;
     begin
         len := ord (p^);
+        while vdpWriteAddress + length > 24 * 32 do
+            scroll;
+        inc (vdpWriteAddress, max (len, length));
         for i := len + 1 to length do
-            writechar (' ');
+            vdpwd := ' ';
         while len > 0 do 
             begin
                 inc (p);
-                writechar (p^);
+                vdpwd := p^;
                 dec (len)
-            end
+            end;
     end;
     
-procedure __write_boolean (var f: text; b: boolean; length, precision: integer; runtimeData: pointer);
+procedure __write_boolean (var f: text; b: boolean; length, precision: integer);
     begin
         if b then
-            __write_string (f, 'true', length, precision, runtimeData)
+            __write_string (f, 'true', length, precision)
         else
-            __write_string (f, 'false', length, precision, runtimeData)
+            __write_string (f, 'false', length, precision)
     end;
 
 function min (a, b: integer): integer;

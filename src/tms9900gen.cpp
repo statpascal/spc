@@ -23,7 +23,7 @@ r10:       stack pointer (decrementing, points to last value in stack)
 r11:	   link register
 r12 - r15: saved by caller
 
-Stack layout of activation frame upon entry:
+Stack layout of activation frame:
 
 +---------------------------------+
 |				  |
@@ -236,10 +236,10 @@ void T9900Generator::optimizePeepHole (TCodeSequence &code) {
         }
         
         // mov op1, reg
-        // a|s|c reg, op2
+        // a|s|c|mov reg, op2
         // ->
-        // a|s|c op1, op2
-        else if (op1 == T9900Op::mov && (op2 == T9900Op::a || op2 == T9900Op::s || op2 == T9900Op::c) && isSameCalcStackReg (op_1_2, op_2_1)) {
+        // a|s|c|mov op1, op2
+        else if (op1 == T9900Op::mov && (op2 == T9900Op::mov || op2 == T9900Op::a || op2 == T9900Op::s || op2 == T9900Op::c) && isSameCalcStackReg (op_1_2, op_2_1)) {
             op_2_1 = op_1_1;
             comm_2 = comm_1 + " " + comm_2;
             removeLines (code, line, 1);
@@ -265,6 +265,16 @@ void T9900Generator::optimizePeepHole (TCodeSequence &code) {
             op_1_2 = op_3_2;
             comm_1.append ( " " + comm_3);
             removeLines (code, line1, 2);
+        }
+        
+        // li reg, imm1
+        // mov reg, op
+        // li reg, imm1
+        // ->
+        // remove redundant load
+        else if (op1 == T9900Op::li && op2 == T9900Op::mov && op3 == T9900Op::li && op_1_2.val == op_3_2.val &&
+                 isSameCalcStackReg (op_1_1, op_2_1) && isSameCalcStackReg (op_2_1, op_3_1)) {
+            removeLines (code, line2, 1);
         }
         
         // movb op, reg
@@ -337,12 +347,33 @@ void T9900Generator::optimizePeepHole (TCodeSequence &code) {
             removeLines (code, line, 2);
         }
         
+        // li reg1, imm
+        // a reg1, reg2
+        // ->
+        // ai reg2, imm
+        else if (op1 == T9900Op::li && op2 == T9900Op::a && isSameCalcStackReg (op_1_1, op_2_1) && !isSameCalcStackReg (op_2_1, op_2_2)) {
+            op1 = T9900Op::ai;
+            op_1_1 = op_2_2;
+            removeLines (code, line1, 1);
+            if (line != code.begin ()) --line;
+        }
+        
         // inv reg
         // inv reg
         // ->
         // remove instructions
         else if (op1 == T9900Op::inv && op1 == op2 && isSameCalcStackReg (op_1_1, op_2_1)) {
             removeLines (code, line, 2);
+        }
+        
+        // ai reg, imm1
+        // ai reg, imm2
+        // ->
+        // ai reg, imm1 + imm2
+        else if (op1 == T9900Op::ai && op2 == T9900Op::ai && isSameCalcStackReg (op_1_1, op_2_1)) {
+            op_2_2.val = (op_2_2.val + op_1_2.val) & 0xffff;
+            removeLines (code, line, 1);
+            comm_2 = comm_1;
         }
         
         // Access via base pointer
@@ -359,10 +390,10 @@ void T9900Generator::optimizePeepHole (TCodeSequence &code) {
                 comm_3 = comm_2;
                 removeLines (code, line, 2);
             }
-            // mov|a|s op, *reg
+            // mov|movb|a|s op, *reg
             // ->
-            // mov|a|s op, @imm(r9)
-            else if ((op3 == T9900Op::a || op3 == T9900Op::s || op3 == T9900Op::mov) && op_1_1.isReg () && isSameCalcStackReg (op_2_1, op_3_2) && op_3_2.t == T9900Operand::TAddressingMode::RegInd) {
+            // mov|movb|a|s op, @imm(r9)
+            else if ((op3 == T9900Op::a || op3 == T9900Op::s || op3 == T9900Op::mov || op3 == T9900Op::movb) && op_1_1.isReg () && isSameCalcStackReg (op_2_1, op_3_2) && op_3_2.t == T9900Operand::TAddressingMode::RegInd) {
                 op_3_2 = T9900Operand (T9900Reg::r9, op_2_2.val);
                 comm_3 = comm_2;
                 removeLines (code, line, 2);
@@ -709,18 +740,35 @@ void T9900Generator::outputIntegerCmpOperation (TToken operation, TExpressionBas
         r2 = fetchReg (intScratchReg1);
         r3 = r1 = fetchReg (intScratchReg2);
     }
-    r4 = intScratchReg3;
-    outputCode (T9900Op::clr, r4);
     outputCode (T9900Op::c, r1, r2);
+    outputCode (T9900Op::clr, r3);
     for (T9900Op op: cmpOperation.at (operation))
         outputCode (op, T9900Operand ("!"));
-    outputCode (T9900Op::inc, r4);
+    outputCode (T9900Op::inc, r3);
     outputCode (T9900Op::def_label, T9900Operand ("!"));
-    outputCode (T9900Op::mov, r4, r3);
     saveReg (r3);
 }
 
 void T9900Generator::outputIntegerOperation (TToken operation, TExpressionBase *left, TExpressionBase *right) {
+    if (operation == TToken::DivInt || operation == TToken::Mod) {
+        visit (right);
+        T9900Reg reg = getSaveReg (intScratchReg2);
+        saveReg (reg);
+        visit (left);
+        T9900Reg rl = fetchReg (intScratchReg1);
+        outputCode (T9900Op::clr, reg);
+        fetchReg (intScratchReg2);
+        T9900Reg rr = fetchReg (intScratchReg3);
+        outputCode (T9900Op::div, rr, reg);
+        if (operation == TToken::DivInt)
+            outputCode (T9900Op::mov, reg, rr);
+        else
+            outputCode (T9900Op::mov, rl, rr);
+        saveReg (rr);
+        return;
+    }
+
+
     visit (left);
     visit (right);
     
@@ -1507,24 +1555,6 @@ void T9900Generator::initStaticRoutinePtr (std::size_t addr, const TRoutineValue
 */    
 }
     
-void T9900Generator::externalRoutine (TSymbol &s) {
-/*
-    void *lib;
-    std::unordered_map<std::string, void *>::iterator it = openLibs.find (s.getExtLibName ());
-    if (it == openLibs.end ())
-        lib = openLibs [s.getExtLibName ()] = dlopen (s.getExtLibName ().c_str (), RTLD_NOW);
-    else
-        lib = it->second;
-    
-    void *f = dlsym (lib, s.getExtSymbolName ().c_str ());
-    if (f)
-        s.setOffset (reinterpret_cast<std::int64_t> (f));
-    else
-        std::cerr << "Symbol not found: lib " << s.getExtLibName () << ", sym " << s.getExtSymbolName () << std::endl;
-    outputLabelDefinition (s.getExtSymbolName (), reinterpret_cast<std::uint64_t> (f));
-*/    
-}
-
 void T9900Generator::beginRoutineBody (const std::string &routineName, std::size_t level, TSymbolList &symbolList, const std::set<T9900Reg> &saveRegs, bool hasStackFrame) {
 //    if (level > 1) {    
         outputComment (std::string ());
@@ -1735,9 +1765,9 @@ void T9900Generator::generateBlock (TBlock &block) {
     
     for (TSymbol *s: blockSymbols) 
         if (s->checkSymbolFlag (TSymbol::Routine)) {
-            if (s->checkSymbolFlag (TSymbol::External)) 
-                externalRoutine (*s);
-            else 
+            if (s->checkSymbolFlag (TSymbol::External)) {
+                // nothing to do yet
+            } else 
                 visit (s->getBlock ());
         }
 

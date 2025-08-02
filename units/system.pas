@@ -209,7 +209,7 @@ procedure __read_bin (var f, buf; size: int64; var blocksread: int64; runtimeDat
 procedure __write_lf (var f: text; runtimeData: pointer); external name 'rt_write_lf';
 procedure __read_lf (var f: text; runtimeData: pointer); external name 'rt_read_lf';
 
-procedure __write_int64 (var f: text; n, length, precision: int64; runtimeData: pointer); external name 'rt_write_int';
+procedure __write_int (var f: text; n, length, precision: int64; runtimeData: pointer); external name 'rt_write_int';
 procedure __write_char (var f: text; ch: char; length, precision: int64; runtimeData: pointer); external name 'rt_write_char';
 procedure __write_string (var f: text; s: string; length, precision: int64; runtimeData: pointer); external name 'rt_write_string';
 procedure __write_boolean (var f: text; b: boolean; length, precision: int64; runtimeData: pointer); external name 'rt_write_bool';

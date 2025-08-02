@@ -1,3 +1,7 @@
+vdpwa equ >8c02
+vdpwd equ >8c00
+vdprd equ >8800
+
 ; Wait for key press
 
 waitkey:
@@ -16,6 +20,53 @@ waitkey:
         jmp waitkey
 !
 	b *r11
+
+_rt_scroll_up:
+	li r0, 32
+!
+	swpb r0
+	movb r0, @vdpwa
+	swpb r0
+	movb r0, @vdpwa
+	li r1, 8
+	li r2, >8320
+!
+	movb @vdprd, *r2+
+	movb @vdprd, *r2+
+	movb @vdprd, *r2+
+	movb @vdprd, *r2+
+	dec r1
+	jne -!
+
+	ai r0, >4000 - 32
+	swpb r0
+	movb r0, @vdpwa
+	swpb r0
+	movb r0, @vdpwa
+
+	li r1, 8
+	li r2, >8320
+!
+	movb *r2+, @vdpwd
+	movb *r2+, @vdpwd
+	movb *r2+, @vdpwd
+	movb *r2+, @vdpwd
+	dec r1
+	jne -!
+
+	ai r0, 64 - >4000
+	ci r0, 768
+	jne -!!!
+
+	li r1, 32
+	li r2, 32 * 256
+!
+	movb r2, @vdpwd
+	dec r1
+	jne -!
+
+	b *r11
+	
 
 ; Copy string
 ;

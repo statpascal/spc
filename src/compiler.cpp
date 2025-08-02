@@ -686,7 +686,7 @@ const TSimpleConstant *TBlock::parseSimpleConstant (TType *type) {
         
     if ((basetype->isReal () || basetype->isSingle ()) && (c->getType () == &stdType.Int64 || c->getType ()->isReal ()))
         c = compiler.createMemoryPoolObject<TSimpleConstant> (c->getDouble (), basetype);
-    else if (basetype == &stdType.String && c->getType () == &stdType.Char)
+    else if ((basetype->isShortString () || basetype == &stdType.String) && c->getType () == &stdType.Char)
         c = compiler.createMemoryPoolObject<TSimpleConstant> (std::string (1, c->getChar ()), &stdType.String);
     else if (basetype->isRoutine () && c->getType ()->isRoutine () && static_cast<const TRoutineType *> (basetype)->matchesOverload (static_cast<TRoutineType *> (c->getType ()))) {
         TRoutineValue *rval = compiler.createMemoryPoolObject <TRoutineValue> (c->getString (), *this);
@@ -698,7 +698,8 @@ const TSimpleConstant *TBlock::parseSimpleConstant (TType *type) {
         TSimpleConstant *result = compiler.createMemoryPoolObject<TSimpleConstant> (*c);
         result->setType (type);
         c = result;
-    } else if (c->getType () != basetype && !(c->getType ()->isSet () && (!c->getType ()->getBaseType () || c->getType ()->getBaseType () == basetype)))
+    } else if (c->getType () != basetype && !(c->getType ()->isSet () && (!c->getType ()->getBaseType () || c->getType ()->getBaseType () == basetype))  &&
+               !(type->isShortString () && c->getType () == &stdType.String))
         compiler.errorMessage (TCompilerImpl::InvalidType, "Expected constant of type '" + type->getName () + "' but got '" + c->getType ()->getName () + "'");
     else {
         TSimpleConstant *result = compiler.createMemoryPoolObject<TSimpleConstant> (*c);
@@ -754,7 +755,7 @@ const TRecordConstant *TBlock::parseRecordConstant (TRecordType *type) {
 const TConstant *TBlock::parseTypedConstant (TType *type) {
     if (type->isRecord ())
         return parseRecordConstant (dynamic_cast<TRecordType *> (type));
-    if (type->isArray ())
+    if (type->isArray () && !type->isShortString ())
         return parseArrayConstant (dynamic_cast<TArrayType *> (type));
     return parseSimpleConstant (type);
 }

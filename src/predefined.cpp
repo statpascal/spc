@@ -203,7 +203,7 @@ TWriteRoutine::TWriteRoutine (TBlock &block, std::vector<TRuntimeRoutine::TForma
 void TWriteRoutine::checkArguments (TBlock &block, std::vector<TRuntimeRoutine::TFormatArguments> &arguments, bool linefeed) {
     TCompilerImpl &compiler = block.getCompiler ();
     static const std::map<std::pair<TType *, bool>, std::string> outputFunctionName = {
-        {{&stdType.Int64, false}, "__write_int64"},
+        {{&stdType.Int64, false}, "__write_int"},
         {{&stdType.Char, false}, "__write_char"},
         {{&stdType.Boolean, false}, "__write_boolean"},
         {{&stdType.Real, false}, "__write_dbl"},
@@ -237,13 +237,20 @@ void TWriteRoutine::checkArguments (TBlock &block, std::vector<TRuntimeRoutine::
                 compiler.errorMessage (TCompilerImpl::InvalidType, "Cannot output value of type " + basetype->getName ());
             else {                
                 checkFormatArguments (argument, basetype, block);
-                std::vector<TExpressionBase *> args = {textfile, argument.expression, argument.length, argument.precision, TExpressionBase::createVariableAccess (TConfig::globalRuntimeDataPtr, block)};
+                std::vector<TExpressionBase *> args = {textfile, argument.expression, argument.length, argument.precision};
+#ifndef CREATE_9900
+                args.push_back (TExpressionBase::createVariableAccess (TConfig::globalRuntimeDataPtr, block));
+#endif                
                 appendTransformedNode (createRuntimeCall (outputFunctionName.at (std::make_pair (basetype, isVector)), nullptr, std::move (args), block, true));
             }
         }
         
     if (linefeed)
+#ifdef CREATE_9900
+        appendTransformedNode (createRuntimeCall ("__write_lf", nullptr, {textfile}, block, true));
+#else    
         appendTransformedNode (createRuntimeCall ("__write_lf", nullptr, {textfile, createVariableAccess (TConfig::globalRuntimeDataPtr, block)}, block, true));
+#endif        
 }
 
 
