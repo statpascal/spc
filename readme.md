@@ -96,8 +96,8 @@ This is work in progress.
 The compiler can produce a ROM cartridge for the TI99/4A.
 
 There are no floating point, file operations or heap allocated values yet (but one
-can obtain pointers with the addr operator), the case statement is still
-missing and the runtime library is rather limited.
+can obtain pointers with the addr operator), and the runtime library is
+still rather limited.
 
 To enable the TI99 mode, execute the makefile with the option *ti99=1*:
 

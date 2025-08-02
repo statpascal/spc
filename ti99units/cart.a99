@@ -5,9 +5,8 @@ ws	bss 32
 
 	aorg >6000
 
-	byte >aa, >01
-        byte >01		Number of programs
-        byte >00
+	data >aa01		Magic
+        data >0100		Number of programs
         data >0000		Power up list
         data prog_list
         data >0000		DSR list

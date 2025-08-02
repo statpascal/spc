@@ -471,17 +471,15 @@ void T9900Generator::outputComment (const std::string &s) {
 }
 
 void T9900Generator::outputLocalJumpTables () {
-/*
     if (!jumpTableDefinitions.empty ()) {
         outputComment ("jump tables for case statements");
         for (const TJumpTable &it: jumpTableDefinitions) {
             outputLabel (it.tableLabel);
             for (const std::string &s: it.jumpLabels)
-                outputCode (TX64Op::data_diff_dq, (s.empty () ? it.defaultLabel : s), it.tableLabel);
+                outputCode (T9900Op::data, T9900Operand (s.empty () ? it.defaultLabel : s));
         }
         jumpTableDefinitions.clear ();
     }
-*/    
 }
 
 void T9900Generator::outputGlobalConstants () {
@@ -533,9 +531,9 @@ std::string T9900Generator::registerConstant (const std::string &s) {
     return stringDefinitions.back ().label;
 }
 
-//void TX64Generator::registerLocalJumpTable (const std::string &tableLabel, const std::string &defaultLabel, std::vector<std::string> &&jumpLabels) {
-//    jumpTableDefinitions.emplace_back (TJumpTable {tableLabel, defaultLabel, std::move (jumpLabels)});
-//}
+void T9900Generator::registerLocalJumpTable (const std::string &tableLabel, const std::string &defaultLabel, std::vector<std::string> &&jumpLabels) {
+    jumpTableDefinitions.emplace_back (TJumpTable {tableLabel, defaultLabel, std::move (jumpLabels)});
+}
 
 void T9900Generator::outputLabelDefinition (const std::string &label, const std::size_t value) {
     labelDefinitions [label] = value;
@@ -1208,7 +1206,6 @@ void T9900Generator::generateCode (TLValueDereference &lValueDereference) {
     TType *type = getMemoryOperationType (lValueDereference.getType ());
     
     visit (lValue);
-
     // leave pointer on stack if not scalar type
     
     if (type != &stdType.UnresOverload) {
@@ -1233,15 +1230,7 @@ void T9900Generator::generateCode (TArrayIndex &arrayIndex) {
         index = static_cast<TTypeCast *> (index)->getExpression ();
         
     if (type == &stdType.String) {
-        /*
-        visit (base);
-        visit (index);
-        loadReg (TX64Reg::rsi);
-        loadReg (TX64Reg::rdi);
-        outputCode (TX64Op::mov, TX64Reg::rax, std::string ("rt_str_index"));
-        outputCode (TX64Op::call, TX64Reg::rax);
-        saveReg (TX64Reg::rax);
-        */
+        // cannot be used - remove AnsiString from predefined types for 9900
     } else {
         visit (base);
         if (type->isPointer ()) {
@@ -1394,22 +1383,10 @@ void T9900Generator::generateCode (TIfStatement &ifStatement) {
 }
 
 void T9900Generator::generateCode (TCaseStatement &caseStatement) {
-/*
-    const int maxCaseJumpList = 128;
-
-    TX64Reg reg;
-    TExpressionBase *expr = caseStatement.getExpression (), *base = expr;
-    if (base->isTypeCast ())
-        base = static_cast<TTypeCast *> (base)->getExpression ();
-    if (base->isLValueDereference ()) 
-        base = static_cast<TLValueDereference *> (base)->getLValue ();
-    if (base->isSymbol () && !base->isReference () && static_cast<TVariable *> (base)->getSymbol ()->getRegister () != TSymbol::InvalidRegister) {
-         reg = TX64Reg::rax;
-         outputCode (TX64Op::mov, reg, static_cast<TX64Reg> (static_cast<TVariable *> (base)->getSymbol ()->getRegister ()));
-    } else {
-        visit (expr);
-        reg = fetchReg (intScratchReg2);
-    }
+    const int maxCaseJumpList = 32;
+    
+    visit (caseStatement.getExpression ());
+    T9900Reg reg = fetchReg (intScratchReg2);
     
     const TCaseStatement::TCaseList &caseList = caseStatement.getCaseList ();
     const std::int64_t minLabel = caseStatement.getMinLabel (), maxLabel = caseStatement.getMaxLabel ();
@@ -1419,39 +1396,43 @@ void T9900Generator::generateCode (TCaseStatement &caseStatement) {
         std::int64_t last = 0;
         outputComment ("no-opt");
         for (const TCaseStatement::TSortedEntry &e: caseStatement.getSortedLabels ()) {
-            if (e.label.a != last)
-                outputCode (TX64Op::sub, reg, e.label.a - last);
-            else
-                outputCode (TX64Op::test, reg, reg);
+            outputCode (T9900Op::ai, reg, last - e.label.a);
             last = e.label.a;
-            if (e.label.a == e.label.b)
-                outputCode (TX64Op::je, e.jumpLabel->getOverloadName ());
-            else {
-                outputCode (TX64Op::cmp, reg, e.label.b - last);
-                outputCode (TX64Op::jbe, e.jumpLabel->getOverloadName ());
+            if (e.label.a == e.label.b) {
+                outputCode (T9900Op::jne, T9900Operand ("!"));
+                outputCode (T9900Op::b, e.jumpLabel->getOverloadName ());
+            } else {
+                outputCode (T9900Op::ci, reg, e.label.b - last);
+                outputCode (T9900Op::jh, T9900Operand ("!"));
+                outputCode (T9900Op::b, e.jumpLabel->getOverloadName ());
             }
+            outputLabel ("!");
         }
         if (TStatement *defaultStatement = caseStatement.getDefaultStatement ()) {
             visit (defaultStatement);
         }
-        outputCode (TX64Op::jmp, endLabel);
+        outputCode (T9900Op::b, endLabel);
 
     } else {
         const std::string evalTableLabel = getNextCaseLabel ();
         std::string defaultLabel = endLabel;
         if (minLabel) 
-            outputCode (TX64Op::sub, reg, minLabel);
+            outputCode (T9900Op::ai, reg, -minLabel);
         outputComment ("no-opt");
-        outputCode (TX64Op::cmp, reg, maxLabel - minLabel);
+        outputCode (T9900Op::ci, reg, maxLabel - minLabel);
         
         if (TStatement *defaultStatement = caseStatement.getDefaultStatement ()) {
-            outputCode (TX64Op::jbe, evalTableLabel);
             defaultLabel = getNextCaseLabel ();
+            outputCode (T9900Op::jh, T9900Operand (defaultLabel));
+            outputCode (T9900Op::b, T9900Operand (evalTableLabel));
             outputLabel (defaultLabel);
             visit (defaultStatement);
-            outputCode (TX64Op::jmp, endLabel);
-        }  else
-            outputCode (TX64Op::ja, endLabel);
+            outputCode (T9900Op::b, endLabel);
+        }  else {
+            outputCode (T9900Op::jle, T9900Operand ("!"));
+            outputCode (T9900Op::b, endLabel);
+            outputLabel ("!");
+        }
         
         std::vector<std::string> jumpTable (maxLabel - minLabel + 1);
         for (const TCaseStatement::TCase &c: caseList) {
@@ -1461,9 +1442,10 @@ void T9900Generator::generateCode (TCaseStatement &caseStatement) {
         }
         outputLabel (evalTableLabel);
         const std::string tableLabel = getNextLocalLabel ();
-        outputCode (TX64Op::lea, intScratchReg1, TX64Operand (tableLabel, true));
-        outputCode (TX64Op::add, intScratchReg1, TX64Operand (intScratchReg1, reg, 8, 0));
-        outputCode (TX64Op::jmp, intScratchReg1);
+        outputCode (T9900Op::sla, reg, 1);
+        outputCode (T9900Op::ai, reg, T9900Operand (tableLabel));
+        outputCode (T9900Op::mov, T9900Operand (reg, T9900Operand::TAddressingMode::RegInd), reg);
+        outputCode (T9900Op::b, T9900Operand (reg, T9900Operand::TAddressingMode::RegInd));
 
         registerLocalJumpTable (tableLabel, defaultLabel, std::move (jumpTable));
     }
@@ -1471,10 +1453,9 @@ void T9900Generator::generateCode (TCaseStatement &caseStatement) {
     for (const TCaseStatement::TCase &c: caseList) {
         outputLabel (c.jumpLabel->getOverloadName ());
         visit (c.statement);
-        outputCode (TX64Op::jmp, endLabel);
+        outputCode (T9900Op::b, endLabel);
     }    
     outputLabel (endLabel);
-*/    
 }
 
 void T9900Generator::generateCode (TStatementSequence &statementSequence) {
