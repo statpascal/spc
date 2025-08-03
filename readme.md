@@ -103,11 +103,11 @@ To enable the TI99 mode, execute the makefile with the option *ti99=1*:
 
 ```
 make clean
-make ti99=1 -j 4
+make ti99=1
 ```
 
 This will set the default unit search path of the compiler to the *ti99units* directory. The
-*system.pas* in this directory (which is included by default) containes the
+*system.pas* in this directory (which is included by default) contains the
 runtime library. The *tests/ti99* directory shows what is
 already working.
 

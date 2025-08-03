@@ -1,7 +1,7 @@
 program sieve (output);
 
 const 
-    n = 10000;
+    n = 1000;
     rep = 1;
 
 var

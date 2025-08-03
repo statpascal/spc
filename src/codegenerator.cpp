@@ -8,6 +8,7 @@
 #include <cassert>
 #include <numeric>
 #include <string.h>
+#include <arpa/inet.h>
 
 
 namespace statpascal {
@@ -147,6 +148,8 @@ void TBaseGenerator::alignType (TType *type) {
 }
 
 void TBaseGenerator::assignStackOffsets (ssize_t &pos, TSymbolList &symbolList, bool handleParameters) {
+    // move static variables to end of list
+    std::stable_partition (symbolList.begin (), symbolList.end (), [] (TSymbol *s) { return !s->checkSymbolFlag (TSymbol::StaticVariable); });
     for (TSymbol *s: symbolList)
         if (s->getRegister () == TSymbol::InvalidRegister)
         if ((handleParameters && s->checkSymbolFlag (TSymbol::Parameter)) ||
@@ -238,6 +241,10 @@ void TBaseGenerator::allocateGlobalDataArea (std::size_t n) {
 void TBaseGenerator::initStaticVariable (char *addr, const TType *t, const TConstant *constant) {
     if (t->isEnumerated ()) {
         std::uint64_t n = static_cast<const TSimpleConstant *> (constant)->getInteger ();
+#ifdef CREATE_9900
+        if (t->getSize () == 2)
+            n = htons (n);
+#endif        
         memcpy (addr, &n, t->getSize ());
     } else if (t->isReal ())
         *reinterpret_cast<double *> (addr) = static_cast<const TSimpleConstant *> (constant)->getDouble ();
@@ -245,7 +252,11 @@ void TBaseGenerator::initStaticVariable (char *addr, const TType *t, const TCons
         *reinterpret_cast<float *> (addr) = static_cast<const TSimpleConstant *> (constant)->getDouble ();
     else if (t->isString ()) 
         *reinterpret_cast<TAnyValue *> (addr) = runtimeData.getStringConstant (registerStringConstant (static_cast<const TSimpleConstant *> (constant)->getString ()));
-    else if (t->isRoutine ()) 
+    else if (t->isShortString ()) {
+        const std::string s = static_cast<const TSimpleConstant *> (constant)->getString ();
+        *addr++ = s.length ();
+        memcpy (addr, s.data (), std::min (s.length (), t->getSize () - 1));
+    } else if (t->isRoutine ()) 
         initStaticRoutinePtr (reinterpret_cast<std::uint64_t> (addr), static_cast<const TSimpleConstant *> (constant)->getRoutineValue ());
         
 /*        *reinterpret_cast<std::size_t *> (addr) = static_cast<const TSimpleConstant *> (constant)->getRoutineValue ()->getSymbol ()->getOffset ();
@@ -290,8 +301,8 @@ void TBaseGenerator::assignGlobals (TSymbolList &blockSymbols) {
 
 void TBaseGenerator::initStaticGlobals (TSymbolList &globalSymbols) {
     for (TSymbol *s: globalSymbols)
-            if (s->checkSymbolFlag (TSymbol::StaticVariable))
-                initStaticVariable (reinterpret_cast<char *> (s->getOffset ()), s->getType (), s->getConstant ());
+        if (s->checkSymbolFlag (TSymbol::StaticVariable))
+            initStaticVariable (reinterpret_cast<char *> (s->getOffset ()), s->getType (), s->getConstant ());
 }
 
 std::vector<std::string> TBaseGenerator::createSymbolList (const std::string &routineName, std::size_t level, TSymbolList &symbolList, const std::vector<std::string> &regNames) {

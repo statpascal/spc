@@ -68,14 +68,6 @@ procedure scroll;
         setVdpAddress (vdpWriteAddress or WriteAddr)
     end;
     
-procedure writechar (ch: char);
-    begin
-        vdpwd := ch;
-        inc (vdpWriteAddress);
-        if vdpWriteAddress = 24 * 32 then
-            scroll
-    end;
-    
 procedure __write_lf (var f: text);
     begin
         vdpWriteAddress := (vdpWriteAddress + 32) and not 31;
@@ -117,37 +109,37 @@ procedure __write_int (var f: text; n, length, precision: integer);
     
 procedure __write_char (var f: text; ch: char; length, precision: integer);
     var
-        i: integer;
+        s: string [1];
     begin
-        for i := 1 to pred (length) do
-            writechar (' ');
-        writechar (ch)
+        s [0] := #1;
+        s [1] := ch;
+        __write_string (f, s, length, precision);
     end;
     
 procedure __write_string (var f: text; p: PChar; length, precision: integer);
     var
-        len, i: integer;
+        strlen, len, i: integer;
     begin
-        len := ord (p^);
-        while vdpWriteAddress + length > 24 * 32 do
+        strlen := ord (p^);
+        len := max (strlen, length);
+        while vdpWriteAddress + len > 24 * 32 do
             scroll;
-        inc (vdpWriteAddress, max (len, length));
-        for i := len + 1 to length do
+        inc (vdpWriteAddress, len);
+        for i := strlen + 1 to length do
             vdpwd := ' ';
-        while len > 0 do 
+        while strlen > 0 do 
             begin
                 inc (p);
                 vdpwd := p^;
-                dec (len)
+                dec (strlen)
             end;
     end;
     
 procedure __write_boolean (var f: text; b: boolean; length, precision: integer);
+    const
+        s: array [boolean] of string [5] = ('false', 'true');
     begin
-        if b then
-            __write_string (f, 'true', length, precision)
-        else
-            __write_string (f, 'false', length, precision)
+        __write_string (f, s [b], length, precision)
     end;
 
 function min (a, b: integer): integer;

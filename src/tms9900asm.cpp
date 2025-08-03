@@ -81,6 +81,14 @@ std::string T9900Operation::makeString () const {
             for (const char c: operand2.label)
                 append (c);
             return operand1.makeString () + " text >" + res.str () + "    ; " + operand2.label; }
+        case T9900Op::byte: {
+            std::stringstream res;
+            auto append = [&res] (char c) {
+                res << std::hex << std::setfill ('0') << std::setw (2) << std::nouppercase << static_cast<unsigned> (c);
+            };
+            for (const char c: operand1.label)
+                append (c);
+            return std::string (8, ' ') +  "text >" + res.str (); }
         case T9900Op::end:
             return "";
         default: {

@@ -107,6 +107,7 @@ protected:
     
     void assignGlobals (TSymbolList &globalSymbols);
     void initStaticGlobals (TSymbolList &globalSymbols);
+    void initStaticVariable (char *addr, const TType *t, const TConstant *constant);
     
     TType *getMemoryOperationType (TType *type);
     bool getSetTypeLimit (const TExpressionBase *, std::int64_t &minval, std::int64_t &maxval);
@@ -120,7 +121,6 @@ protected:
     
 private:    
     virtual void initStaticRoutinePtr (std::size_t addr, const TRoutineValue *) = 0;
-    void initStaticVariable (char *addr, const TType *t, const TConstant *constant);
     
     TTypeAnyManagerMap typeAnyManagerMap;
     TRuntimeData &runtimeData;

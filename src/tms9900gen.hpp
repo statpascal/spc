@@ -74,6 +74,10 @@ private:
     struct TStringDefinition {
         std::string label, val;
     };
+    struct TStaticDataDefinition {
+        std::string label;
+        std::vector<char> values;
+    };
     
     using TCodeSequence = std::list<T9900Operation>;
     TCodeSequence program, *currentOutput;
@@ -104,7 +108,7 @@ private:
     void codeMultiplyConst (T9900Reg, std::size_t);
     void codeMove (const TType *);
     
-    void initStaticVariable (char *addr, const TType *t, const TConstant *constant);
+//    void initStaticVariable (char *addr, const TType *t, const TConstant *constant);
     
     // TODO -> make signed args
     void codeRuntimeCall (const std::string &fn, T9900Reg globalDataReg, const std::vector<std::pair<T9900Reg, std::size_t>> &additionalArgs);
@@ -144,6 +148,8 @@ private:
     std::vector<TConstantDefinition> constantDefinitions;
     std::vector<TSetDefinition> setDefinitions;
     std::vector<TStringDefinition> stringDefinitions;
+    TStaticDataDefinition staticDataDefinition;
+    
     std::string endOfRoutineLabel;
     
     struct TJumpTable {

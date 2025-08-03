@@ -196,6 +196,17 @@ void T9900Generator::optimizePeepHole (TCodeSequence &code) {
             removeLines (code, line, 1);
         }
         
+        // li reg1, imm
+        // add reg1, reg2
+        // ->
+        // ai reg2, imm
+        else if (op1 == T9900Op::li && op2 == T9900Op::a && isSameCalcStackReg (op_1_1, op_2_1) && op_2_2.t == T9900Operand::TAddressingMode::Reg) {
+            op2 = T9900Op::ai;
+            op_2_1 = op_2_2;
+            op_2_2 = op_1_2;
+            removeLines (code, line, 1);
+        }
+        
         // mov|szc op, reg
         // ci reg, 0
         // ->
@@ -519,6 +530,21 @@ void T9900Generator::outputGlobalConstants () {
         outputComment ("String Constants");
         for (const TStringDefinition &s: stringDefinitions)
             outputCode (T9900Op::stri, T9900Operand (s.label), T9900Operand (s.val));
+    }
+    if (!staticDataDefinition.label.empty ()) {
+        outputComment (std::string ());
+        outputComment ("Static variable init data");
+        outputLabel (staticDataDefinition.label);
+        std::string val;
+        for (char c: staticDataDefinition.values) {
+            val.push_back (c);
+            if (val.size () == 16) {
+                outputCode (T9900Op::byte, val);
+                val.clear ();
+            }
+        }
+        if (val.size ())
+            outputCode (T9900Op::byte, val);
     }
 /*    
     for (const TConstantDefinition &c: constantDefinitions) {
@@ -1148,7 +1174,7 @@ void T9900Generator::codeMultiplyConst (const T9900Reg reg, const std::size_t n)
     if (n == 0) 
         outputCode (T9900Op::clr, reg);
     else {
-        outputCode (T9900Op::li, intScratchReg1, n);
+        outputCode (T9900Op::li, intScratchReg2, n);
         outputCode (T9900Op::mpy, reg, intScratchReg2);
         outputCode (T9900Op::mov, intScratchReg3, reg);
     }
@@ -1685,7 +1711,29 @@ void T9900Generator::codeBlock (TBlock &block, bool hasStackFrame, TCodeSequence
     setOutput (&globalInits);
     if (blockSymbols.getLevel () == 1) {
         assignGlobalVariables (blockSymbols);
-        initStaticGlobals (blockSymbols);
+        std::size_t firstStatic = 0;
+        bool staticFound = false;
+        for (TSymbol *s: blockSymbols)
+            if (!staticFound && s->checkSymbolFlag (TSymbol::StaticVariable)) {
+                firstStatic = s->getOffset ();
+                staticFound = true;
+            }
+        if (staticFound) {
+            std::size_t staticSize = 65536 - firstStatic;
+            outputComment (std::string ());
+            outputComment ("Init static globals: " + std::to_string (staticSize) + " bytes at address " + std::to_string (firstStatic));
+            std::vector<char> data (staticSize);
+            for (TSymbol *s: blockSymbols)
+                if (s->checkSymbolFlag (TSymbol::StaticVariable))
+                    initStaticVariable (&data [s->getOffset () - firstStatic], s->getType (), s->getConstant ());
+            staticDataDefinition.label = getNextLocalLabel ();
+            staticDataDefinition.values = std::move (data);
+            outputLabel ("$init_static");
+            outputCode (T9900Op::li, T9900Reg::r12, staticDataDefinition.label);
+            outputCode (T9900Op::li, T9900Reg::r13, firstStatic);
+            outputCode (T9900Op::li, T9900Reg::r14, staticSize);
+            outputCode (T9900Op::b, T9900Operand ("_rt_copy_mem"));
+        }
     }
     
     setOutput (&blockCode);
@@ -1723,9 +1771,7 @@ void T9900Generator::codeBlock (TBlock &block, bool hasStackFrame, TCodeSequence
     
     if (!globalInits.empty ()) {
         optimizePeepHole (globalInits);
-        outputLabel ("$init_static");
         std::move (globalInits.begin (), globalInits.end (), std::back_inserter (blockEpilogue));
-        outputCode (T9900Op::b, T9900Operand (T9900Reg::r11, T9900Operand::TAddressingMode::RegInd));
     }
     
     blockStatements.clear ();    

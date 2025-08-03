@@ -14,7 +14,7 @@ enum class T9900Op {
     jmp, jlt, jle, jeq, jhe, jgt, jne, jnc, joc, jno, jl, jh, jop, sbo, sbz, tb, coc, czc,
     xor_, xop, ldcr, stcr, mpy, div, szc, szcb, s, sb, c, cb, a, ab, mov, movb, soc, socb,
     // Pseude ops 
-    def_label, comment, stri, data, end
+    def_label, comment, stri, data, byte, end
 };
 
 enum class T9900Reg {
