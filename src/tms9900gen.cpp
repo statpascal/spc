@@ -250,7 +250,7 @@ void T9900Generator::optimizePeepHole (TCodeSequence &code) {
         // a|s|c|mov reg, op2
         // ->
         // a|s|c|mov op1, op2
-        else if (op1 == T9900Op::mov && (op2 == T9900Op::mov || op2 == T9900Op::a || op2 == T9900Op::s || op2 == T9900Op::c) && isSameCalcStackReg (op_1_2, op_2_1)) {
+        else if (op1 == T9900Op::mov && (op2 == T9900Op::mov || op2 == T9900Op::a || op2 == T9900Op::s || op2 == T9900Op::c) && isSameCalcStackReg (op_1_2, op_2_1) && op_2_1.t == T9900Operand::TAddressingMode::Reg) {
             op_2_1 = op_1_1;
             comm_2 = comm_1 + " " + comm_2;
             removeLines (code, line, 1);
@@ -260,7 +260,7 @@ void T9900Generator::optimizePeepHole (TCodeSequence &code) {
         // c op2, reg
         // ->
         // a|s|c op2, op1
-        else if (op1 == T9900Op::mov && op2 == T9900Op::c && isSameCalcStackReg (op_1_2, op_2_2)) {
+        else if (op1 == T9900Op::mov && op2 == T9900Op::c && isSameCalcStackReg (op_1_2, op_2_2) && op_2_2.t == T9900Operand::TAddressingMode::Reg) {
             op_2_2 = op_1_1;
             comm_2 = comm_1 + " " + comm_2;
             removeLines (code, line, 1);

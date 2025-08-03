@@ -93,11 +93,13 @@ The next steps will be:
 
 This is work in progress.
 
-The compiler can produce a ROM cartridge for the TI99/4A.
+The compiler can produce a ROM cartridge for the TI99/4A. The upper memory
+(24 KB) is used for global variables and stack frames, the lower memory (8
+KB) as heap for dynamic allocations.
 
-There are no floating point, file operations or heap allocated values yet (but one
-can obtain pointers with the addr operator), and the runtime library is
-still rather limited.
+There are no floating point or file operations yet, and the runtime library is
+still rather limited. Dynamic memory management is limited to a *mark/release*
+style.
 
 To enable the TI99 mode, execute the makefile with the option *ti99=1*:
 
@@ -125,7 +127,6 @@ user@host:~/src/statpascal> ls -l cart.bin
 The following steps are planned:
 
 - add missing language features (case statement, initialized variables)
-- simple UCSD-like heap management (mark/release)
 - a standard runtime library
 - floating point operations (probably IEEE-754 binary32)
 - bank switched code in cartridge address range

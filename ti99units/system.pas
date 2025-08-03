@@ -29,6 +29,11 @@ function __short_str_concat (a, b: PChar): string;
 function length (s: PChar): integer;
 
 procedure waitkey; external;
+
+procedure __new (var p: pointer; count, size: integer);
+procedure __dispose (p: pointer);
+procedure mark (var p: pointer);
+procedure release (p: pointer);
     
 implementation
 
@@ -46,6 +51,42 @@ var
     gromwa: char absolute $9c02;
     gromrd: char absolute $9800;
     
+// simple UCSD-like heap managment in lower memory
+
+const
+    heapPtr: integer = $4000;
+    heapMin = $2000;
+    
+procedure __new (var p: pointer; count, size: integer);
+    var
+        n: integer;
+    begin
+        n := count * size;
+        if heapPtr - n < heapMin then
+            p := nil
+        else 
+            begin
+                dec (heapPtr, n);
+                p := pointer (heapPtr)
+            end
+    end;
+    
+procedure __dispose (p: pointer);
+    begin
+        // nothing yet
+    end;
+    
+procedure mark (var p: pointer);
+    begin
+        p := pointer (heapPtr)
+    end;
+    
+procedure release (p: pointer);
+    begin
+        heapPtr := integer (p)
+    end;
+
+// 
     
 procedure setVdpAddress (n: integer);
     begin

@@ -125,8 +125,11 @@ TNewRoutine::TNewRoutine (TBlock &block, std::vector<TExpressionBase *> &&args):
           static_cast<TLValueDereference *> (args [0])->getLValue (),
           args.size () == 2 ? args [1] : createInt64Constant (1, block),
           createInt64Constant (type->getSize (), block),
+#ifndef CREATE_9900          
           createAnyManagerIndex (type, block),
-          createVariableAccess (TConfig::globalRuntimeDataPtr, block)},
+          createVariableAccess (TConfig::globalRuntimeDataPtr, block)
+#endif          
+         },
          block, false));
 }
 
@@ -375,7 +378,12 @@ enum TName {
     Exit, Break, Halt
 };
 
-enum {SpecialParser = 1, AppendGlobalRuntimeDataPtr = 2, RuntimeNoParaCheck = 4, KeepType = 8};
+#ifdef CREATE_9900
+    // no global runtime pointer
+    enum {SpecialParser = 1, AppendGlobalRuntimeDataPtr = 0, RuntimeNoParaCheck = 4, KeepType = 8};
+#else
+    enum {SpecialParser = 1, AppendGlobalRuntimeDataPtr = 2, RuntimeNoParaCheck = 4, KeepType = 8};
+#endif
     
 struct TRoutine {
     const TName name;
