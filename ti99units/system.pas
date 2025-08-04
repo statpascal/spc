@@ -6,6 +6,7 @@ type
     integer = int16;
     PChar = ^char;
     string1 = string [1];
+    string4 = string [4];
     
 var
     input, output: text;
@@ -24,9 +25,15 @@ procedure __write_char (var f: text; ch: char; length, precision: integer);
 procedure __write_string (var f: text; p: PChar; length, precision: integer);
 procedure __write_boolean (var f: text; b: boolean; length, precision: integer);
 
+function length (s: PChar): integer;
 function __short_str_char (ch: char): string1;
 function __short_str_concat (a, b: PChar): string;
-function length (s: PChar): integer;
+function __str_equal (s, t: PChar): boolean;
+function __str_not_equal (s, t: PChar): boolean; 
+function __str_less_equal (s, t: PChar): boolean; 
+function __str_greater_equal (s, t: PChar): boolean; 
+function __str_less (s, t: PChar): boolean; 
+function __str_greater (s, t: PChar): boolean; 
 
 procedure waitkey; external;
 
@@ -34,6 +41,11 @@ procedure __new (var p: pointer; count, size: integer);
 procedure __dispose (p: pointer);
 procedure mark (var p: pointer);
 procedure release (p: pointer);
+
+procedure setCRUBit (addr: integer; val: boolean); external;
+
+function hexstr (n: integer): string4;
+
     
 implementation
 
@@ -61,7 +73,7 @@ procedure __new (var p: pointer; count, size: integer);
     var
         n: integer;
     begin
-        n := count * size;
+        n := (count * size + 1) and not 1;
         if heapPtr - n < heapMin then
             p := nil
         else 
@@ -222,10 +234,66 @@ function __short_str_concat (a, b: PChar): string;
         move (b [1], res [ord (a^) + 1], min (ord (b^), 255 - ord (a^)));
         res^ := chr (min (255, ord (a^) + ord (b^)))
     end;
+
+function strCompare (s, t: PChar): integer;
+    var 
+        i: integer;
+    begin
+        for i := 1 to min (ord (s^), ord (t^)) do
+            if s [i] <> t [i] then
+                begin
+                    strCompare := ord (s [i]) - ord (t [i]);
+                    exit
+                end;
+        strCompare := ord (s^) - ord (t^)
+    end;
+    
+function __str_equal (s, t: PChar): boolean;
+    begin
+        __str_equal := strCompare (s, t) = 0
+    end;
+    
+function __str_not_equal (s, t: PChar): boolean; 
+    begin
+        __str_not_equal := strCompare (s, t) <> 0
+    end;
+    
+function __str_less_equal (s, t: PChar): boolean; 
+    begin
+        __str_less_equal := strCompare (s, t) <= 0
+    end;
+    
+function __str_greater_equal (s, t: PChar): boolean; 
+    begin
+        __str_greater_equal := strCompare (s, t) >= 0
+    end;
+    
+function __str_less (s, t: PChar): boolean; 
+    begin
+        __str_less := strCompare (s, t) < 0
+    end;
+    
+function __str_greater (s, t: PChar): boolean; 
+    begin
+        __str_greater := strCompare (s, t) > 0
+    end;
     
 function length (s: PChar): integer;
     begin
         length := ord (s^)
+    end;
+    
+function hexstr (n: integer): string4;
+    const 
+        hex: string [16] = '0123456789ABCDEF';
+    var
+        res: string [4];
+        i, j: integer;
+    begin
+        for i := 1 to 4 do
+            res [i] := hex [succ (n shr (16 - i shl 2) and $0f)];
+        res [0] := #4;
+        hexstr := res
     end;
     
 procedure loadCharset;

@@ -2,6 +2,7 @@ program strings;
 
 const
     s = 'String constant';
+    t = 'String also';
 
 var
     a, b: string [20];
@@ -31,6 +32,15 @@ begin
     for i := 1 to 10 do
         a [i] := chr (ord ('a') + pred (i));
     writeln (a);
+
+    writeln;
+    writeln ('Comparison:');
+    writeln ('s=', s);
+    writeln ('t=', t);    
+    writeln ('s=s: ', s = s);
+    writeln ('s=t: ', s = t);
+    writeln ('s<t: ', s < t);
+    writeln ('t<s: ', t < s);
     
     waitkey
 end.

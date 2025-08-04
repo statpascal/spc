@@ -283,7 +283,7 @@ void T9900Generator::optimizePeepHole (TCodeSequence &code) {
         // li reg, imm1
         // ->
         // remove redundant load
-        else if (op1 == T9900Op::li && op2 == T9900Op::mov && op3 == T9900Op::li && op_1_2.val == op_3_2.val &&
+        else if (op1 == T9900Op::li && op2 == T9900Op::mov && op3 == T9900Op::li && op_1_2.isImm () && op_3_2.isImm () && op_1_2.val == op_3_2.val &&
                  isSameCalcStackReg (op_1_1, op_2_1) && isSameCalcStackReg (op_2_1, op_3_1)) {
             removeLines (code, line2, 1);
         }
@@ -356,17 +356,6 @@ void T9900Generator::optimizePeepHole (TCodeSequence &code) {
             op_3_1 = op_3_2;
             op_3_2 = op_1_2;
             removeLines (code, line, 2);
-        }
-        
-        // li reg1, imm
-        // a reg1, reg2
-        // ->
-        // ai reg2, imm
-        else if (op1 == T9900Op::li && op2 == T9900Op::a && isSameCalcStackReg (op_1_1, op_2_1) && !isSameCalcStackReg (op_2_1, op_2_2)) {
-            op1 = T9900Op::ai;
-            op_1_1 = op_2_2;
-            removeLines (code, line1, 1);
-            if (line != code.begin ()) --line;
         }
         
         // inv reg

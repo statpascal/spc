@@ -2,6 +2,14 @@ vdpwa equ >8c02
 vdpwd equ >8c00
 vdprd equ >8800
 
+; Access CRU: address, val on call stack
+
+setcrubit:
+	mov *r10+, r12
+	mov *r10+, r13
+	ldcr r13, 1
+	b *r11
+
 ; Wait for key press
 
 waitkey:
