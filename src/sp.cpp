@@ -58,8 +58,9 @@ void compile9900 (int argc, char **argv) {
     sp::TCompiler compiler (generator);
     
     compiler.setFilename (argv [1]);
+    std::filesystem::path file (argv [1]);
     std::filesystem::path exepath = std::filesystem::read_symlink ("/proc/self/exe");
-    compiler.setUnitSearchPathes ({".", exepath.parent_path ().string () + "/../ti99units"});
+    compiler.setUnitSearchPathes ({".", file.parent_path ().string (), exepath.parent_path ().string () + "/../ti99units"});
     
     compiler.compile ();
     

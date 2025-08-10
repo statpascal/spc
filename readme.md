@@ -7,6 +7,9 @@ host applications by generating X64 and ARM64 assembly code.  It uses the
 Linux calling conventions on these architectures so the generated code does
 *not* work under Windows oder MacOS.
 
+As a toy project, a code generator for the TI99/4A (see next section) is in
+development.
+
 A typical Statpascal implementation of the QuickSort algorithm looks like:
 
     program qsortvec;
@@ -97,9 +100,9 @@ The compiler can produce a ROM cartridge for the TI99/4A. The upper memory
 (24 KB) is used for global variables and stack frames, the lower memory (8
 KB) as heap for dynamic allocations.
 
-There are no floating point or file operations yet, and the runtime library is
-still rather limited. Dynamic memory management is limited to a *mark/release*
-style.
+There is no floating point yet and the runtime library is
+still rather limited. Dynamic memory management currently uses a *mark/release*
+style. File operations are supported using PABs.
 
 To enable the TI99 mode, execute the makefile with the option *ti99=1*:
 
@@ -126,11 +129,10 @@ user@host:~/src/statpascal> ls -l cart.bin
 
 The following steps are planned:
 
-- add missing language features (case statement, initialized variables)
 - a standard runtime library
 - floating point operations (probably IEEE-754 binary32)
 - bank switched code in cartridge address range
-- file operations
+- Pascal file operations
 
 ## License
 

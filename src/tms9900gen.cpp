@@ -372,8 +372,19 @@ void T9900Generator::optimizePeepHole (TCodeSequence &code) {
         // ai reg, imm1 + imm2
         else if (op1 == T9900Op::ai && op2 == T9900Op::ai && isSameCalcStackReg (op_1_1, op_2_1)) {
             op_2_2.val = (op_2_2.val + op_1_2.val) & 0xffff;
-            removeLines (code, line, 1);
             comm_2 = comm_1;
+            removeLines (code, line, 1);
+        }
+        
+        // li reg, imm1
+        // ai reg, imm2
+        // ->
+        // li reg, imm1 + imm2
+        else if (op1 == T9900Op::li && op2 == T9900Op::ai && isSameReg (op_1_1, op_2_1)) {
+            op2 = op1;
+            op_2_2.val += op_1_2.val;
+            comm_2 = comm_1 + " " + comm_2;
+            removeLines (code, line, 1);
         }
         
         // Access via base pointer

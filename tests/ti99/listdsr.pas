@@ -1,19 +1,6 @@
 program listdsr;
 
-type
-    TStandardHeaderNodePtr = ^TStandardHeaderNode;
-    TStandardHeaderNode = record
-        next: TStandardHeaderNodePtr;
-        address: integer;
-        name: string
-    end;
-    
-    TStandardHeader = record
-        magic, version, nrprogs, filler: uint8;
-        pwrupList: pointer;
-        prgList, dsrList, subList: TStandardHeaderNodePtr;
-        isrList: pointer
-    end;
+uses dsr;
 
 var
     header: TStandardHeader absolute $4000;
@@ -21,6 +8,10 @@ var
     cruAddr: integer;
     
 begin
+    // make sure all cards are turned off
+    for cruAddr := $10 to $1f do
+        setCRUBit (cruAddr shl 8, false);
+        
     cruAddr := $1000;
     repeat
         setCRUBit (cruAddr, true);

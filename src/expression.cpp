@@ -523,6 +523,8 @@ TType *TExpressionBase::checkOperatorTypes (TExpressionBase *&left, TExpressionB
         case TToken::LessEqual:
             if (ltype == rtype && (ltype->isEnumerated () || ltype->isReal () || ltype->isString ()))
                 return &stdType.Boolean;
+            if (ltype->isShortString () && rtype->isShortString ())
+                return &stdType.Boolean;
             if (ltype->isPointer () && rtype->isPointer ())
                 if (ltype == &stdType.GenericPointer || rtype == &stdType.GenericPointer ||
                     ltype->getBaseType () == rtype->getBaseType ())
@@ -588,6 +590,14 @@ TExpressionBase *TExpression::parse (TBlock &block) {
         {TToken::LessThan,	"__str_less"},
         {TToken::GreaterThan,	"__str_greater"}
     };
+    static const std::map<TToken, std::string> shortStrRuntimeFunc = {
+        {TToken::Equal, 	"__short_str_equal"},
+        {TToken::NotEqual,	"__short_str_not_equal"},
+        {TToken::LessEqual,	"__short_str_less_equal"},
+        {TToken::GreaterEqual,	"__short_str_greater_equal"},
+        {TToken::LessThan,	"__short_str_less"},
+        {TToken::GreaterThan,	"__short_str_greater"}
+    };
     static const std::map<TToken, std::string> vecRuntimeFunc = {
         {TToken::Equal, 	"__vec_equal"},
         {TToken::NotEqual,	"__vec_not_equal"},
@@ -613,6 +623,8 @@ TExpressionBase *TExpression::parse (TBlock &block) {
                     left = createRuntimeCall (setRuntimeFunc.at (operation), type, {left, right}, block, false);
                 else if (left->getType () == &stdType.String)
                     left = createRuntimeCall (strRuntimeFunc.at (operation), type, {left, right}, block, true);
+                else if (left->getType ()->isShortString ())
+                    left = createRuntimeCall (shortStrRuntimeFunc.at (operation), type, {left, right}, block, true);
                 else if (left->getType ()->isVector ()) {
                     const TStdType::TScalarTypeCode
                         tca = TStdType::getScalarTypeCode (static_cast<TVectorType *> (left->getType ())->getBaseType ()),

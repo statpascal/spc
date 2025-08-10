@@ -10,10 +10,14 @@ type
     
 var
     input, output: text;
+    memb: array [0..65535] of uint8 absolute $0000;
+    memw: array [0..32767] of integer absolute $0000;
     
 procedure gotoxy (x, y: integer);
 
 procedure move (var src, dest; length: integer); external;
+procedure vmbw (var src; dest, length: integer); external;
+procedure vmbr (var dest; src, length: integer); external;
 
 function min (a, b: integer): integer;
 function max (a, b: integer): integer;
@@ -26,14 +30,17 @@ procedure __write_string (var f: text; p: PChar; length, precision: integer);
 procedure __write_boolean (var f: text; b: boolean; length, precision: integer);
 
 function length (s: PChar): integer;
+function pos (ch: char; s: PChar): integer;
+function copy (s: PChar; start, len: integer): string;
+
 function __short_str_char (ch: char): string1;
 function __short_str_concat (a, b: PChar): string;
-function __str_equal (s, t: PChar): boolean;
-function __str_not_equal (s, t: PChar): boolean; 
-function __str_less_equal (s, t: PChar): boolean; 
-function __str_greater_equal (s, t: PChar): boolean; 
-function __str_less (s, t: PChar): boolean; 
-function __str_greater (s, t: PChar): boolean; 
+function __short_str_equal (s, t: PChar): boolean;
+function __short_str_not_equal (s, t: PChar): boolean; 
+function __short_str_less_equal (s, t: PChar): boolean; 
+function __short_str_greater_equal (s, t: PChar): boolean; 
+function __short_str_less (s, t: PChar): boolean; 
+function __short_str_greater (s, t: PChar): boolean; 
 
 procedure waitkey; external;
 
@@ -118,16 +125,14 @@ procedure scroll;
     begin
        _rt_scroll_up;
         dec (vdpWriteAddress, 32);
-        setVdpAddress (vdpWriteAddress or WriteAddr)
     end;
     
 procedure __write_lf (var f: text);
     begin
         vdpWriteAddress := (vdpWriteAddress + 32) and not 31;
         if vdpWriteAddress = 24 * 32 then
-            scroll
-        else 
-            setVdpAddress (vdpWriteAddress or WriteAddr);
+            scroll;
+        setVdpAddress (vdpWriteAddress or WriteAddr);
     end;
     
 procedure __write_int (var f: text; n, length, precision: integer);
@@ -177,6 +182,7 @@ procedure __write_string (var f: text; p: PChar; length, precision: integer);
         len := max (strlen, length);
         while vdpWriteAddress + len > 24 * 32 do
             scroll;
+        setVdpAddress (vdpWriteAddress or WriteAddr);
         inc (vdpWriteAddress, len);
         for i := strlen + 1 to length do
             vdpwd := ' ';
@@ -225,6 +231,8 @@ function __short_str_char (ch: char): string1;
         res [1] := ch
     end;
 
+// TODO: pass max. length of result string - this will crash if too short
+
 function __short_str_concat (a, b: PChar): string;
     var
         res: PChar;
@@ -248,34 +256,34 @@ function strCompare (s, t: PChar): integer;
         strCompare := ord (s^) - ord (t^)
     end;
     
-function __str_equal (s, t: PChar): boolean;
+function __short_str_equal (s, t: PChar): boolean;
     begin
-        __str_equal := strCompare (s, t) = 0
+        __short_str_equal := strCompare (s, t) = 0
     end;
     
-function __str_not_equal (s, t: PChar): boolean; 
+function __short_str_not_equal (s, t: PChar): boolean; 
     begin
-        __str_not_equal := strCompare (s, t) <> 0
+        __short_str_not_equal := strCompare (s, t) <> 0
     end;
     
-function __str_less_equal (s, t: PChar): boolean; 
+function __short_str_less_equal (s, t: PChar): boolean; 
     begin
-        __str_less_equal := strCompare (s, t) <= 0
+        __short_str_less_equal := strCompare (s, t) <= 0
     end;
     
-function __str_greater_equal (s, t: PChar): boolean; 
+function __short_str_greater_equal (s, t: PChar): boolean; 
     begin
-        __str_greater_equal := strCompare (s, t) >= 0
+        __short_str_greater_equal := strCompare (s, t) >= 0
     end;
     
-function __str_less (s, t: PChar): boolean; 
+function __short_str_less (s, t: PChar): boolean; 
     begin
-        __str_less := strCompare (s, t) < 0
+        __short_str_less := strCompare (s, t) < 0
     end;
     
-function __str_greater (s, t: PChar): boolean; 
+function __short_str_greater (s, t: PChar): boolean; 
     begin
-        __str_greater := strCompare (s, t) > 0
+        __short_str_greater := strCompare (s, t) > 0
     end;
     
 function length (s: PChar): integer;
@@ -283,6 +291,37 @@ function length (s: PChar): integer;
         length := ord (s^)
     end;
     
+function pos (ch: char; s: PChar): integer;
+    var
+        i: integer;
+    begin
+        for i := 1 to ord (s^) do
+            if s [i] = ch then
+                begin
+                    pos := i;
+                    exit
+                end;
+        pos := 0
+    end;
+    
+// TODO: pass max. length of result string - this will crash if too short
+
+function copy (s: PChar; start, len: integer): string;
+    var
+        res: PChar;
+    begin
+        res := PPChar (addr (s) + (-1))^;	// addr of result is on stack before a
+        if start <= ord (s^) then
+            begin
+                if start + len > succ (ord (s^)) then
+                    len := succ (ord (s^) - start);
+                move (s [start], res [1], len);
+                res^ := chr (len)
+            end
+        else
+            res^ := #0
+    end;
+
 function hexstr (n: integer): string4;
     const 
         hex: string [16] = '0123456789ABCDEF';
