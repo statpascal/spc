@@ -210,7 +210,7 @@ void TX64Generator::removeUnusedLocalLabels (TCodeSequence &code) {
         }
     TCodeSequence::iterator line = code.begin ();
     while (line != code.end ())
-        if (line->operation == TX64Op::def_label && line->operand1.label.substr (0, 2) == ".l" && usedLabels.find (line->operand1.label) == usedLabels.end ())
+        if (line->operation == TX64Op::def_label && line->operand1.label.substr (0, 3) == "__l" && usedLabels.find (line->operand1.label) == usedLabels.end ())
             line = code.erase (line);
         else
             ++line;
@@ -1467,14 +1467,14 @@ void TX64Generator::generateCode (TRoutineValue &routineValue) {
     if (s->checkSymbolFlag (TSymbol::External))
         outputCode (TX64Operation (TX64Op::mov, reg, s->getExtSymbolName ()));
     else
-        outputCode (TX64Operation (TX64Op::lea, reg, TX64Operand (s->getOverloadName (), true)));
+        outputCode (TX64Operation (TX64Op::lea, reg, TX64Operand (s->getName (), true)));
     saveReg (reg);
 }
 
 void TX64Generator::codeSymbol (const TSymbol *s, const TX64Reg reg) {
     if (s->getLevel () == 1)
-//        outputCode (TX64Op::lea, reg, TX64Operand (s->getOverloadName (), true));
-        outputCode (TX64Op::mov, reg, s->getOffset (), s->getOverloadName ());
+//        outputCode (TX64Op::lea, reg, TX64Operand (s->getName (), true));
+        outputCode (TX64Op::mov, reg, s->getOffset (), s->getName ());
     else if (s->getLevel () == currentLevel) {
         if (s->getRegister () == TSymbol::InvalidRegister)
             outputCode (TX64Op::lea, reg, TX64Operand (TX64Reg::rbp, s->getOffset ()), s->getName ());
@@ -1977,10 +1977,10 @@ void TX64Generator::generateCode (TCaseStatement &caseStatement) {
                 outputCode (TX64Op::test, reg, reg);
             last = e.label.a;
             if (e.label.a == e.label.b)
-                outputCode (TX64Op::je, e.jumpLabel->getOverloadName ());
+                outputCode (TX64Op::je, e.jumpLabel->getName ());
             else {
                 outputCode (TX64Op::cmp, reg, e.label.b - last);
-                outputCode (TX64Op::jbe, e.jumpLabel->getOverloadName ());
+                outputCode (TX64Op::jbe, e.jumpLabel->getName ());
             }
         }
         if (TStatement *defaultStatement = caseStatement.getDefaultStatement ()) {
@@ -2009,7 +2009,7 @@ void TX64Generator::generateCode (TCaseStatement &caseStatement) {
         for (const TCaseStatement::TCase &c: caseList) {
             for (const TCaseStatement::TLabel &label: c.labels)
                 for (std::int64_t n = label.a; n <= label.b; ++n)
-                    jumpTable [n - minLabel] = c.jumpLabel->getOverloadName ();
+                    jumpTable [n - minLabel] = c.jumpLabel->getName ();
         }
         outputLabel (evalTableLabel);
         const std::string tableLabel = getNextLocalLabel ();
@@ -2021,7 +2021,7 @@ void TX64Generator::generateCode (TCaseStatement &caseStatement) {
     }
     
     for (const TCaseStatement::TCase &c: caseList) {
-        outputLabel (c.jumpLabel->getOverloadName ());
+        outputLabel (c.jumpLabel->getName ());
         visit (c.statement);
         outputCode (TX64Op::jmp, endLabel);
     }    
@@ -2043,15 +2043,15 @@ void TX64Generator::outputCompare (const TX64Operand &var, const std::int64_t n)
 }
 
 void TX64Generator::generateCode (TLabeledStatement &labeledStatement) {
-    outputLabel (".lbl_" + labeledStatement.getLabel ()->getOverloadName ());
+    outputLabel (labeledStatement.getLabel ()->getName ());
     visit (labeledStatement.getStatement ());
 }
 
 void TX64Generator::generateCode (TGotoStatement &gotoStatement) {
     if (TExpressionBase *condition = gotoStatement.getCondition ())
-        outputBooleanCheck (condition, ".lbl_" + gotoStatement.getLabel ()->getOverloadName (), false);
+        outputBooleanCheck (condition, gotoStatement.getLabel ()->getName (), false);
     else
-        outputCode (TX64Op::jmp, ".lbl_" + gotoStatement.getLabel ()->getOverloadName ());
+        outputCode (TX64Op::jmp, gotoStatement.getLabel ()->getName ());
 }
     
 void TX64Generator::generateCode (TBlock &block) {
@@ -2076,7 +2076,7 @@ void TX64Generator::generateCode (TProgram &program) {
 }
 
 void TX64Generator::initStaticRoutinePtr (std::size_t addr, const TRoutineValue *routineValue) {
-    outputCode (TX64Op::lea, TX64Reg::rax, TX64Operand (routineValue->getSymbol ()->getOverloadName (), true));
+    outputCode (TX64Op::lea, TX64Reg::rax, TX64Operand (routineValue->getSymbol ()->getName (), true));
     outputCode (TX64Op::mov, TX64Operand (TX64Reg::none, reinterpret_cast<std::uint64_t> (addr)), TX64Reg::rax);
 }
     
@@ -2380,7 +2380,7 @@ void TX64Generator::codeBlock (TBlock &block, bool hasStackFrame, TCodeSequence 
     }
     // TODO: destory global variables !!!!
     
-//    logOptimizer = block.getSymbol ()->getOverloadName () == "gettapeinput_$182";
+//    logOptimizer = block.getSymbol ()->getName () == "gettapeinput_$182";
     
     removeUnusedLocalLabels (blockCode);
     optimizePeepHole (blockCode);
@@ -2398,7 +2398,7 @@ void TX64Generator::codeBlock (TBlock &block, bool hasStackFrame, TCodeSequence 
     stackPositions = 0;    
     
     setOutput (&blockPrologue);    
-    beginRoutineBody (block.getSymbol ()->getOverloadName (), blockSymbols.getLevel (), blockSymbols, saveRegs, hasStackFrame);
+    beginRoutineBody (block.getSymbol ()->getName (), blockSymbols.getLevel (), blockSymbols, saveRegs, hasStackFrame);
     optimizePeepHole (blockPrologue);
     
     setOutput (&blockEpilogue);
@@ -2425,6 +2425,7 @@ void TX64Generator::generateBlock (TBlock &block) {
 //    std::cout << "Entering: " << block.getSymbol ()->getName () << std::endl;
 
     TSymbolList &blockSymbols = block.getSymbols ();
+    makeUniqueLabelNames (blockSymbols);
     TCodeSequence blockStatements;
     
     assignStackOffsets (block);

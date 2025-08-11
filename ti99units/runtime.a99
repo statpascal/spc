@@ -29,6 +29,8 @@ waitkey:
 !
 	b *r11
 
+;  TODO: cannot safely use R2 - R5 in rt_scroll_up
+
 _rt_scroll_up:
 	li r0, 32
 	li r3, vdpwa

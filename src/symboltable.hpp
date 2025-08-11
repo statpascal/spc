@@ -44,9 +44,6 @@ public:
     const std::string &getExtLibName () const;
     const std::string &getExtSymbolName () const;
     
-    void setOverloadName (const std::string &);
-    const std::string &getOverloadName () const;
-    
     void setType (TType *);
     TType *getType () const;
     
@@ -78,16 +75,12 @@ public:
     void setConstant (const TConstant *);
     const TConstant *getConstant () const;
 
-    // forward calls    
-//    void appendUnresolvedReferencePosition (std::size_t);
-//    const std::vector<std::size_t> &getUnresolvedReferencePositions () const;
-    
     // set level/offset from alias
     void setAliasData ();
     
     static const ssize_t LabelDefined = -1, UndefinedLabelUsed = -2, InvalidRegister = -1;
 private:
-    std::string name, libName, extSymbolName, overloadName;
+    std::string name, libName, extSymbolName;
     std::size_t level;
     TFlags flags;
     TSymbol *alias;
@@ -96,7 +89,6 @@ private:
     bool aliased;
     TType *type;
     const TConstant *constantValue;
-//    std::vector<std::size_t> unresolvedReferencePositions;
 };
 
 
@@ -123,6 +115,9 @@ public:
     TSymbol *searchSymbol (const std::string &name, TSymbol::TFlags = TSymbol::AllSymbols) const;
     std::vector<TSymbol *> searchSymbols (const std::string &name, TSymbol::TFlags = TSymbol::AllSymbols) const;
     void removeSymbol (const TSymbol *);
+    
+    TSymbol *makeLocalLabel (char c);	// -> yields --c - makeUniqueLabelNames in TBaseGenerator provides distinct names. 
+                                        // Labels with c = 'l' are removed by optimzier if not referenced in block (case jump tables are outside)
     
     void moveSymbols (TSymbol::TFlags, TSymbolList &dest);
     void copySymbols (TSymbol::TFlags, TSymbolList &dest);
@@ -282,23 +277,5 @@ inline void TSymbol::setConstant (const TConstant *constant) {
 inline const TConstant *TSymbol::getConstant () const {
     return constantValue;
 }
-
-inline void TSymbol::setOverloadName (const std::string &s) {
-    overloadName = s;
-}
-
-inline const std::string &TSymbol::getOverloadName () const {
-    return overloadName;
-}
-
-/*
-inline void TSymbol::appendUnresolvedReferencePosition (std::size_t pos) {
-    unresolvedReferencePositions.push_back (pos);
-}
-
-inline const std::vector<std::size_t> &TSymbol::getUnresolvedReferencePositions () const {
-    return unresolvedReferencePositions;
-}
-*/
 
 }

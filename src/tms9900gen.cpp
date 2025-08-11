@@ -1,3 +1,4 @@
+
 /** \file tms9900gen.hpp
 */
 
@@ -141,7 +142,7 @@ void T9900Generator::removeUnusedLocalLabels (TCodeSequence &code) {
         }
     TCodeSequence::iterator line = code.begin ();
     while (line != code.end ())
-        if (line->operation == T9900Op::def_label && line->operand1.label.substr (0, 2) == ".l" && usedLabels.find (line->operand1.label) == usedLabels.end ())
+        if (line->operation == T9900Op::def_label && line->operand1.label.substr (0, 3) == "__l" && usedLabels.find (line->operand1.label) == usedLabels.end ())
             line = code.erase (line);
         else
             ++line;
@@ -417,68 +418,6 @@ void T9900Generator::optimizePeepHole (TCodeSequence &code) {
     while (!code.empty () && code.back ().operation == T9900Op::end)
         code.pop_back ();
 }
-
-/*
-void T9900Generator::replaceLabel (TX64Operation &op, TX64Operand &operand, std::size_t offset) {
-    if (operand.isLabel) {
-        std::unordered_map<std::string, std::size_t>::iterator it = labelDefinitions.find (operand.label);
-        if (it != labelDefinitions.end ()) {
-            op.comment = operand.label;
-            operand = TX64Operand (it->second);
-        } else {
-            it = relLabelDefinitions.find (operand.label);
-            if (it != relLabelDefinitions.end ()) {
-                op.comment = operand.label;
-                operand.imm = it->second - offset;
-            }
-        }
-    }
-}
-*/
-
-/*
-void T9900Generator::assemblePass (int pass, std::vector<std::uint8_t> &opcodes, bool generateListing, std::vector<std::string> &listing) {
-    std::size_t offset = 0;
-    std::vector<std::uint8_t> opcode;
-    
-    if (pass == 2 && generateListing) {
-        listing.push_back ("bits 64");
-        for (const std::pair<const std::string, std::size_t> &v: labelDefinitions)
-            listing.push_back (v.first + " equ 0x" + toHexString (v.second));
-    }
-    
-    for (const TX64Operation &op: program) {
-        TX64Operation encode = op;
-        if (pass == 1 && encode.operation == TX64Op::def_label && encode.operand1.isLabel)
-            relLabelDefinitions [encode.operand1.label] = offset;
-        if (encode.operation < TX64Op::def_label) {
-            replaceLabel (encode, encode.operand1, offset);
-            replaceLabel (encode, encode.operand2, offset);
-        } 
-        opcode.clear ();
-        encode.outputCode (opcode, offset);
-        
-        if (pass == 2) {
-            opcodes.insert (opcodes.end (), opcode.begin (), opcode.end ());
-            if (generateListing) {
-                std::string line;
-                if (!opcode.empty ()) {
-                    std::stringstream ss;
-                    ss << std::hex << std::uppercase << std::setfill ('0') << std::setw (8) << offset << ": ";
-                    for (std::uint8_t v: opcode)
-                        ss << std::setw (2) << static_cast<int> (v);
-                    line = ss.str ();
-                }
-                line.resize (35, ' ');
-//                listing.push_back (line + op.makeString ());
-                listing.push_back (op.makeString ());
-            }
-        }
-        
-        offset += opcode.size ();
-    }
-}    
-*/
 
 void T9900Generator::getAssemblerCode (std::vector<std::uint8_t> &opcodes, bool generateListing, std::vector<std::string> &listing) {
     opcodes.clear ();
@@ -1103,13 +1042,13 @@ void T9900Generator::generateCode (TRoutineValue &routineValue) {
     if (s->checkSymbolFlag (TSymbol::External))
         outputCode (T9900Operation (T9900Op::li, reg, s->getExtSymbolName ()));
     else
-        outputCode (T9900Operation (T9900Op::li, reg, s->getOverloadName ()));
+        outputCode (T9900Operation (T9900Op::li, reg, s->getName ()));
     saveReg (reg);
 }
 
 void T9900Generator::codeSymbol (const TSymbol *s, const T9900Reg reg) {
     if (s->getLevel () == 1)	// global
-        outputCode (T9900Op::li, reg, s->getOffset (), s->getOverloadName ());
+        outputCode (T9900Op::li, reg, s->getOffset (), s->getName ());
     else if (s->getLevel () == currentLevel) {
         outputCode (T9900Op::mov, T9900Reg::r9, reg), 
         outputCode (T9900Op::ai, reg, s->getOffset (), s->getName ());
@@ -1191,17 +1130,6 @@ void T9900Generator::codeMove (const TType *type) {
         else
             outputCode (T9900Op::bl, T9900Operand ("_rt_copy_mem"));
     }
-}
-
-void T9900Generator::codeRuntimeCall (const std::string &funcname, const T9900Reg globalDataReg, const std::vector<std::pair<T9900Reg, std::size_t>> &additionalArgs) {
-/*
-    for (const std::pair<TX64Reg, std::size_t> &arg: additionalArgs)
-        outputCode (TX64Op::mov, arg.first, arg.second);
-    codeSymbol (globalRuntimeDataSymbol, TX64Reg::rax);
-    outputCode (TX64Op::mov, globalDataReg, TX64Operand (TX64Reg::rax, 0));
-    outputCode (TX64Op::mov, TX64Reg::rax, funcname);
-    outputCode (TX64Op::call, TX64Reg::rax);
-*/    
 }
 
 void T9900Generator::codePush (const T9900Operand op) {
@@ -1474,11 +1402,11 @@ void T9900Generator::generateCode (TCaseStatement &caseStatement) {
             last = e.label.a;
             if (e.label.a == e.label.b) {
                 outputCode (T9900Op::jne, T9900Operand ("!"));
-                outputCode (T9900Op::b, e.jumpLabel->getOverloadName ());
+                outputCode (T9900Op::b, e.jumpLabel->getName ());
             } else {
                 outputCode (T9900Op::ci, reg, e.label.b - last);
                 outputCode (T9900Op::jh, T9900Operand ("!"));
-                outputCode (T9900Op::b, e.jumpLabel->getOverloadName ());
+                outputCode (T9900Op::b, e.jumpLabel->getName ());
             }
             outputLabel ("!");
         }
@@ -1512,7 +1440,7 @@ void T9900Generator::generateCode (TCaseStatement &caseStatement) {
         for (const TCaseStatement::TCase &c: caseList) {
             for (const TCaseStatement::TLabel &label: c.labels)
                 for (std::int64_t n = label.a; n <= label.b; ++n)
-                    jumpTable [n - minLabel] = c.jumpLabel->getOverloadName ();
+                    jumpTable [n - minLabel] = c.jumpLabel->getName ();
         }
         outputLabel (evalTableLabel);
         const std::string tableLabel = getNextLocalLabel ();
@@ -1525,7 +1453,7 @@ void T9900Generator::generateCode (TCaseStatement &caseStatement) {
     }
     
     for (const TCaseStatement::TCase &c: caseList) {
-        outputLabel (c.jumpLabel->getOverloadName ());
+        outputLabel (c.jumpLabel->getName ());
         visit (c.statement);
         outputCode (T9900Op::b, endLabel);
     }    
@@ -1542,15 +1470,15 @@ void T9900Generator::outputCompare (const T9900Operand &var, const std::int64_t 
 }
 
 void T9900Generator::generateCode (TLabeledStatement &labeledStatement) {
-    outputLabel (".lbl_" + labeledStatement.getLabel ()->getOverloadName ());
+    outputLabel (labeledStatement.getLabel ()->getName ());
     visit (labeledStatement.getStatement ());
 }
 
 void T9900Generator::generateCode (TGotoStatement &gotoStatement) {
     if (TExpressionBase *condition = gotoStatement.getCondition ())
-        outputBooleanCheck (condition, ".lbl_" + gotoStatement.getLabel ()->getOverloadName (), false);
+        outputBooleanCheck (condition, gotoStatement.getLabel ()->getName (), false);
     else
-        outputCode (T9900Op::b, ".lbl_" + gotoStatement.getLabel ()->getOverloadName ());
+        outputCode (T9900Op::b, gotoStatement.getLabel ()->getName ());
 }
     
 void T9900Generator::generateCode (TBlock &block) {
@@ -1576,7 +1504,7 @@ void T9900Generator::generateCode (TProgram &program) {
 
 void T9900Generator::initStaticRoutinePtr (std::size_t addr, const TRoutineValue *routineValue) {
 /*
-    outputCode (TX64Op::lea, TX64Reg::rax, TX64Operand (routineValue->getSymbol ()->getOverloadName (), true));
+    outputCode (TX64Op::lea, TX64Reg::rax, TX64Operand (routineValue->getSymbol ()->getName (), true));
     outputCode (TX64Op::mov, TX64Operand (TX64Reg::none, reinterpret_cast<std::uint64_t> (addr)), TX64Reg::rax);
 */    
 }
@@ -1743,7 +1671,7 @@ void T9900Generator::codeBlock (TBlock &block, bool hasStackFrame, TCodeSequence
     visit (block.getStatements ());
     
     outputLabel (endOfRoutineLabel);
-//    logOptimizer = block.getSymbol ()->getOverloadName () == "gettapeinput_$182";
+//    logOptimizer = block.getSymbol ()->getName () == "gettapeinput_$182";
     
     removeUnusedLocalLabels (blockCode);
     optimizePeepHole (blockCode);
@@ -1761,7 +1689,7 @@ void T9900Generator::codeBlock (TBlock &block, bool hasStackFrame, TCodeSequence
     stackPositions = 0;    
     
     setOutput (&blockPrologue);    
-    beginRoutineBody (block.getSymbol ()->getOverloadName (), blockSymbols.getLevel (), blockSymbols, saveRegs, hasStackFrame);
+    beginRoutineBody (block.getSymbol ()->getName (), blockSymbols.getLevel (), blockSymbols, saveRegs, hasStackFrame);
     optimizePeepHole (blockPrologue);
     
     setOutput (&blockEpilogue);
@@ -1786,6 +1714,7 @@ void T9900Generator::generateBlock (TBlock &block) {
 //    std::cout << "Entering: " << block.getSymbol ()->getName () << std::endl;
 
     TSymbolList &blockSymbols = block.getSymbols ();
+    makeUniqueLabelNames (blockSymbols);
     TCodeSequence blockStatements;
     
     assignStackOffsets (block);

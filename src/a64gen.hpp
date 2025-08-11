@@ -124,8 +124,6 @@ private:
     void setRegUsed (TA64Reg);
     bool isRegUsed (TA64Reg) const;
 
-    std::string getUniqueLabelName (const std::string &);    
-    
     bool is32BitLimit (std::int64_t);
 
     bool codeRangeCheck, createCompilerListing;

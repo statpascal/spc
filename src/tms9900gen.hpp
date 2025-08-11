@@ -111,7 +111,6 @@ private:
 //    void initStaticVariable (char *addr, const TType *t, const TConstant *constant);
     
     // TODO -> make signed args
-    void codeRuntimeCall (const std::string &fn, T9900Reg globalDataReg, const std::vector<std::pair<T9900Reg, std::size_t>> &additionalArgs);
     void codeSignExtension (TType *, T9900Reg destReg, T9900Operand srcOperand);
     
     void codeInlinedFunction (TFunctionCall &);

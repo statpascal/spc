@@ -260,7 +260,7 @@ void TBaseGenerator::initStaticVariable (char *addr, const TType *t, const TCons
         initStaticRoutinePtr (reinterpret_cast<std::uint64_t> (addr), static_cast<const TSimpleConstant *> (constant)->getRoutineValue ());
         
 /*        *reinterpret_cast<std::size_t *> (addr) = static_cast<const TSimpleConstant *> (constant)->getRoutineValue ()->getSymbol ()->getOffset ();
-        outputCode (TX64Op::lea, TX64Reg::rax, TX64Operand (static_cast<const TSimpleConstant *> (constant)->getRoutineValue ()->getSymbol ()->getOverloadName (), true));
+        outputCode (TX64Op::lea, TX64Reg::rax, TX64Operand (static_cast<const TSimpleConstant *> (constant)->getRoutineValue ()->getSymbol ()->getName (), true));
         outputCode (TX64Op::mov, TX64Operand (TX64Reg::none, reinterpret_cast<std::uint64_t> (addr)), TX64Reg::rax);
 
 */        
@@ -331,18 +331,27 @@ std::vector<std::string> TBaseGenerator::createSymbolList (const std::string &ro
             ss << "  ";
             if (s->getType ()->isReference ())
                 ss << "var ";
-            ss << s->getOverloadName () << ": " << s->getType ()->getName ();;
+            ss << s->getName () << ": " << s->getType ()->getName ();;
             headerListing.push_back (ss.str ());
         }
     return headerListing;
 }
 
+void TBaseGenerator::makeUniqueLabelNames (TSymbolList &symbols) {
+    for (TSymbol *s: symbols)
+        if ((s->checkSymbolFlag (TSymbol::Label) || s->checkSymbolFlag (TSymbol::Routine)) && !s->checkSymbolFlag (TSymbol::External)) {
+            const std::string t = s->getName ();
+            if (!t.empty () && t [0] != '.')
+                s->setName (t + "_" + std::to_string (labelCount++));
+        }
+}
+
 std::string TBaseGenerator::getNextLocalLabel () {
-    return ".l" + std::to_string (labelCount++) + '$';
+    return "__l_" + std::to_string (labelCount++);
 }
 
 std::string TBaseGenerator::getNextCaseLabel () {
-    return ".c" + std::to_string (labelCount++) + '$';
+    return "__c" + std::to_string (labelCount++);
 }
 
 }

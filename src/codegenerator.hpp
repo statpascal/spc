@@ -76,9 +76,6 @@ public:
     void *getGlobalDataArea () const;
     TRuntimeData *getRuntimeData () const;
     
-    std::string getNextLocalLabel ();
-    std::string getNextCaseLabel ();
-    
     struct TTypeAnyManager {
         TAnyManager *anyManager;
         std::size_t runtimeIndex;
@@ -87,6 +84,9 @@ public:
 protected:
     explicit TBaseGenerator (TRuntimeData &);
 
+    std::string getNextLocalLabel ();
+    std::string getNextCaseLabel ();
+    
     void assignAlignedOffset (TSymbol &s, ssize_t &offset, std::size_t align);
     void assignStackOffsets (ssize_t &pos, TSymbolList &symbolList, bool handleParameters);
     
@@ -108,6 +108,7 @@ protected:
     void assignGlobals (TSymbolList &globalSymbols);
     void initStaticGlobals (TSymbolList &globalSymbols);
     void initStaticVariable (char *addr, const TType *t, const TConstant *constant);
+    void makeUniqueLabelNames (TSymbolList &);
     
     TType *getMemoryOperationType (TType *type);
     bool getSetTypeLimit (const TExpressionBase *, std::int64_t &minval, std::int64_t &maxval);
@@ -116,13 +117,12 @@ protected:
 
     // TODO: private after A64 modificiation    
     void allocateGlobalDataArea (std::size_t n);
-    std::size_t labelCount;
-    
     
 private:    
     virtual void initStaticRoutinePtr (std::size_t addr, const TRoutineValue *) = 0;
     
     TTypeAnyManagerMap typeAnyManagerMap;
+    std::size_t labelCount;
     TRuntimeData &runtimeData;
     void *globalDataArea;
 };

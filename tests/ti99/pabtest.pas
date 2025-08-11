@@ -18,7 +18,7 @@ procedure test;
             numchar := 0;
             status := 0;
             recnr := 0;
-            name := 'DSK1.123-T02'
+            name := 'DSK1.TEST01'
         end;
             
         if not dsrLink (pab, pabVdpAddr) then

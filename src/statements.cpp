@@ -42,13 +42,15 @@ TStatement *TStatement::parse (TBlock &declarations) {
 }
 
 TSymbol *TStatement::createLocalLabel (TBlock &declarations) {
-    TCompilerImpl &compiler = declarations.getCompiler ();
-    return declarations.getSymbols ().addLabel (reinterpret_cast<TBaseGenerator &> (compiler.getCodeGenerator ()).getNextLocalLabel ()).symbol;
+//    TCompilerImpl &compiler = declarations.getCompiler ();
+//    return declarations.getSymbols ().addLabel (reinterpret_cast<TBaseGenerator &> (compiler.getCodeGenerator ()).getNextLocalLabel ()).symbol;
+    return declarations.getSymbols ().makeLocalLabel ('l');
 }
 
 TSymbol *TStatement::createCaseLabel (TBlock &declarations) {
-    TCompilerImpl &compiler = declarations.getCompiler ();
-    return declarations.getSymbols ().addLabel (reinterpret_cast<TBaseGenerator &> (compiler.getCodeGenerator ()).getNextCaseLabel ()).symbol;
+//    TCompilerImpl &compiler = declarations.getCompiler ();
+//    return declarations.getSymbols ().addLabel (reinterpret_cast<TBaseGenerator &> (compiler.getCodeGenerator ()).getNextCaseLabel ()).symbol;
+    return declarations.getSymbols ().makeLocalLabel ('c');
 }
 
 std::vector<TStatement *> TStatement::parseStatementSequence (TBlock &declarations, TToken endToken) {

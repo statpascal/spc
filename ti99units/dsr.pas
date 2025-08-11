@@ -111,8 +111,8 @@ function dsrLink (var pab: TPab; pabVdpAddr: integer): boolean;
                         begin
                             if dsrList^.name = device then
                                 begin
-                                    memW [$83f2 shr 1] := dsrList^.address;	// R9 (GPLWS)
-                                    memW [$83f8 shr 1] := cruAddr;		// R12 (GPLWS)
+                                    memW [$83f2 div 2] := dsrList^.address;	// R9 (GPLWS)
+                                    memW [$83f8 div 2] := cruAddr;		// R12 (GPLWS)
 
 (* The DSRLNK routine in the Editor/Assembler module would also set the following memory
    addresses (not saving R15 of GPLWS). It is unclear if that is really needed - at least
@@ -133,11 +133,11 @@ function dsrLink (var pab: TPab; pabVdpAddr: integer): boolean;
                         end
                 end;
             setCRUBit (cruAddr, false);
-            inc (cruAddr, $100);
+            inc (cruAddr, $100)
         until (cruAddr = $2000) or completed;
         
         vmbr (pab, pabVdpAddr, sizeof (TPab));
-        dsrLink := completed;
+        dsrLink := completed
     end;
 
 end.

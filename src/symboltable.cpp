@@ -10,7 +10,7 @@ namespace statpascal {
 const ssize_t TSymbol::LabelDefined, TSymbol::UndefinedLabelUsed, TSymbol::InvalidRegister;
 
 TSymbol::TSymbol (const std::string &name, TType *type, std::size_t level, TFlags flags, TSymbol *alias):
-  name (name), overloadName (name), level (level), flags (flags), alias (alias), block (nullptr), offset (0), parameterPosition (0), assignedRegister (InvalidRegister), aliased (false), constantValue (nullptr) {
+  name (name), level (level), flags (flags), alias (alias), block (nullptr), offset (0), parameterPosition (0), assignedRegister (InvalidRegister), aliased (false), constantValue (nullptr) {
     setType (type);
 }
 
@@ -84,8 +84,6 @@ TSymbolList::TAddSymbolResult TSymbolList::addNamedType (const std::string &name
 }
 
 TSymbolList::TAddSymbolResult TSymbolList::addSymbol (const std::string &name, TType *type, TSymbol::TFlags flags, TSymbol *alias) {
-    thread_local static std::uint64_t routineCount = 0;
-
     std::vector<TSymbol *> results;
     std::copy_if (symbols.begin (), symbols.end (), std::back_inserter (results), [&name] (TSymbol *s) { return s->getName () == name; });
     if (!results.empty ()) {
@@ -98,10 +96,13 @@ TSymbolList::TAddSymbolResult TSymbolList::addSymbol (const std::string &name, T
     }
         
     TSymbol *s = memoryPoolFactory.create<TSymbol> (name, type, level, flags, alias);
-    if ((type && type->isRoutine ()) || flags & TSymbol::Label)
-        s->setOverloadName (name + "_$" + std::to_string (routineCount++));
     symbols.push_back (s);
     return {s, false};
+}
+
+TSymbol *TSymbolList::makeLocalLabel (char c) {
+    symbols.push_back (memoryPoolFactory.create<TSymbol> (std::string ("__") + c, nullptr, level, TSymbol::Label, nullptr));
+    return symbols.back ();
 }
 
 TSymbol *TSymbolList::searchSymbol (const std::string &name, TSymbol::TFlags flags) const {

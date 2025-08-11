@@ -221,7 +221,7 @@ void TA64Generator::removeUnusedLocalLabels (std::vector<TA64Operation> &code) {
                     usedLabels.insert (operand.label);
     std::size_t line = 0;
     while (line < code.size ())
-        if (code [line].operation == TA64Op::def_label && code [line].operands [0].label.substr (0, 2) == ".l" &&
+        if (code [line].operation == TA64Op::def_label && code [line].operands [0].label.substr (0, 3) == "__l" &&
             usedLabels.find (code [line].operands [0].label) == usedLabels.end ())
             code.erase (code.begin () + line);
         else
@@ -778,7 +778,7 @@ void TA64Generator::getAssemblerCode (std::vector<std::uint8_t> &opcodes, bool g
         code.push_back (".balign 16");
         code.push_back (startOfGlobals + ":");
         for (const TGlobalDefinition &g: globalDefinitions)
-            if (g.name == globalRuntimeDataSymbol->getOverloadName ())
+            if (g.name == globalRuntimeDataSymbol->getName ())
                 code.push_back (g.name + ": .xword 0x" + toHexString (reinterpret_cast<std::uint64_t> (&runtimeData)));
             else if (g.size)
                 code.push_back (g.name + ": .space " + std::to_string (g.size) + ", 0");
@@ -1387,7 +1387,7 @@ void TA64Generator::generateCode (TRoutineValue &routineValue) {
     if (s->checkSymbolFlag (TSymbol::External))
         loadLabelAddress (s->getExtSymbolName (), reg);
     else
-        loadLabelAddress (s->getOverloadName (), reg);
+        loadLabelAddress (s->getName (), reg);
     saveReg (reg);
 }
 
@@ -1400,7 +1400,6 @@ void TA64Generator::loadLabelAddress (const std::string &label, const TA64Reg re
 
 void TA64Generator::codeSymbol (const TSymbol *s, const TA64Reg reg) {
     if (s->getLevel () == 1) 
-//        loadLabelAddress (s->getOverloadName (), reg);
         loadImmediate (reg, s->getOffset ());
     else if (s->getLevel () == currentLevel) {
         if (s->getRegister () == TSymbol::InvalidRegister) {
@@ -2288,7 +2287,7 @@ void TA64Generator::assignRegisters (TSymbolList &blockSymbols) {
 
 void TA64Generator::initStaticRoutinePtr (std::size_t addr, const TRoutineValue *routineValue) {
     loadImmediate (intScratchReg1, addr);
-    loadLabelAddress (routineValue->getSymbol ()->getOverloadName (), intScratchReg2);
+    loadLabelAddress (routineValue->getSymbol ()->getName (), intScratchReg2);
     outputCode (TA64Op::str, {intScratchReg2, TA64Operand (intScratchReg1, TA64Reg::none, 0)});
 }
 
@@ -2315,9 +2314,6 @@ void TA64Generator::codeBlock (TBlock &block, std::vector<TUnit *> units, bool h
         outputCode (TA64Op::bl, {TA64Operand ("$init_static")});
     visit (block.getStatements ());
     
-//    logOptimizer = block.getSymbol ()->getOverloadName () == "gettapeinput_$182";
-
-
     outputLabel (endOfRoutineLabel);
     if (level > 1) {
         // TODO: this is called twice!
@@ -2354,7 +2350,7 @@ void TA64Generator::codeBlock (TBlock &block, std::vector<TUnit *> units, bool h
         saveRegs.push_back (TA64Reg::xzr);
     
     setOutput (&blockPrologue);    
-    beginRoutineBody (block.getSymbol ()->getOverloadName (), blockSymbols.getLevel (), blockSymbols, saveRegs, hasStackFrame);
+    beginRoutineBody (block.getSymbol ()->getName (), blockSymbols.getLevel (), blockSymbols, saveRegs, hasStackFrame);
     optimizePeepHole (blockPrologue);
     
     setOutput (&blockEpilogue);
@@ -2384,9 +2380,7 @@ void TA64Generator::generateBlock (TBlock &block, std::vector<TUnit *> units) {
 //    std::cout << "Entering: " << block.getSymbol ()->getName () << std::endl;
 
     TSymbolList &blockSymbols = block.getSymbols ();
-    for (TSymbol *s: blockSymbols)
-        if (s->checkSymbolFlag (TSymbol::Label))
-            s->setName (getUniqueLabelName (s->getName ()));
+    makeUniqueLabelNames (blockSymbols);
 
     std::vector<TA64Operation> blockStatements;
     
@@ -2421,10 +2415,6 @@ void TA64Generator::generateBlock (TBlock &block, std::vector<TUnit *> units) {
 
 bool TA64Generator::is32BitLimit (std::int64_t n) {
     return std::numeric_limits<std::int32_t>::min () <= n && n <= std::numeric_limits<std::int32_t>::max ();
-}
-
-std::string TA64Generator::getUniqueLabelName (const std::string &s) {
-    return s + "_" + std::to_string (labelCount++) + '$';
 }
 
 } // namespace statpascal
