@@ -320,20 +320,35 @@ std::vector<std::string> TBaseGenerator::createSymbolList (const std::string &ro
     }
     ss << routineName << ", level: " << level;
     headerListing.push_back (ss.str ());
-    for (const TSymbol *s: symbolList)
-        if (s->checkSymbolFlag (TSymbol::Variable) || s->checkSymbolFlag (TSymbol::Parameter)) {
-            ss.str (std::string ());
-            ss << std::setw (6);
-            if (s->getRegister () != TSymbol::InvalidRegister)
-                ss << regNames [s->getRegister ()];
-            else
-                ss << s->getOffset ();
-            ss << "  ";
-            if (s->getType ()->isReference ())
-                ss << "var ";
-            ss << s->getName () << ": " << s->getType ()->getName ();;
-            headerListing.push_back (ss.str ());
-        }
+    TSymbolList *symbols = &symbolList;
+    while (symbols && symbols->getLevel () == symbolList.getLevel ()) {
+        for (const TSymbol *s: *symbols)
+            if (s->checkSymbolFlag (TSymbol::Variable) || s->checkSymbolFlag (TSymbol::Parameter) || s->checkSymbolFlag (TSymbol::Absolute)) {
+                ss.str (std::string ());
+                if (symbolList.getLevel () == 1)
+                    ss << "  " << std::setw (4) << std::hex << std::setfill ('0');
+                else
+                    ss << std::setw (6);
+                if (s->getRegister () != TSymbol::InvalidRegister)
+                    ss << regNames [s->getRegister ()];
+                else
+                    ss << s->getOffset ();
+                ss << "  ";
+                if (symbolList.getLevel () == 1)
+                    ss << std::setfill (' ') << std::dec << std::setw (6) << s->getOffset () << "  ";
+                if (s->getType ()->isReference ())
+                    ss << "var ";
+                ss << s->getName () << ": " << s->getType ()->getName ();;
+                if (s->checkSymbolFlag (TSymbol::Absolute))
+                    ss << " (absolute)";
+                headerListing.push_back (ss.str ());
+            }
+        symbols = symbols->getPreviousLevel ();
+    }
+    if (symbolList.getLevel () == 1) {
+        std::sort (headerListing.begin () + 1, headerListing.end ());
+        headerListing.erase (std::unique (headerListing.begin (), headerListing.end ()), headerListing.end ());
+    }
     return headerListing;
 }
 

@@ -15,9 +15,9 @@ var
     
 procedure gotoxy (x, y: integer);
 
-procedure move (var src, dest; length: integer); external;
-procedure vmbw (var src; dest, length: integer); external;
-procedure vmbr (var dest; src, length: integer); external;
+procedure move (var src, dest; length: integer);
+procedure vmbw (var src; dest, length: integer);
+procedure vmbr (var dest; src, length: integer);
 
 function min (a, b: integer): integer;
 function max (a, b: integer): integer;
@@ -42,7 +42,8 @@ function __short_str_greater_equal (s, t: PChar): boolean;
 function __short_str_less (s, t: PChar): boolean; 
 function __short_str_greater (s, t: PChar): boolean; 
 
-procedure waitkey; external;
+function keypressed: boolean;
+procedure waitkey;
 
 procedure __new (var p: pointer; count, size: integer);
 procedure __dispose (p: pointer);
@@ -61,6 +62,7 @@ const
 
 type
     PPChar = ^PChar;
+    
 var 
     vdpWriteAddress: integer;
     vdprd:  char absolute $8800;
@@ -124,20 +126,22 @@ procedure _rt_scroll_up; assembler;
         li r13, vdpwa
         li r14, vdprd
         li r15, vdpwd
-l1:
+        
+    _rt_scroll_up_1:
         swpb r0
         movb r0, *r13
         swpb r0
         movb r0, *r13
         li r8, 8
         li r12, >8320
-l2:
+        
+    _rt_scroll_up_2:
         movb *r14, *r12+
         movb *r14, *r12+
         movb *r14, *r12+
         movb *r14, *r12+
         dec r8
-        jne l2
+        jne _rt_scroll_up_2
 
         ai r0, >3fe0
         swpb r0
@@ -147,24 +151,79 @@ l2:
 
         li r8, 8
         li r12, >8320
-l3:
+        
+    _rt_scroll_up_3:
         movb *r12+, *r15
         movb *r12+, *r15
         movb *r12+, *r15
         movb *r12+, *r15
         dec r8
-        jne l3
+        jne _rt_scroll_up_3
 
         ai r0, >c040
         ci r0, 768
-        jne l1
+        jne _rt_scroll_up_1
 
         li r8, 32
         li r12, >2000
-l4
+        
+    _rt_scroll_up_4:
         movb r12, *r15
         dec r8
-        jne l4
+        jne _rt_scroll_up_4
+end;
+
+procedure move (var src, dest; length: integer); assembler;
+        mov @src, r12
+        mov @dest, r13
+        mov @length, r14
+        jeq move_2
+        
+    move_1:    
+        movb *r12+, *r13+
+        dec r14
+        jne move_1
+        
+    move_2:
+end;
+    
+procedure vmbw (var src; dest, length: integer); assembler;
+	mov @src, r12
+	mov @dest, r13
+	mov @length, r14
+	jeq vmbw_2
+
+	ori r13, >4000
+	swpb r13
+	movb r13, @vdpwa
+	swpb r13
+	movb r13, @vdpwa
+
+    vmbw_1:
+	movb *r12+, @vdpwd
+	dec r14
+	jne vmbw_1
+	
+    vmbw_2:
+end;
+    
+procedure vmbr (var dest; src, length: integer); assembler;
+	mov @dest, r12
+	mov @src, r13
+	mov @length, r14
+	jeq vmbr_2
+
+	ori r13, >4000
+	swpb r13
+	movb r13, @vdpwa
+	swpb r13
+	movb r13, @vdpwa
+
+    vmbr_1:
+	movb *r12+, @vdpwd
+	dec r14
+	jne vmbr_1
+    vmbr_2:
 end;
 
 procedure gotoxy (x, y: integer);
@@ -187,11 +246,22 @@ procedure __write_lf (var f: text);
         setVdpAddress (vdpWriteAddress or WriteAddr);
     end;
     
+procedure __div_mod (var divmod); assembler;
+    mov *r10, r0
+    li r12, 10
+    mov *r0, r14
+    clr r13
+    div r12, r13
+    mov r13, *r0+
+    mov r14, *r0
+end;
+    
 procedure __write_int (var f: text; n, length, precision: integer);
     var
         buf: string [6];
         neg: boolean;
         p: PChar;
+        divmod: array [0..1] of integer;
     begin
         if n = -32768 then
             __write_string (f, '-32768', length, precision)
@@ -200,13 +270,14 @@ procedure __write_int (var f: text; n, length, precision: integer);
                 p := addr (buf [6]);
                 neg := n < 0;
                 if neg then
-                    n := -n;
+                    divmod [0] := -n
+                else 
+                    divmod [0] := n;
                 repeat
-                    p^ := char (n mod 10 + 48);
+                    __div_mod (divmod);
+                    p^ := chr (divmod [1] + 48);
                     dec (p);
-                    if n > 0 then
-                        n := n div 10
-                until n = 0;
+                until divmod [0] = 0;
                 if neg then
                     begin
                         p^ := '-';
@@ -253,13 +324,24 @@ procedure __write_boolean (var f: text; b: boolean; length, precision: integer);
         __write_string (f, s [b], length, precision)
     end;
 
-function min (a, b: integer): integer;
+function min (a, b: integer): integer; assembler;
+        mov *r10, r12	// pointer to result
+        c @a, @b
+        jlt min_1
+        mov @b, *r12
+        jmp min_2
+    min_1:
+        mov @a, *r12
+    min_2:
+end;
+(*
     begin
         if a < b then
             min := a
         else
             min := b
     end;
+*)    
 
 function max (a, b: integer): integer;
     begin
@@ -386,6 +468,34 @@ function hexstr (n: integer): string4;
             res [i] := hex [succ (n shr (16 - i shl 2) and $0f)];
         res [0] := #4;
         hexstr := res
+    end;
+    
+function keypressed: boolean; assembler;
+        clr r14
+        clr r13
+        li r15, >0100	// true
+        
+    keypressed_1:
+        li r12, >0024
+        ldcr r13, 3
+        li r12, >0006
+        stcr r14, 8
+        ci r14, >ff00
+        jne keypressed_2
+        ai r13, >0100
+        ci r13, >0600
+        jne keypressed_1
+        clr r15		// return false
+    
+    keypressed_2:
+        mov *r10, r12
+        movb r15, *r12
+    end;
+
+procedure waitkey;
+    begin
+        repeat
+        until keypressed
     end;
     
 procedure loadCharset;

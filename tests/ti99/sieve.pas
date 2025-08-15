@@ -1,7 +1,7 @@
 program sieve (output);
 
 const 
-    n = 1000;
+    n = 10000;
     rep = 1;
 
 var
@@ -37,6 +37,6 @@ begin
             end;
     writeln; writeln;
     writeln ('Found ', count, ' primes below ', n);
-    waitkey
+//    waitkey
 end.
 

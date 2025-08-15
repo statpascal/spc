@@ -360,6 +360,18 @@ void T9900Generator::optimizePeepHole (TCodeSequence &code) {
             removeLines (code, line, 2);
         }
         
+        // li reg, imm1
+        // sla reg, imm2
+        // ->
+        // li reg, imm1 << imm2
+        else if (op1 == T9900Op::li && op2 == T9900Op::sla && isSameCalcStackReg (op_1_1, op_2_1) &&
+                 !op_1_2.isLabel () && !op_2_2.isLabel () && op_2_2.val > 0) {
+            op2 = op1;
+            op_2_2.val = op_1_2.val << op_2_2.val;
+            removeLines (code, line, 1);
+            comm_2 = comm_1;
+        }
+        
         // inv reg
         // inv reg
         // ->
@@ -1525,7 +1537,7 @@ void T9900Generator::initStaticRoutinePtr (std::size_t addr, const TRoutineValue
 void T9900Generator::resolvePascalSymbol (T9900Operand &operand, TSymbolList &symbols) {
     if (operand.isValid () && operand.isLabel ()) 
         if (TSymbol *s = symbols.searchSymbol (operand.label))
-            if (s->checkSymbolFlag (TSymbol::Variable) || s->checkSymbolFlag (TSymbol::Parameter)) {
+            if (s->checkSymbolFlag (TSymbol::Variable) || s->checkSymbolFlag (TSymbol::Parameter) || s->checkSymbolFlag (TSymbol::Absolute)) {
                 operand.label.clear ();
                 if (s->getLevel () == 1)
                     operand.val = s->getOffset ();
@@ -1849,7 +1861,7 @@ T9900Reg T9900Generator::parseRegister (TCompilerImpl &compiler, TLexer &lexer) 
 }
 
 T9900Operand T9900Generator::parseInteger (TCompilerImpl &compiler, TLexer &lexer, std::int64_t minval, std::int64_t maxval) {
-    if (maxval == 0xffff && lexer.getToken () == TToken::Identifier)
+    if (maxval == 0xffff && lexer.getToken () == TToken::Identifier) {
         T9900Operand ret = lexer.getString ();
         lexer.getNextToken ();
         return ret;
@@ -1872,7 +1884,7 @@ T9900Operand T9900Generator::parseGeneralAddress (TCompilerImpl &compiler, TLexe
     switch (t) {
         case TToken::AddrOp: 
             lexer.getNextToken ();
-            if (lexer.getToken () == TToken::Identifier) 
+            if (lexer.getToken () == TToken::Identifier)
                 label = lexer.getIdentifier ();
             else if (lexer.getToken () == TToken::IntegerConst) {
                 val = lexer.getInteger ();
@@ -1918,7 +1930,10 @@ void T9900Generator::parseAssemblerBlock (TSymbol *symbol, TBlock &block) {
     
     while (lexer.getToken () != TToken::End && lexer.getToken () != TToken::Error) {
         const std::string &opcode = lexer.getIdentifier ();
-        compiler.checkToken (TToken::Identifier, "Expected label definition or mnemonic");
+        if (lexer.getToken () != TToken::DivInt)
+            compiler.checkToken (TToken::Identifier, "Expected label definition or mnemonic");
+        else
+            lexer.getNextToken ();
 //        std::cout << opcode << std::endl;
         T9900OpDescription desc;
         T9900Operand op1, op2;

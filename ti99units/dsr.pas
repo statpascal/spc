@@ -78,7 +78,25 @@ implementation
 var 
     header: TStandardHeader absolute $4000;
         
-procedure calldsr (var res: boolean); external;
+procedure calldsr (var res: boolean); assembler;
+        lwpi >83e0	// GPLWS
+
+	bl *r9
+	jmp calldsr_1	// continue search for DSR
+
+	lwpi >8300
+	li r0, 256	// call completed
+	jmp calldsr_2
+	
+    calldsr_1:
+	lwpi >8300	// TODO: keep variable/configurable
+	clr r0
+	
+    calldsr_2:
+	mov @res, r12
+	movb r0, *r12
+end;
+
 
 function dsrLink (var pab: TPab; pabVdpAddr: integer): boolean;
     var 
