@@ -18,7 +18,7 @@
 9900 calling conventions 
 
 r0:	   scratch reg; used for shift/rotate count
-r1 - r8:   used as calculator stack; saved by callee
+r1 - r8:   used as calculator stack; saved by callee (r8 only used for MPY/DIV)
 r9:	   used as frame pointer; saved by callee
 r10:       stack pointer (decrementing, points to last value in stack)
 r11:	   link register
@@ -1537,6 +1537,8 @@ void T9900Generator::externalRoutine (TSymbol *s) {
         
         outputLabel (s->getName ());
         std::move (it->second.begin (), it->second.end (), std::back_inserter (program));
+        outputCode (T9900Op::ai, T9900Reg::r10, s->getBlock ()->getSymbols ().getParameterSize () + 2);
+        outputCode (T9900Op::b, T9900Operand (T9900Reg::r11, T9900Operand::TAddressingMode::RegInd));
     }
     
 }
