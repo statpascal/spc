@@ -247,13 +247,13 @@ procedure __write_lf (var f: text);
     end;
     
 procedure __div_mod (var divmod); assembler;
-    mov *r10, r0
-    li r12, 10
-    mov *r0, r14
-    clr r13
-    div r12, r13
-    mov r13, *r0+
-    mov r14, *r0
+        mov *r10, r0
+        li r12, 10
+        mov *r0, r14
+        clr r13
+        div r12, r13
+        mov r13, *r0+
+        mov r14, *r0
 end;
     
 procedure __write_int (var f: text; n, length, precision: integer);
@@ -297,24 +297,44 @@ procedure __write_char (var f: text; ch: char; length, precision: integer);
         __write_string (f, s, length, precision);
     end;
     
+procedure __write_blank (length: integer); assembler;
+        mov @length, r12
+        li r13, vdpwd
+        li r14, >2000
+    __write_blank_1:
+        movb r14, *r13
+        dec r12
+        jne __write_blank_1
+end;
+
+procedure __write_data (p: pointer; length: integer); assembler;
+        mov @length, r12
+        jeq __write_data_2
+        mov @p, r13
+        li r14, vdpwd
+        inc r13
+    __write_data_1:
+        movb *r13+, *r14
+        dec r12
+        jne __write_data_1
+    __write_data_2
+end;
+
 procedure __write_string (var f: text; p: PChar; length, precision: integer);
     var
-        strlen, len, i: integer;
+        len, outlen: integer;
     begin
-        strlen := ord (p^);
-        len := max (strlen, length);
-        while vdpWriteAddress + len > 24 * 32 do
+        len := ord (p^);
+        outlen := len;
+        if length > len then
+            outlen := length;
+        while vdpWriteAddress + outlen > 24 * 32 do
             scroll;
         setVdpAddress (vdpWriteAddress or WriteAddr);
-        inc (vdpWriteAddress, len);
-        for i := strlen + 1 to length do
-            vdpwd := ' ';
-        while strlen > 0 do 
-            begin
-                inc (p);
-                vdpwd := p^;
-                dec (strlen)
-            end;
+        inc (vdpWriteAddress, outlen);
+        if outlen > len then
+            __write_blank (outlen - len);
+        __write_data (p, len)
     end;
     
 procedure __write_boolean (var f: text; b: boolean; length, precision: integer);
