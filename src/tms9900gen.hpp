@@ -91,6 +91,7 @@ private:
     void assignGlobalVariables (TSymbolList &);
     void codeBlock (TBlock &block, bool hasStackFrame, TCodeSequence &blockStatements);
     void generateBlock (TBlock &);
+    void resolvePascalSymbol (T9900Operand &operand, TSymbolList &symbols);
     void externalRoutine (TSymbol *);
     void beginRoutineBody (const std::string &routineName, std::size_t level, TSymbolList &, const std::set<T9900Reg> &saveRegs, bool hasStackFrame);
     void endRoutineBody (std::size_t level, TSymbolList &, const std::set<T9900Reg> &saveRegs, bool hasStackFrame);

@@ -9,14 +9,23 @@ program inlineasm;
    include bank switching code when necessary.
 *)   
 
+var
+    c: integer;
 
 function add (a, b: integer): integer; assembler;
     mov  *r10, r12              // get pointer to return value
-    mov  @2(r10), *r12
-    a    @4(r10), *r12
+    mov  @a, *r12
+    a    @b, *r12
+end;
+
+procedure setC (a: integer); assembler;
+    mov @a, @c			// access global variable
 end;
 
 begin
-    writeln ('5 + 7 = ', add (5, 7));
+    c := 2;
+    writeln ('5 + 7= ', add (5, 7));
+    setC (9);
+    writeln ('c = ', c);
     waitkey
 end.

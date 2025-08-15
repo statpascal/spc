@@ -1521,22 +1521,48 @@ void T9900Generator::initStaticRoutinePtr (std::size_t addr, const TRoutineValue
     outputCode (TX64Op::mov, TX64Operand (TX64Reg::none, reinterpret_cast<std::uint64_t> (addr)), TX64Reg::rax);
 */    
 }
+
+void T9900Generator::resolvePascalSymbol (T9900Operand &operand, TSymbolList &symbols) {
+    if (operand.isValid () && operand.isLabel ()) 
+        if (TSymbol *s = symbols.searchSymbol (operand.label))
+            if (s->checkSymbolFlag (TSymbol::Variable) || s->checkSymbolFlag (TSymbol::Parameter)) {
+                operand.label.clear ();
+                if (s->getLevel () == 1)
+                    operand.val = s->getOffset ();
+                else {
+                    operand.val = s->getOffset () - 4;
+                    operand.reg = T9900Reg::r10;
+                    if (!operand.val)
+                        operand.t = T9900Operand::TAddressingMode::RegInd;
+                    else
+                        operand.t = T9900Operand::TAddressingMode::Indexed;
+                }
+            }
+            
+}
     
 void T9900Generator::externalRoutine (TSymbol *s) {
     std::map<TSymbol *, TCodeSequence>::iterator it = assemblerBlocks.find (s);
     if (it != assemblerBlocks.end ()) {
-        assignParameterOffsets (*s->getBlock ());
+        TBlock &block = *s->getBlock ();
+        TSymbolList &symbols = block.getSymbols ();
         
+        assignParameterOffsets (block);
         setOutput (&program);
         outputComment (std::string ());
 //        TRoutineType *type = static_cast<TRoutineType *> (s->getType ());
 //        std::cout << s->getName () << ": " <<  type->getName () << (type->isFarCall () ? ": FAR" : ": NEAR") << std::endl;
-        for (const std::string &s: createSymbolList (s->getName (), 2, s->getBlock ()->getSymbols (), {}))
+        for (const std::string &s: createSymbolList (s->getName (), symbols.getLevel (), symbols, {}))
             outputComment (s);
         outputComment (std::string ());
-        
         outputLabel (s->getName ());
+        
+        for (T9900Operation &op: it->second) {
+            resolvePascalSymbol (op.operand1, symbols);
+            resolvePascalSymbol (op.operand2, symbols);
+        }
         std::move (it->second.begin (), it->second.end (), std::back_inserter (program));
+        
         outputCode (T9900Op::ai, T9900Reg::r10, s->getBlock ()->getSymbols ().getParameterSize () + 2);
         outputCode (T9900Op::b, T9900Operand (T9900Reg::r11, T9900Operand::TAddressingMode::RegInd));
     }
