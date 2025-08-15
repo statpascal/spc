@@ -9,14 +9,14 @@ var
 
 procedure p;
     var
-	b: integer;
+        b: integer;
     const
         a: integer = 5;
         s: string [5] = 'ABCDE';
         d: char = 'X';
-	e: char = 'Y';
-    var	
-	c: integer;
+        e: char = 'Y';
+    var 
+        c: integer;
     begin
         writeln (a, ' ', s, ' ', d, e)
     end;

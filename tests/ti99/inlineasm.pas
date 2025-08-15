@@ -11,7 +11,7 @@ program inlineasm;
 
 
 function add (a, b: integer): integer; assembler;
-    mov  *r10, r12		// get pointer to return value
+    mov  *r10, r12              // get pointer to return value
     mov  @2(r10), *r12
     a    @4(r10), *r12
 end;

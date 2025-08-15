@@ -12,7 +12,7 @@ procedure test;
     begin
         with pab do begin
             opcode := PabOpen;
-            err_type := PabOutput or PabDisplay or PabVariable;	
+            err_type := PabOutput or PabDisplay or PabVariable; 
             vdpaddr := bufVdpAddr;
             reclen := 80;
             numchar := 0;

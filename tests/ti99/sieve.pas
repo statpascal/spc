@@ -2,7 +2,7 @@ program sieve (output);
 
 const 
     n = 1000;
-    rep = 20;
+    rep = 1;
 
 var
     prim:  array [0..n] of boolean;
@@ -32,11 +32,11 @@ begin
     for i := 2 to n do
         if prim [i] then
             begin
-//                write (i:8);
+                write (i:8);
                 inc (count)
             end;
     writeln; writeln;
     writeln ('Found ', count, ' primes below ', n);
-//    waitkey
+    waitkey
 end.
 

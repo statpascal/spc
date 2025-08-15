@@ -4,7 +4,7 @@ vdprd equ >8800
 
 ; Access CRU: address, val on call stack
 
-setcrubit:
+; setcrubit:
 	mov *r10+, r12
 	mov *r10+, r13
 	ldcr r13, 1

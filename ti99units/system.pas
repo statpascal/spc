@@ -49,7 +49,7 @@ procedure __dispose (p: pointer);
 procedure mark (var p: pointer);
 procedure release (p: pointer);
 
-procedure setCRUBit (addr: integer; val: boolean); external;
+procedure setCRUBit (addr: integer; val: boolean);
 
 function hexstr (n: integer): string4;
 
@@ -106,7 +106,13 @@ procedure release (p: pointer);
     end;
 
 // 
-    
+
+procedure setCRUBit (addr: integer; val: boolean); assembler;
+    mov  *r10, r12
+    mov  @2(r10), r13
+    ldcr r13, 1
+end;
+
 procedure setVdpAddress (n: integer);
     begin
         vdpwa := chr (n and 255);
@@ -310,6 +316,7 @@ function copy (s: PChar; start, len: integer): string;
     var
         res: PChar;
     begin
+
         res := PPChar (addr (s) + (-1))^;	// addr of result is on stack before a
         if start <= ord (s^) then
             begin
