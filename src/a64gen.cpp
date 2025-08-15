@@ -2042,9 +2042,9 @@ void TA64Generator::beginRoutineBody (const std::string &routineName, std::size_
         outputComment (std::string ());
     }
     
-    // TODO: resolve overload !
 //    outputCode (TA64Op::aligncode);
-    outputLabel (routineName);
+    if (!routineName.empty ())
+        outputLabel (routineName);
     
     if (hasStackFrame) {    
         codePush (TA64Reg::x29, TA64Reg::x30);

@@ -1252,13 +1252,19 @@ TConstantValue::TConstantValue (const TSimpleConstant *constant):
 #ifdef CREATE_9900
     setType (type == &stdType.String ? &stdType.ShortString : type);
 #else    
+    // TODO: check constant string expressions on x64!!!!
     setType (type == &stdType.String ? &stdType.Int64 : type);
 #endif    
 }
 
 TConstantValue::TConstantValue (TSymbol *symbol):
   constant (), symbol (symbol) {
+    TType *type = symbol->getType ();
+#ifdef CREATE_9900
+    setType (type == &stdType.String ? &stdType.ShortString : type);
+#else    
     setType (symbol->getType ());
+#endif    
 }
 
 bool TConstantValue::isConstant () const {

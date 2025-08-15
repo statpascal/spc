@@ -268,7 +268,7 @@ private:
 class TRoutineType: public TType {
 typedef TType inherited;
 public:
-    TRoutineType (TSymbolList &&parameters, TType *returnType);
+    TRoutineType (TSymbolList &&parameters, TType *returnType, bool farCall = false);
     
     virtual std::string getName () const override;
     virtual std::size_t getSize () const override;
@@ -281,6 +281,7 @@ public:
     const TSymbolList &getParameter () const;
     TType *getReturnType () const;
     bool parameterEmpty () const;
+    bool isFarCall () const { return farCall; }		// TMS9900 only;
     
     bool matchesForward (const TRoutineType *other) const;
     bool matchesOverload (const TRoutineType *other) const;
@@ -290,6 +291,7 @@ private:
 
     TSymbolList parameters;
     TType *returnType;
+    bool farCall;
 };
 
 class TShortStringType: public TArrayType {

@@ -13,34 +13,6 @@
 
 namespace statpascal {
 
-std::ostream &operator << (std::ostream &os, TToken token) {
-    static std::array<std::string, static_cast<std::size_t> (TToken::Error) + 1> tokens = {
-        // program symbols        
-        "Begin", "End", "If", "Then", "Else", "For", "To", "Downto", "Do", "Const", 				
-        "Type", "Var", "Absolute", "While", "Repeat", "Until", "Record", "Array", "Set", "File", "shortstring",
-        "Vector", "Matrix", 
-        "Of", "Procedure", "Function", "Case", "With", "Nil", "Forward", "External", "Export", "CDecl", "Overload", "Unit", 
-        "Interface", "Implementation", "Initialization", "Finalization", "Uses", "Label", "Goto", "Program",
-
-        // operators
-        "In", "And", "Or", "Xor", "Not", "Shl", "Shr",
-        "DivInt", "Mod", "Add", "Sub", "Mul", "Div",
-        "Equal", "GreaterThan", "LessThan", "GreaterEqual", "LessEqual", "NotEqual",
-        "SizeOf", "AddrOp",
-
-        // other symbols
-        "BracketOpen", "BracketClose", "SquareBracketOpen", "SquareBracketClose",
-        "Comma", "Semicolon",
-        "Colon", "Point", "Define", "Points", "Dereference", "Identifier", "CharConst", "IntegerConst",
-        "RealConst", "StringConst", 
-        "Terminator",
-
-        // unrecognized token
-        "Error"
-    };
-    return os << tokens [static_cast<std::size_t> (token)];
-}
-
 class TLexer::TLexerImpl {
 public:
     TLexerImpl ();
@@ -59,6 +31,8 @@ public:
     std::string getString () const;
     std::string getIdentifier () const;
     unsigned char getChar () const;
+    
+    void setAssemblerMode (bool);
     
     unsigned getLineNumber () const;
     unsigned getLinePosition () const;
@@ -100,6 +74,7 @@ private:
     std::int64_t iVal;
     std::string sVal, sValLower;
     unsigned char cVal;
+    bool assemblerMode;
 };
 
 inline void TLexer::TLexerImpl::setCurrentTokenAndAdvance (TToken t) {
@@ -125,6 +100,7 @@ TLexer::TLexerImpl::TLexerImpl ():
     {"external",	TToken::External},
     {"cdecl",           TToken::CDecl},
     {"overload",	TToken::Overload},
+    {"assembler",       TToken::Assembler},
     {"export",		TToken::Export},
     {"file",		TToken::File},
 #ifdef CREATE_9900
@@ -194,6 +170,7 @@ TLexer::TLexerImpl::TLexerImpl ():
 void TLexer::TLexerImpl::initLexer () {
     lineBegin = sourceIt = &source [0];
     lineNumber = lastReadLineNumber = lastReadPosition = 1;
+    assemblerMode = false;
     getNextToken ();
 }
 
@@ -432,7 +409,7 @@ void TLexer::TLexerImpl::getNextToken () {
     char c = *sourceIt;
     if (isalpha (c) || c == '_')
         parseSymbol ();
-    else if (c == '$')
+    else if (c == '$' || (c == '>' && assemblerMode))
         parseHex ();
     else if (c == '&')
         parseOctal ();
@@ -488,6 +465,10 @@ inline std::string TLexer::TLexerImpl::getIdentifier () const {
 
 inline unsigned char TLexer::TLexerImpl::getChar () const {
     return cVal;
+}
+
+inline void TLexer::TLexerImpl::setAssemblerMode (bool f) {
+    assemblerMode = f;
 }
 
 unsigned TLexer::TLexerImpl::getLineNumber () const {
@@ -580,6 +561,10 @@ std::string TLexer::getIdentifier () const {
 
 unsigned char TLexer::getChar () const {
     return impl ()->getChar ();
+}
+
+void TLexer::setAssemblerMode (bool f) {
+    return impl ()->setAssemblerMode (f);
 }
 
 TLexer::TLexerPosition TLexer::getLexerPosition () const {

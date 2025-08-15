@@ -18,6 +18,8 @@ public:
     T9900Generator (TRuntimeData &, bool codeRangeCheck = true, bool createCompilerListing = false);
     
     void getAssemblerCode (std::vector<std::uint8_t> &, bool generateListing, std::vector<std::string> &);
+    
+    void parseAssemblerBlock (TSymbol *, TBlock &block);
 
     virtual void generateCode (TTypeCast &) override;
     virtual void generateCode (TExpression &) override;
@@ -89,6 +91,7 @@ private:
     void assignGlobalVariables (TSymbolList &);
     void codeBlock (TBlock &block, bool hasStackFrame, TCodeSequence &blockStatements);
     void generateBlock (TBlock &);
+    void externalRoutine (TSymbol *);
     void beginRoutineBody (const std::string &routineName, std::size_t level, TSymbolList &, const std::set<T9900Reg> &saveRegs, bool hasStackFrame);
     void endRoutineBody (std::size_t level, TSymbolList &, const std::set<T9900Reg> &saveRegs, bool hasStackFrame);
 
@@ -156,6 +159,7 @@ private:
         std::vector<std::string> jumpLabels;
     };
     std::vector<TJumpTable> jumpTableDefinitions;
+    std::map<TSymbol *, TCodeSequence> assemblerBlocks;
 
     void setOutput (TCodeSequence *);
     void outputCode (const T9900Operation &);
@@ -182,6 +186,14 @@ private:
     bool isSameCalcStackReg (const T9900Operand &op1, const T9900Operand &op2);
     
     virtual void initStaticRoutinePtr (std::size_t addr, const TRoutineValue *) override;
+    
+    T9900Operand makeLabelMemory (const std::string label, T9900Reg index = T9900Reg::r0);
+    
+    // assembler
+
+    T9900Reg parseRegister (TCompilerImpl &compiler, TLexer &lexer);    
+    T9900Operand parseInteger (TCompilerImpl &compiler, TLexer &lexer, std::int64_t minval, std::int64_t maxvval);
+    T9900Operand parseGeneralAddress (TCompilerImpl &compiler, TLexer &lexer);
     
     // peep hole optimizer
     

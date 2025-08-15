@@ -16,8 +16,8 @@ enum class TToken {
     Begin, End, If, Then, Else, For, To, Downto, Do, Const, 				
     Type, Var, Absolute, While, Repeat, Until, Record, Array, Set, File, ShortString,
     Vector, Matrix, 		
-    Of, Procedure, Function, Case, With, Nil, Forward, External, Export, CDecl, Overload, Unit, 
-    Interface, Implementation, Initialization, Finalization, Uses, Label, Goto, Program,
+    Of, Procedure, Function, Case, With, Nil, Forward, External, Export, CDecl, Overload, Assembler,
+    Unit, Interface, Implementation, Initialization, Finalization, Uses, Label, Goto, Program,
 
     // operators
     In, And, Or, Xor, Not, Shl, Shr,
@@ -66,6 +66,9 @@ public:
     /** same as getString converted to lower case */
     std::string getIdentifier () const;
     unsigned char getChar () const;
+    
+    /** assembler mode: treats > as hex indicator */
+    void setAssemblerMode (bool);
     
     class TLexerPosition {
     public:

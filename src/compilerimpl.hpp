@@ -67,7 +67,7 @@ private:
     TType *parseRecordType ();
     TType *parseSetType ();
     TType *parseFileType ();
-    TType *parseRoutineType (bool isFunction);
+    TType *parseRoutineType (bool isFunction, bool farCall = false);
     TType *parseFunctionType ();
     TType *parseProcedureType ();
     TType *parsePointerType ();
@@ -206,7 +206,7 @@ public:
         StringVarExpected, NumericVarExpected, ParameterTypeNotAllowed, ReturnOnlyInFunction, ArrayExpected,
         IncompatibleTypes, FunctionCallExpected, ProcedureCallExpected, IntegerConstantsExpected, InvalidNumberArguments,
         InvalidNumberInitializers, ComponentNotFound, IdentifierAlreadyDeclared, VariableExpected, IntegerVarExpected, NodeRequired,
-        DivisionByZero, InvalidUseOfSymbol, PointerRequired, FileNotFound, MemoryFull, InternalError,
+        DivisionByZero, InvalidUseOfSymbol, PointerRequired, FileNotFound, MemoryFull, InternalError, AssemblerError,
         PositionFound
     };
     void errorMessage (TErrorType, const std::string &description = std::string ());

@@ -2107,9 +2107,9 @@ void TX64Generator::beginRoutineBody (const std::string &routineName, std::size_
         outputComment (std::string ());
     }
     
-    // TODO: resolve overload !
 //    outputCode (TX64Op::aligncode);
-    outputLabel (routineName);
+    if (!routineName.empty ())
+        outputLabel (routineName);
     
     if (hasStackFrame) {    
         codePush (TX64Reg::rbp);

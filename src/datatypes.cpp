@@ -494,8 +494,8 @@ TType *TReferenceType::getBaseType () const {
 }
 
 
-TRoutineType::TRoutineType (TSymbolList &&parameters, TType *returnType):
-  parameters (std::move (parameters)), returnType (returnType) {
+TRoutineType::TRoutineType (TSymbolList &&parameters, TType *returnType, bool farCall):
+  parameters (std::move (parameters)), returnType (returnType), farCall (farCall) {
 }
 
 std::string TRoutineType::getName () const {

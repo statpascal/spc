@@ -100,7 +100,7 @@ bool T9900Generator::isCalleeSavedReg (const T9900Reg reg) {
 }
 
 bool T9900Generator::isCalleeSavedReg (const T9900Operand &op) {
-    return op.isReg () && isCalleeSavedReg (op.reg);
+    return op.usesReg () && isCalleeSavedReg (op.reg);
 }
 
 bool T9900Generator::isCalcStackReg (const T9900Reg reg) {
@@ -108,11 +108,11 @@ bool T9900Generator::isCalcStackReg (const T9900Reg reg) {
 }
 
 bool T9900Generator::isCalcStackReg (const T9900Operand &op) {
-    return op.isReg () && isCalcStackReg (op.reg);
+    return op.usesReg () && isCalcStackReg (op.reg);
 }
 
 bool T9900Generator::isSameReg (const T9900Operand &op1, const T9900Operand &op2) {
-    return op1.isReg () && op2.isReg () && op1.reg == op2.reg;
+    return op1.usesReg () && op2.usesReg () && op1.reg == op2.reg;
 }
 
 bool T9900Generator::isSameCalcStackReg (const T9900Operand &op1, const T9900Operand &op2) {
@@ -234,6 +234,7 @@ void T9900Generator::optimizePeepHole (TCodeSequence &code) {
         // bl @label|imm
         else if (op1 == T9900Op::li && op2 == T9900Op::bl && isSameCalcStackReg (op_1_1, op_2_1)) {
             op_2_1 = op_1_2;
+            op_2_1.t = T9900Operand::TAddressingMode::Memory;
             removeLines (code, line, 1);
         }
         
@@ -273,7 +274,7 @@ void T9900Generator::optimizePeepHole (TCodeSequence &code) {
         // ->
         // movb op1, op2
         else if (op1 == T9900Op::movb && op2 == T9900Op::srl && op3 == T9900Op::movb &&
-            isSameCalcStackReg (op_1_2, op_2_1) && op_3_1.isIndexed () && op_3_1.val == 0x8301 + 2 * static_cast<int> (op_1_2.reg)) {
+            isSameCalcStackReg (op_1_2, op_2_1) && op_3_1.isMemory () && op_3_1.val == 0x8301 + 2 * static_cast<int> (op_1_2.reg)) {
             op_1_2 = op_3_2;
             comm_1.append ( " " + comm_3);
             removeLines (code, line1, 2);
@@ -284,7 +285,7 @@ void T9900Generator::optimizePeepHole (TCodeSequence &code) {
         // li reg, imm1
         // ->
         // remove redundant load
-        else if (op1 == T9900Op::li && op2 == T9900Op::mov && op3 == T9900Op::li && op_1_2.isImm () && op_3_2.isImm () && op_1_2.val == op_3_2.val &&
+        else if (op1 == T9900Op::li && op2 == T9900Op::mov && op3 == T9900Op::li && op_1_2.isImm () && op_3_2.isImm () && op_1_2.getValue () == op_3_2.getValue () &&
                  isSameCalcStackReg (op_1_1, op_2_1) && isSameCalcStackReg (op_2_1, op_3_1)) {
             removeLines (code, line2, 1);
         }
@@ -316,7 +317,7 @@ void T9900Generator::optimizePeepHole (TCodeSequence &code) {
         // sla/sra op, r0
         // ->
         // sla/sra op, imm
-        else if (op1 == T9900Op::li && op2 == T9900Op::mov && (op3 == T9900Op::sla || op3 == T9900Op::sra) && op_3_2.isReg ()) {
+        else if (op1 == T9900Op::li && op2 == T9900Op::mov && (op3 == T9900Op::sla || op3 == T9900Op::sra) && op_3_2.usesReg ()) {
             op_3_2 = op_1_2;
             removeLines (code, line, 2);
         }
@@ -325,7 +326,7 @@ void T9900Generator::optimizePeepHole (TCodeSequence &code) {
         // mov reg, op
         // ->
         // clr @op
-        else if (op1 == T9900Op::li && !op_1_2.val && op2 == T9900Op::mov && isSameCalcStackReg (op_1_1, op_2_1)) {
+        else if (op1 == T9900Op::li && !op_1_2.val && !op_1_2.isLabel () && op2 == T9900Op::mov && isSameCalcStackReg (op_1_1, op_2_1)) {
             op2 = T9900Op::clr;
             op_2_1 = op_2_2;
             op_2_2 = T9900Operand ();
@@ -351,7 +352,7 @@ void T9900Generator::optimizePeepHole (TCodeSequence &code) {
         // szc reg1, reg2
         // ->
         // andi reg2, imm
-        else if (op1 == T9900Op::li && op2 == T9900Op::inv && op3 == T9900Op::szc && isSameCalcStackReg (op_1_1, op_2_1) &&
+        else if (op1 == T9900Op::li && !op_1_2.isLabel () && op2 == T9900Op::inv && op3 == T9900Op::szc && isSameCalcStackReg (op_1_1, op_2_1) &&
                  isSameCalcStackReg (op_2_1, op_3_1) && op_3_2.t == T9900Operand::TAddressingMode::Reg) {
             op3 = T9900Op::andi;
             op_3_1 = op_3_2;
@@ -405,7 +406,7 @@ void T9900Generator::optimizePeepHole (TCodeSequence &code) {
             // mov|movb|a|s op, *reg
             // ->
             // mov|movb|a|s op, @imm(r9)
-            else if ((op3 == T9900Op::a || op3 == T9900Op::s || op3 == T9900Op::mov || op3 == T9900Op::movb) && op_1_1.isReg () && isSameCalcStackReg (op_2_1, op_3_2) && op_3_2.t == T9900Operand::TAddressingMode::RegInd) {
+            else if ((op3 == T9900Op::a || op3 == T9900Op::s || op3 == T9900Op::mov || op3 == T9900Op::movb) && op_1_1.usesReg () && isSameCalcStackReg (op_2_1, op_3_2) && op_3_2.t == T9900Operand::TAddressingMode::RegInd) {
                 op_3_2 = T9900Operand (T9900Reg::r9, op_2_2.val);
                 comm_3 = comm_2;
                 removeLines (code, line, 2);
@@ -612,11 +613,12 @@ void T9900Generator::outputBooleanCheck (TExpressionBase *expr, const std::strin
     
     TExpression *condition = dynamic_cast<TExpression *> (expr);
     
+    const std::string ll = getNextLocalLabel ();
     if (condition && (condition->getLeftExpression ()->getType ()->isEnumerated () || condition->getLeftExpression ()->getType ()->isPointer ())) {
         visit (condition->getLeftExpression ());
         TExpressionBase *right = condition->getRightExpression ();
         if (right->isConstant ())
-            outputCode (T9900Op::ci, fetchReg (intScratchReg1), T9900Operand (static_cast<TConstantValue *> (right)->getConstant ()->getInteger ()));
+            outputCode (T9900Op::ci, fetchReg (intScratchReg1), static_cast<TConstantValue *> (right)->getConstant ()->getInteger ());
         else {
             visit (condition->getRightExpression ());
             const T9900Reg r2 = fetchReg (intScratchReg1);
@@ -624,18 +626,18 @@ void T9900Generator::outputBooleanCheck (TExpressionBase *expr, const std::strin
             outputCode (T9900Operation (T9900Op::c, r1, r2));
         }
         for (T9900Op op: (branchOnFalse ? intFalseJmp : intTrueJmp).at (condition->getOperation ()))
-            outputCode (op, T9900Operand ("!"));
-        outputCode (T9900Op::b, label);
-        outputCode (T9900Op::def_label, T9900Operand ("!"));
+            outputCode (op, ll);
+        outputCode (T9900Op::b, makeLabelMemory (label));
+        outputCode (T9900Op::def_label, ll);
     } else if (condition && condition->getLeftExpression ()->getType ()->isReal ()) {
         //
     } else {
         visit (expr);
         const T9900Reg reg = fetchReg (intScratchReg1);
         outputCode (T9900Op::ci, reg, 0);
-        outputCode (branchOnFalse ? T9900Op::jne : T9900Op::jeq, T9900Operand ("!"));
-        outputCode (T9900Op::b, label);
-        outputCode (T9900Op::def_label, T9900Operand ("!"));
+        outputCode (branchOnFalse ? T9900Op::jne : T9900Op::jeq, ll);
+        outputCode (T9900Op::b, makeLabelMemory (label));
+        outputCode (T9900Op::def_label, ll);
     }
 }
 
@@ -707,10 +709,11 @@ void T9900Generator::outputIntegerCmpOperation (TToken operation, TExpressionBas
     }
     outputCode (T9900Op::c, r1, r2);
     outputCode (T9900Op::clr, r3);
+    const std::string ll = getNextLocalLabel ();    
     for (T9900Op op: cmpOperation.at (operation))
-        outputCode (op, T9900Operand ("!"));
+        outputCode (op, ll);
     outputCode (T9900Op::inc, r3);
-    outputCode (T9900Op::def_label, T9900Operand ("!"));
+    outputCode (T9900Op::def_label, ll);
     saveReg (r3);
 }
 
@@ -934,7 +937,13 @@ void T9900Generator::generateCode (TFunctionCall &functionCall) {
         return;
     }
 
+
+//    TRoutineType *type = static_cast<TRoutineType *> (functionCall.getFunction ()->getType ());
+//    std::cout << "CALL: " <<  type->getName () << (type->isFarCall () ? ": FAR" : ": NEAR") << std::endl;
+
+
     TExpressionBase *function = functionCall.getFunction ();
+    const bool isFarCall = static_cast<TRoutineType *> (function->getType ())->isFarCall ();
     const std::vector<TExpressionBase *> &args = functionCall.getArguments ();
 
     struct TParameterDescription {
@@ -960,6 +969,8 @@ void T9900Generator::generateCode (TFunctionCall &functionCall) {
         offCount += (s->getType ()->getSize () + 1) & ~1;
         ++it;
     }
+    if (isFarCall)
+        offCount += 2;
 /*    
     std::cout << "Function call:" << std::endl << "  Stack: " << stackCount << std::endl;
     for (TParameterDescription &pd: parameterDescriptions) {
@@ -1026,7 +1037,7 @@ void T9900Generator::generateCode (TConstantValue &constant) {
     } else if (constant.getConstant ()->getType () == &stdType.String) {
         T9900Reg reg = getSaveReg (intScratchReg1);
         const std::string label = registerConstant (constant.getConstant ()->getString ());
-        outputCode (T9900Op::li, reg, T9900Operand (label));
+        outputCode (T9900Op::li, reg, label);
         saveReg (reg);
     } else {
         T9900Reg reg = getSaveReg (intScratchReg1);
@@ -1126,9 +1137,9 @@ void T9900Generator::codeMove (const TType *type) {
         loadReg (intScratchReg2);
         outputCode (T9900Op::li, intScratchReg4, n);
         if (type->isShortString ())
-            outputCode (T9900Op::bl, T9900Operand ("_rt_copy_str"));
+            outputCode (T9900Op::bl, makeLabelMemory ("_rt_copy_str"));
         else
-            outputCode (T9900Op::bl, T9900Operand ("_rt_copy_mem"));
+            outputCode (T9900Op::bl, makeLabelMemory ("_rt_copy_mem"));
     }
 }
 
@@ -1340,7 +1351,7 @@ void T9900Generator::generateCode (TPredefinedRoutine &predefinedRoutine) {
                 // TODO : range check
                 break;
             case TPredefinedRoutine::Exit:
-                outputCode (T9900Op::b, endOfRoutineLabel);
+                outputCode (T9900Op::b, makeLabelMemory (endOfRoutineLabel));
                 break;
         }
     }
@@ -1376,7 +1387,7 @@ void T9900Generator::generateCode (TIfStatement &ifStatement) {
     visit (ifStatement.getStatement1 ());
     if (TStatement *statement2 = ifStatement.getStatement2 ()) {
         const std::string l2 = getNextLocalLabel ();
-        outputCode (T9900Op::b, l2);
+        outputCode (T9900Op::b, makeLabelMemory (l2));
         outputLabel (l1);
         visit (statement2);
         outputLabel (l2);
@@ -1400,20 +1411,21 @@ void T9900Generator::generateCode (TCaseStatement &caseStatement) {
         for (const TCaseStatement::TSortedEntry &e: caseStatement.getSortedLabels ()) {
             outputCode (T9900Op::ai, reg, last - e.label.a);
             last = e.label.a;
+            const std::string ll = getNextLocalLabel ();
             if (e.label.a == e.label.b) {
-                outputCode (T9900Op::jne, T9900Operand ("!"));
-                outputCode (T9900Op::b, e.jumpLabel->getName ());
+                outputCode (T9900Op::jne, ll);
+                outputCode (T9900Op::b, makeLabelMemory (e.jumpLabel->getName ()));
             } else {
                 outputCode (T9900Op::ci, reg, e.label.b - last);
-                outputCode (T9900Op::jh, T9900Operand ("!"));
-                outputCode (T9900Op::b, e.jumpLabel->getName ());
+                outputCode (T9900Op::jh, ll);
+                outputCode (T9900Op::b, makeLabelMemory (e.jumpLabel->getName ()));
             }
-            outputLabel ("!");
+            outputLabel (ll);
         }
         if (TStatement *defaultStatement = caseStatement.getDefaultStatement ()) {
             visit (defaultStatement);
         }
-        outputCode (T9900Op::b, endLabel);
+        outputCode (T9900Op::b, makeLabelMemory (endLabel));
 
     } else {
         const std::string evalTableLabel = getNextCaseLabel ();
@@ -1425,15 +1437,16 @@ void T9900Generator::generateCode (TCaseStatement &caseStatement) {
         
         if (TStatement *defaultStatement = caseStatement.getDefaultStatement ()) {
             defaultLabel = getNextCaseLabel ();
-            outputCode (T9900Op::jh, T9900Operand (defaultLabel));
-            outputCode (T9900Op::b, T9900Operand (evalTableLabel));
+            outputCode (T9900Op::jh, defaultLabel);
+            outputCode (T9900Op::b, makeLabelMemory (evalTableLabel));
             outputLabel (defaultLabel);
             visit (defaultStatement);
-            outputCode (T9900Op::b, endLabel);
+            outputCode (T9900Op::b, makeLabelMemory (endLabel));
         }  else {
-            outputCode (T9900Op::jle, T9900Operand ("!"));
-            outputCode (T9900Op::b, endLabel);
-            outputLabel ("!");
+            const std::string ll = getNextLocalLabel ();
+            outputCode (T9900Op::jle, ll);
+            outputCode (T9900Op::b, makeLabelMemory (endLabel));
+            outputLabel (ll);
         }
         
         std::vector<std::string> jumpTable (maxLabel - minLabel + 1);
@@ -1455,7 +1468,7 @@ void T9900Generator::generateCode (TCaseStatement &caseStatement) {
     for (const TCaseStatement::TCase &c: caseList) {
         outputLabel (c.jumpLabel->getName ());
         visit (c.statement);
-        outputCode (T9900Op::b, endLabel);
+        outputCode (T9900Op::b, makeLabelMemory (endLabel));
     }    
     outputLabel (endLabel);
 }
@@ -1478,7 +1491,7 @@ void T9900Generator::generateCode (TGotoStatement &gotoStatement) {
     if (TExpressionBase *condition = gotoStatement.getCondition ())
         outputBooleanCheck (condition, gotoStatement.getLabel ()->getName (), false);
     else
-        outputCode (T9900Op::b, gotoStatement.getLabel ()->getName ());
+        outputCode (T9900Op::b, makeLabelMemory (gotoStatement.getLabel ()->getName ()));
 }
     
 void T9900Generator::generateCode (TBlock &block) {
@@ -1509,16 +1522,33 @@ void T9900Generator::initStaticRoutinePtr (std::size_t addr, const TRoutineValue
 */    
 }
     
-void T9900Generator::beginRoutineBody (const std::string &routineName, std::size_t level, TSymbolList &symbolList, const std::set<T9900Reg> &saveRegs, bool hasStackFrame) {
-//    if (level > 1) {    
+void T9900Generator::externalRoutine (TSymbol *s) {
+    std::map<TSymbol *, TCodeSequence>::iterator it = assemblerBlocks.find (s);
+    if (it != assemblerBlocks.end ()) {
+        assignParameterOffsets (*s->getBlock ());
+        
+        setOutput (&program);
         outputComment (std::string ());
-        for (const std::string &s: createSymbolList (routineName, level, symbolList, {}))
+//        TRoutineType *type = static_cast<TRoutineType *> (s->getType ());
+//        std::cout << s->getName () << ": " <<  type->getName () << (type->isFarCall () ? ": FAR" : ": NEAR") << std::endl;
+        for (const std::string &s: createSymbolList (s->getName (), 2, s->getBlock ()->getSymbols (), {}))
             outputComment (s);
         outputComment (std::string ());
-//    }
+        
+        outputLabel (s->getName ());
+        std::move (it->second.begin (), it->second.end (), std::back_inserter (program));
+    }
     
-    // TODO: resolve overload !
-    outputLabel (routineName);
+}
+    
+void T9900Generator::beginRoutineBody (const std::string &routineName, std::size_t level, TSymbolList &symbolList, const std::set<T9900Reg> &saveRegs, bool hasStackFrame) {
+    outputComment (std::string ());
+    for (const std::string &s: createSymbolList (routineName, level, symbolList, {}))
+        outputComment (s);
+    outputComment (std::string ());
+    
+    if (!routineName.empty ())
+        outputLabel (routineName);
 
     if (level > 1) {    
         if (hasStackFrame) {    
@@ -1554,9 +1584,16 @@ void T9900Generator::endRoutineBody (std::size_t level, TSymbolList &symbolList,
         }
         if (symbolList.getParameterSize ())
             outputCode (T9900Op::ai, T9900Reg::r10, symbolList.getParameterSize ());
+        
+        // !!!!
+        if (level == 2)
+            outputCode (T9900Op::ai, T9900Reg::r10, 2);		// remove bank parameter
+        // !!!!
+        
+        
         outputCode (T9900Op::b, T9900Operand (T9900Reg::r11, T9900Operand::TAddressingMode::RegInd));
     } else
-        outputCode (T9900Op::blwp, 0);
+        outputCode (T9900Op::blwp, T9900Operand (T9900Reg::r0, 0));
 }
 
 TCodeGenerator::TParameterLocation T9900Generator::classifyType (const TType *type) {
@@ -1573,9 +1610,16 @@ TCodeGenerator::TReturnLocation T9900Generator::classifyReturnType (const TType 
 }
 
 void T9900Generator::assignParameterOffsets (TBlock &block) {
+
+    TSymbol *s = block.getSymbol ();
+//    TRoutineType *type = static_cast<TRoutineType *> (s->getType ());
+//    std::cout << s->getName () << ": " <<  type->getName () << (type->isFarCall () ? ": FAR" : ": NEAR") << std::endl;
+
+
+
     TSymbolList &symbolList = block.getSymbols ();
     
-    std::size_t valueParaOffset = 4;
+    std::size_t valueParaOffset = 4;;
     for (TSymbol *s: symbolList)
         if (s->checkSymbolFlag (TSymbol::Parameter)) {
             TType *type = s->getType ();
@@ -1660,14 +1704,15 @@ void T9900Generator::codeBlock (TBlock &block, bool hasStackFrame, TCodeSequence
             outputCode (T9900Op::li, T9900Reg::r12, staticDataDefinition.label);
             outputCode (T9900Op::li, T9900Reg::r13, firstStatic);
             outputCode (T9900Op::li, T9900Reg::r14, staticSize);
-            outputCode (T9900Op::b, T9900Operand ("_rt_copy_mem"));
+            // TODO: inline
+            outputCode (T9900Op::b, makeLabelMemory ("_rt_copy_mem"));
         }
     }
     
     setOutput (&blockCode);
     
     if (!globalInits.empty ()) 
-        outputCode (T9900Op::bl, T9900Operand ("$init_static"));
+        outputCode (T9900Op::bl, makeLabelMemory ("$init_static"));
     visit (block.getStatements ());
     
     outputLabel (endOfRoutineLabel);
@@ -1741,11 +1786,175 @@ void T9900Generator::generateBlock (TBlock &block) {
     for (TSymbol *s: blockSymbols) 
         if (s->checkSymbolFlag (TSymbol::Routine)) {
             if (s->checkSymbolFlag (TSymbol::External)) {
-                // nothing to do yet
+                externalRoutine (s);
             } else 
                 visit (s->getBlock ());
         }
 
+}
+
+T9900Operand T9900Generator::makeLabelMemory (const std::string label, T9900Reg index) {
+    return T9900Operand (label, index);
+}
+
+
+
+T9900Reg T9900Generator::parseRegister (TCompilerImpl &compiler, TLexer &lexer) {
+    std::int64_t regNr = -1;
+    if (lexer.getToken () == TToken::Identifier) {
+        std::string s= lexer.getIdentifier ();
+        if (s [0] == 'R') 
+            s [0] = 'r';
+        for (int i = 0; i < 16; ++i)
+            if (s == regname [i]) {
+                regNr = i;
+                break;
+            }
+    } else if (lexer.getToken () == TToken::IntegerConst)
+        regNr = lexer.getInteger ();
+    if (regNr < 0 || regNr > 15) {
+        regNr = 0;
+        compiler.errorMessage (TCompilerImpl::AssemblerError, "Invalid register");
+    }
+    lexer.getNextToken ();
+    return static_cast<T9900Reg> (regNr);
+}
+
+T9900Operand T9900Generator::parseInteger (TCompilerImpl &compiler, TLexer &lexer, std::int64_t minval, std::int64_t maxval) {
+    std::int64_t val = lexer.getInteger ();
+    compiler.checkToken (TToken::IntegerConst, "Integer constant expected");
+    if (val < minval || val > maxval) {
+        compiler.errorMessage (TCompilerImpl::AssemblerError, "Integer out of range (allowed is " + std::to_string (minval) + " - " + std::to_string (maxval) + ")");;
+        val = minval;
+    }
+    return val;
+}   
+
+
+T9900Operand T9900Generator::parseGeneralAddress (TCompilerImpl &compiler, TLexer &lexer) {
+    TToken t = lexer.getToken ();
+    std::string label;
+    std::int64_t val;
+    T9900Reg reg = T9900Reg::r0;
+    switch (t) {
+        case TToken::AddrOp: 
+            lexer.getNextToken ();
+            if (lexer.getToken () == TToken::Identifier) 
+                label = lexer.getIdentifier ();
+            else if (lexer.getToken () == TToken::IntegerConst) {
+                val = lexer.getInteger ();
+                if (val < 0 || val > 65535)
+                    compiler.errorMessage (TCompilerImpl::AssemblerError, "Memory address out of range");
+            } else
+                compiler.errorMessage (TCompilerImpl::AssemblerError, "Label or memory address expected");
+            lexer.getNextToken ();
+            if (lexer.checkToken (TToken::BracketOpen)) {
+                reg = parseRegister (compiler, lexer);
+                if (reg == T9900Reg::r0)
+                    compiler.errorMessage (TCompilerImpl::AssemblerError, "Cannot use R0 for indexed memory addressing");
+                compiler.checkToken (TToken::BracketClose, "')' expected at end of indexed memory addressing");
+            }
+            if (!label.empty ())
+                return T9900Operand (label, reg);
+            else
+                return T9900Operand (reg, val);
+        case TToken::Mul: {
+            lexer.getNextToken ();
+            T9900Reg reg = parseRegister (compiler, lexer);
+            if (lexer.getToken () == TToken::Add) {
+                lexer.getNextToken ();
+                return T9900Operand (reg, T9900Operand::TAddressingMode::RegIndInc);
+            } else
+                return T9900Operand (reg, T9900Operand::TAddressingMode::RegInd); }
+        case TToken::Identifier:
+        case TToken::IntegerConst:
+            return T9900Operand (parseRegister (compiler, lexer), T9900Operand::TAddressingMode::Reg);
+        default:
+            compiler.errorMessage (TCompilerImpl::AssemblerError, "Invalid general address");
+            return T9900Operand ();
+    }
+}
+
+void T9900Generator::parseAssemblerBlock (TSymbol *symbol, TBlock &block) {
+//    std::cout << "Parsing ASM block " << symbol->getName () << std::endl;
+    TCompilerImpl &compiler = block.getCompiler ();
+    TLexer &lexer = compiler.getLexer ();
+    lexer.setAssemblerMode (true);
+    
+    TCodeSequence &output = assemblerBlocks [symbol];
+    
+    while (lexer.getToken () != TToken::End && lexer.getToken () != TToken::Error) {
+        const std::string &opcode = lexer.getIdentifier ();
+        compiler.checkToken (TToken::Identifier, "Expected label definition or mnemonic");
+//        std::cout << opcode << std::endl;
+        T9900OpDescription desc;
+        T9900Operand op1, op2;
+        if (lookupInstruction (opcode, desc)) {
+            switch (desc.format) {
+                case T9900Format::F1:
+                    op1 = parseGeneralAddress (compiler, lexer);
+                    compiler.checkToken (TToken::Comma, "Comma expected after general address");
+                    op2 = parseGeneralAddress (compiler, lexer);
+                    break;
+                case T9900Format::F2:
+                    op1 = lexer.getIdentifier ();
+                    compiler.checkToken (TToken::Identifier, "Label expected as target of " + opcode);
+                    break;
+                case T9900Format::F2M:
+                    op1 = lexer.getInteger ();
+                    compiler.checkToken (TToken::IntegerConst, "Integer expected in I/O instruction");
+                    // TODO: range check
+                    break;
+                case T9900Format::F3:
+                    op1 = parseRegister (compiler, lexer);
+                    compiler.checkToken (TToken::Comma, "Comma expected after register");
+                    op2 = parseGeneralAddress (compiler, lexer);
+                    break;
+                case T9900Format::F4:
+                    op1 = parseGeneralAddress (compiler, lexer);
+                    compiler.checkToken (TToken::Comma, "Comma expected after register");
+                    op2 = parseInteger (compiler, lexer, 0, 15);
+                    break;
+                case T9900Format::F5:
+                    op1 = parseRegister (compiler, lexer);
+                    compiler.checkToken (TToken::Comma, "Comma expected after register");
+                    op2 = parseInteger (compiler, lexer, 0, 15);
+                    break;
+                case T9900Format::F6:
+                    op1 = parseGeneralAddress (compiler, lexer);
+                    break;
+                case T9900Format::F7:
+                    // no operand
+                    break;
+                case T9900Format::F8:
+                    op1 = parseRegister (compiler, lexer);
+                    compiler.checkToken (TToken::Comma, "Comma expected after register");
+                    op2 = parseInteger (compiler, lexer, -32768, 0xffff);
+                    break;
+                case T9900Format::F8_1:
+                    op1 = parseInteger (compiler, lexer, 0, 0xffff);
+                    break;
+                case T9900Format::F8_2:
+                    op1 = parseRegister (compiler, lexer);
+                    break;
+                case T9900Format::F9:
+                    op1 = parseGeneralAddress (compiler, lexer);
+                    compiler.checkToken (TToken::Comma, "Comma expected after register");
+                    op2 = parseRegister (compiler, lexer);
+                    break;
+                case T9900Format::F_None:
+                    // byte, data, stri
+                    break;
+            }
+            output.push_back (T9900Operation (desc.opcode, op1, op2));
+        } else {
+            if (lexer.getToken () == TToken::Colon)
+                lexer.getNextToken ();
+            output.push_back (T9900Operation (T9900Op::def_label, opcode));
+        } 
+    }
+    compiler.checkToken (TToken::End, "'end' expected at end of assembler block");
+    lexer.setAssemblerMode (false);
 }
 
 } // namespace statpascal

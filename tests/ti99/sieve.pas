@@ -1,8 +1,8 @@
 program sieve (output);
 
 const 
-    n = 10000;
-    rep = 1;
+    n = 1000;
+    rep = 20;
 
 var
     prim:  array [0..n] of boolean;
@@ -32,7 +32,7 @@ begin
     for i := 2 to n do
         if prim [i] then
             begin
-                write (i:8);
+//                write (i:8);
                 inc (count)
             end;
     writeln; writeln;

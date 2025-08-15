@@ -2,6 +2,7 @@
 
 #include "expression.hpp"
 #include "codegenerator.hpp"
+#include "tms9900gen.hpp"
 #include "config.hpp"
 
 #include <iostream>
@@ -485,7 +486,7 @@ TType *TBlock::parseFileType () {
         return symbols->searchSymbol (TConfig::binFileType, TSymbol::NamedType)->getType ();
 }
 
-TType *TBlock::parseRoutineType (bool isFunction) {
+TType *TBlock::parseRoutineType (bool isFunction, bool farCall) {
     TSymbolList parameters (nullptr, compiler.getMemoryPoolFactory ());
     parseParameterDeclaration (parameters);
     
@@ -497,7 +498,7 @@ TType *TBlock::parseRoutineType (bool isFunction) {
             // avoid invalid entry in symbol table
             returnType = &stdType.Void;
     }
-    return compiler.createMemoryPoolObject<TRoutineType> (std::move (parameters), returnType);
+    return compiler.createMemoryPoolObject<TRoutineType> (std::move (parameters), returnType, farCall);
 }
 
 TType *TBlock::parseFunctionType () {
@@ -699,7 +700,7 @@ const TSimpleConstant *TBlock::parseSimpleConstant (TType *type) {
         result->setType (type);
         c = result;
     } else if (c->getType () != basetype && !(c->getType ()->isSet () && (!c->getType ()->getBaseType () || c->getType ()->getBaseType () == basetype))  &&
-               !(type->isShortString () && c->getType () == &stdType.String))
+               !(type->isShortString () && c->getType () == &stdType.String ))
         compiler.errorMessage (TCompilerImpl::InvalidType, "Expected constant of type '" + type->getName () + "' but got '" + c->getType ()->getName () + "'");
     else {
         TSimpleConstant *result = compiler.createMemoryPoolObject<TSimpleConstant> (*c);
@@ -857,10 +858,10 @@ void TBlock::parseSubroutine (bool isFunction) {
     }
     
     lexer.getNextToken ();
-    TRoutineType *routineType = static_cast<TRoutineType *> (parseRoutineType (isFunction));
+    TRoutineType *routineType = static_cast<TRoutineType *> (parseRoutineType (isFunction, symbols->getLevel () == 1));
     compiler.checkAndSynchronize (TToken::Semicolon, "';' expected at end of subroutine header");
     
-    bool isForward = false, isExport = false, isExternal = false;
+    bool isForward = false, isExport = false, isExternal = false, isAssembler = false;
     if (lexer.checkToken (TToken::CDecl))
         compiler.checkToken (TToken::Semicolon, "';' expected after 'cdecl' declaration");
     if (lexer.checkToken (TToken::Overload))
@@ -872,8 +873,9 @@ void TBlock::parseSubroutine (bool isFunction) {
     else if (lexer.checkToken (TToken::External)) {
         isExternal = true;
         parseExternalDeclaration (libName, symbolName);
-    }
-    if (isForward || isExport || isExternal)
+    } else if (lexer.checkToken (TToken::Assembler))
+        isAssembler = true;
+    if (isForward || isExport || isExternal || isAssembler)
         compiler.checkToken (TToken::Semicolon, "';' expected at end of subroutine header");
     
     TSymbolList::TAddSymbolResult result = symbols->addRoutine (identifier, routineType);
@@ -927,9 +929,19 @@ void TBlock::parseSubroutine (bool isFunction) {
             symbol->addSymbolFlags (TSymbol::Forward);
     } else {
         symbol->removeSymbolFlags (TSymbol::Forward);
-        if (isExport)
-            symbol->addSymbolFlags (TSymbol::Export);
-        symbol->getBlock ()->parse ();
+        if (isAssembler) {
+            symbol->setExternal (libName, symbolName);
+            if (T9900Generator *gen = dynamic_cast<T9900Generator *> (&getCompiler ().getCodeGenerator ()))
+                gen->parseAssemblerBlock (symbol, *this);
+            else {
+                compiler.errorMessage (TCompilerImpl::InvalidUseOfSymbol, "'assembler' declaration not supported for target architecture");
+                compiler.recoverPanicMode ({TToken::End});
+            }
+        } else {
+            if (isExport)
+                symbol->addSymbolFlags (TSymbol::Export);
+            symbol->getBlock ()->parse ();
+        }
         compiler.checkToken (TToken::Semicolon, "';' expected after subroutine");
     }
 }
@@ -1010,7 +1022,7 @@ void TUnit::parseHeader () {
 
 TStatement *TUnit::parseInitFinal (const std::string funcName, TBlock &declarations) {
     TSymbolList parameters (nullptr, compiler.getMemoryPoolFactory ());
-    TRoutineType *t = compiler.createMemoryPoolObject<TRoutineType> (std::move (parameters), &stdType.Void);
+    TRoutineType *t = compiler.createMemoryPoolObject<TRoutineType> (std::move (parameters), &stdType.Void, true);
     TSymbol *initSymbol = allSymbols->addRoutine (funcName, t).symbol;
     initSymbol->setBlock (compiler.createMemoryPoolObject<TBlock> (compiler, compiler.createMemoryPoolObject<TSymbolList> (allSymbols, compiler.getMemoryPoolFactory ()), initSymbol, &declarations));
     initSymbol->getBlock ()->parse ();

@@ -5,6 +5,7 @@
 
 #include <cstdint>
 #include <string>
+#include <vector>
 
 namespace statpascal {
 
@@ -21,25 +22,45 @@ enum class T9900Reg {
     r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, nrRegs
 };
 
+const std::vector<std::string>
+    regname = {"r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15"};
+
+
+enum class T9900Format { F1, F2, F2M, F3, F4, F5, F6, F7, F8, F8_1, F8_2, F9, F_None };
+
+struct T9900OpDescription {
+    T9900Op opcode;
+    std::uint16_t bits;
+    std::string name;
+    T9900Format format;
+};
+
 class T9900Operand {
 public:
-    enum class TAddressingMode { Invalid, Reg, RegInd, RegIndInc, Indexed, Imm, Label };
+    enum class TAddressingMode { Invalid, Reg, RegInd, RegIndInc, Memory, Indexed, Imm };
     
     T9900Operand ();
     T9900Operand (T9900Reg, TAddressingMode t = TAddressingMode::Reg);
-    T9900Operand (T9900Reg, std::uint16_t offset);
+    T9900Operand (T9900Reg, std::uint16_t base);
     T9900Operand (std::uint16_t imm);
-    T9900Operand (const std::string &label);
+    
+    T9900Operand (const std::string &label);	// immediate
+    T9900Operand (const std::string &label, T9900Reg reg);	// memory (R0) or indexed
 
-    std::string makeString (bool addAt = false) const;
+    std::string makeString () const;
+    
     bool isValid () const { return t != TAddressingMode::Invalid; }
-    bool isLabel () const { return t == TAddressingMode::Label; }
+    bool isLabel () const { return !label.empty (); }
     bool isImm () const { return t == TAddressingMode::Imm; }
+    bool isMemory () const { return t == TAddressingMode::Memory; }
     bool isIndexed () const { return t == TAddressingMode::Indexed; }
-    bool isReg () const { return t == TAddressingMode::Reg ||
+    bool isReg () const { return t == TAddressingMode::Reg; }
+    bool usesReg () const { return t == TAddressingMode::Reg ||
                                  t == TAddressingMode::RegInd ||
                                  t == TAddressingMode::RegIndInc ||
-                                 (t == TAddressingMode::Indexed && reg != T9900Reg::r0); }
+                                 t == TAddressingMode::Indexed; }
+                                 
+    std::string getValue () const;
     
     std::string label;
     T9900Reg reg;
@@ -57,5 +78,8 @@ public:
     T9900Operand operand1, operand2;
     std::string comment;
 };
+
+
+bool lookupInstruction (const std::string &s, T9900OpDescription &desc);
 
 }
