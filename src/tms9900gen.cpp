@@ -1849,6 +1849,11 @@ T9900Reg T9900Generator::parseRegister (TCompilerImpl &compiler, TLexer &lexer) 
 }
 
 T9900Operand T9900Generator::parseInteger (TCompilerImpl &compiler, TLexer &lexer, std::int64_t minval, std::int64_t maxval) {
+    if (maxval == 0xffff && lexer.getToken () == TToken::Identifier)
+        T9900Operand ret = lexer.getString ();
+        lexer.getNextToken ();
+        return ret;
+    }
     std::int64_t val = lexer.getInteger ();
     compiler.checkToken (TToken::IntegerConst, "Integer constant expected");
     if (val < minval || val > maxval) {

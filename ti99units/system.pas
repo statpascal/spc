@@ -119,7 +119,53 @@ procedure setVdpAddress (n: integer);
         vdpwa := chr (n shr 8)
     end;
     
-procedure _rt_scroll_up; external;    
+procedure _rt_scroll_up; assembler;
+        li r0, 32
+        li r13, vdpwa
+        li r14, vdprd
+        li r15, vdpwd
+l1:
+        swpb r0
+        movb r0, *r13
+        swpb r0
+        movb r0, *r13
+        li r8, 8
+        li r12, >8320
+l2:
+        movb *r14, *r12+
+        movb *r14, *r12+
+        movb *r14, *r12+
+        movb *r14, *r12+
+        dec r8
+        jne l2
+
+        ai r0, >3fe0
+        swpb r0
+        movb r0, *r13
+        swpb r0
+        movb r0, *r13
+
+        li r8, 8
+        li r12, >8320
+l3:
+        movb *r12+, *r15
+        movb *r12+, *r15
+        movb *r12+, *r15
+        movb *r12+, *r15
+        dec r8
+        jne l3
+
+        ai r0, >c040
+        ci r0, 768
+        jne l1
+
+        li r8, 32
+        li r12, >2000
+l4
+        movb r12, *r15
+        dec r8
+        jne l4
+end;
 
 procedure gotoxy (x, y: integer);
     begin
