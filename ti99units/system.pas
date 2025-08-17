@@ -22,6 +22,7 @@ procedure vmbr (var dest; src, length: integer);
 function min (a, b: integer): integer;
 function max (a, b: integer): integer;
 function sqr (a: integer): integer;
+function abs (n: integer): integer; external;
 
 procedure __write_lf (var f: text);
 procedure __write_int (var f: text; n, length, precision: integer);
@@ -188,41 +189,41 @@ procedure move (var src, dest; length: integer); assembler;
 end;
     
 procedure vmbw (var src; dest, length: integer); assembler;
-	mov @src, r12
-	mov @dest, r13
-	mov @length, r14
-	jeq vmbw_2
+        mov @src, r12
+        mov @dest, r13
+        mov @length, r14
+        jeq vmbw_2
 
-	ori r13, >4000
-	swpb r13
-	movb r13, @vdpwa
-	swpb r13
-	movb r13, @vdpwa
+        ori r13, >4000
+        swpb r13
+        movb r13, @vdpwa
+        swpb r13
+        movb r13, @vdpwa
 
     vmbw_1:
-	movb *r12+, @vdpwd
-	dec r14
-	jne vmbw_1
-	
+        movb *r12+, @vdpwd
+        dec r14
+        jne vmbw_1
+        
     vmbw_2:
 end;
     
 procedure vmbr (var dest; src, length: integer); assembler;
-	mov @dest, r12
-	mov @src, r13
-	mov @length, r14
-	jeq vmbr_2
+        mov @dest, r12
+        mov @src, r13
+        mov @length, r14
+        jeq vmbr_2
 
-	ori r13, >4000
-	swpb r13
-	movb r13, @vdpwa
-	swpb r13
-	movb r13, @vdpwa
+        ori r13, >4000
+        swpb r13
+        movb r13, @vdpwa
+        swpb r13
+        movb r13, @vdpwa
 
     vmbr_1:
-	movb *r12+, @vdpwd
-	dec r14
-	jne vmbr_1
+        movb *r12+, @vdpwd
+        dec r14
+        jne vmbr_1
     vmbr_2:
 end;
 
@@ -269,10 +270,7 @@ procedure __write_int (var f: text; n, length, precision: integer);
             begin
                 p := addr (buf [6]);
                 neg := n < 0;
-                if neg then
-                    divmod [0] := -n
-                else 
-                    divmod [0] := n;
+                divmod [0] := abs (n);
                 repeat
                     __div_mod (divmod);
                     p^ := chr (divmod [1] + 48);
@@ -345,7 +343,7 @@ procedure __write_boolean (var f: text; b: boolean; length, precision: integer);
     end;
 
 function min (a, b: integer): integer; assembler;
-        mov *r10, r12	// pointer to result
+        mov *r10, r12   // pointer to result
         c @a, @b
         jlt min_1
         mov @b, *r12
@@ -375,12 +373,12 @@ function sqr (a: integer): integer;
     begin
         sqr := a * a
     end;
-
+    
 function __short_str_char (ch: char): string1;
     var
         res: PChar;
     begin
-        res := PPChar (addr (ch) + (-1))^;	// addr of result is on stack before a
+        res := PPChar (addr (ch) + (-1))^;      // addr of result is on stack before a
         res [0] := #1;
         res [1] := ch
     end;
@@ -391,7 +389,7 @@ function __short_str_concat (a, b: PChar): string;
     var
         res: PChar;
     begin
-        res := PPChar (addr (a) + (-1))^;	// addr of result is on stack before a
+        res := PPChar (addr (a) + (-1))^;       // addr of result is on stack before a
         move (a^, res^, ord (a^) + 1);
         move (b [1], res [ord (a^) + 1], min (ord (b^), 255 - ord (a^)));
         res^ := chr (min (255, ord (a^) + ord (b^)))
@@ -465,7 +463,7 @@ function copy (s: PChar; start, len: integer): string;
         res: PChar;
     begin
 
-        res := PPChar (addr (s) + (-1))^;	// addr of result is on stack before a
+        res := PPChar (addr (s) + (-1))^;       // addr of result is on stack before a
         if start <= ord (s^) then
             begin
                 if start + len > succ (ord (s^)) then
@@ -493,7 +491,7 @@ function hexstr (n: integer): string4;
 function keypressed: boolean; assembler;
         clr r14
         clr r13
-        li r15, >0100	// true
+        li r15, >0100   // true
         
     keypressed_1:
         li r12, >0024
@@ -505,7 +503,7 @@ function keypressed: boolean; assembler;
         ai r13, >0100
         ci r13, >0600
         jne keypressed_1
-        clr r15		// return false
+        clr r15         // return false
     
     keypressed_2:
         mov *r10, r12
@@ -522,7 +520,7 @@ procedure loadCharset;
     var 
         i, j: integer;
     begin
-        gromwa := #$06;	// >06b4: standard char set
+        gromwa := #$06; // >06b4: standard char set
         gromwa := #$b4;
         setVdpAddress ($0800 + 8 * 32 or WriteAddr);
         for i := 32 to 127 do

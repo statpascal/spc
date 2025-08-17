@@ -384,7 +384,7 @@ void T9900Generator::optimizePeepHole (TCodeSequence &code) {
         // ai reg, imm2
         // ->
         // ai reg, imm1 + imm2
-        else if (op1 == T9900Op::ai && op2 == T9900Op::ai && isSameCalcStackReg (op_1_1, op_2_1)) {
+        else if (op1 == T9900Op::ai && op2 == T9900Op::ai && isSameReg (op_1_1, op_2_1) && !op_1_2.isLabel () && !op_2_2.isLabel ()) {
             op_2_2.val = (op_2_2.val + op_1_2.val) & 0xffff;
             comm_2 = comm_1;
             removeLines (code, line, 1);
@@ -706,7 +706,16 @@ void T9900Generator::outputIntegerCmpOperation (TToken operation, TExpressionBas
     };
         
     bool secondFirst = left->isSymbol () || left->isConstant () || left->isLValueDereference ();
-    T9900Reg r1, r2, r3, r4;
+    T9900Reg r1, r2, r3;
+    
+    if (right->isConstant () && !static_cast<TConstantValue *> (right)->getConstant ()->getInteger () && operation == TToken::LessThan) {
+        visit (left);
+        T9900Reg reg = fetchReg (intScratchReg2);
+        outputCode (T9900Op::srl, reg, 15);
+        saveReg (reg);
+        return;
+    }
+    
     
     if (secondFirst) {
         visit (right);
@@ -885,11 +894,19 @@ void T9900Generator::generateCode (TTerm &term) {
 }
 
 void T9900Generator::codeInlinedFunction (TFunctionCall &functionCall) {
-/*
+
     TExpressionBase *function = functionCall.getFunction ();
     const std::vector<TExpressionBase *> &args = functionCall.getArguments ();
     const std::string s = static_cast<TRoutineValue *> (function)->getSymbol ()->getExtSymbolName ();
+    
+    if (s == "abs") {
+        visit (args [0]);
+        const T9900Reg reg = fetchReg (intScratchReg1);
+        outputCode (T9900Op::abs, reg);
+        saveReg (reg);
+    }
 
+/*
     if (s == "rt_dbl_abs") {
         visit (args [0]);
         const TX64Reg reg = fetchXmmReg (xmmScratchReg1);
@@ -934,7 +951,7 @@ bool T9900Generator::isFunctionCallInlined (TFunctionCall &functionCall) {
     TExpressionBase *function = functionCall.getFunction ();
     if (function->isRoutine ()) {
         const std::string s = static_cast<TRoutineValue *> (function)->getSymbol ()->getExtSymbolName ();
-        return s == "rt_dbl_abs" || s == "sqrt" || s == "ntohs" || s == "htons" || s == "rt_in_set";
+        return s == "abs";
     } else
         return false;        
 }
@@ -1142,16 +1159,39 @@ void T9900Generator::codeMultiplyConst (const T9900Reg reg, const std::size_t n)
     }
 }
 
+void T9900Generator::inlineMove (T9900Reg src, T9900Reg dst, T9900Reg count) {            
+    const std::string ll = getNextLocalLabel ();
+    outputCode (T9900Op::def_label, ll);
+    outputCode (T9900Op::movb, T9900Operand (src, T9900Operand::TAddressingMode::RegIndInc), T9900Operand (dst, T9900Operand::TAddressingMode::RegIndInc));
+    outputCode (T9900Op::dec, count);
+    outputCode (T9900Op::jne, ll);
+}
+
 void T9900Generator::codeMove (const TType *type) {
-    std::size_t n = type->getSize ();
-    if (n) {
-        loadReg (intScratchReg3);
-        loadReg (intScratchReg2);
-        outputCode (T9900Op::li, intScratchReg4, n);
-        if (type->isShortString ())
-            outputCode (T9900Op::bl, makeLabelMemory ("_rt_copy_str"));
-        else
-            outputCode (T9900Op::bl, makeLabelMemory ("_rt_copy_mem"));
+    const std::size_t n = type->getSize ();
+    if (type->isShortString ()) {
+        T9900Reg count = getSaveReg (intScratchReg2);
+        T9900Reg dst = fetchReg (intScratchReg3);
+        T9900Reg src = fetchReg (intScratchReg4);
+        outputCode (T9900Op::li, intScratchReg1, 256 * (n - 1));
+        outputCode (T9900Op::movb, T9900Operand (src, T9900Operand::TAddressingMode::RegIndInc), count);
+        outputCode (T9900Op::cb, count, intScratchReg1);
+        const std::string ll1 = getNextLocalLabel ();
+        outputCode (T9900Op::jl, ll1);
+        outputCode (T9900Op::mov, intScratchReg1, count);
+        outputCode (T9900Op::def_label, ll1);
+        outputCode (T9900Op::movb, count, T9900Operand (dst, T9900Operand::TAddressingMode::RegIndInc));
+        const std::string ll2 = getNextLocalLabel ();
+        outputCode (T9900Op::jeq, ll2);
+        outputCode (T9900Op::srl, count, 8);
+        inlineMove (src, dst, count);
+        outputCode (T9900Op::def_label, ll2);
+    } else {
+        T9900Reg count = getSaveReg (intScratchReg2);
+        outputCode (T9900Op::li, count, n);
+        T9900Reg dst = fetchReg (intScratchReg3);
+        T9900Reg src = fetchReg (intScratchReg4);
+        inlineMove (src, dst, count);
     }
 }
 
@@ -1744,8 +1784,8 @@ void T9900Generator::codeBlock (TBlock &block, bool hasStackFrame, TCodeSequence
             outputCode (T9900Op::li, T9900Reg::r12, staticDataDefinition.label);
             outputCode (T9900Op::li, T9900Reg::r13, firstStatic);
             outputCode (T9900Op::li, T9900Reg::r14, staticSize);
-            // TODO: inline
-            outputCode (T9900Op::b, makeLabelMemory ("_rt_copy_mem"));
+            inlineMove (T9900Reg::r12, T9900Reg::r13, T9900Reg::r14);
+            outputCode (T9900Op::b, T9900Operand (T9900Reg::r11, T9900Operand::TAddressingMode::RegInd));
         }
     }
     

@@ -1263,7 +1263,7 @@ TConstantValue::TConstantValue (TSymbol *symbol):
 #ifdef CREATE_9900
     setType (type == &stdType.String ? &stdType.ShortString : type);
 #else    
-    setType (symbol->getType ());
+    setType (type);
 #endif    
 }
 

@@ -110,6 +110,8 @@ private:
     void codeLoadMemory (TType *, T9900Reg destReg, T9900Operand srcMem);
     void codeStoreMemory (TType *, T9900Operand destMem, T9900Reg srcReg);
     void codeMultiplyConst (T9900Reg, std::size_t);
+    
+    void inlineMove (T9900Reg src, T9900Reg dst, T9900Reg count);
     void codeMove (const TType *);
     
 //    void initStaticVariable (char *addr, const TType *t, const TConstant *constant);
