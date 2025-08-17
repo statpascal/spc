@@ -61,6 +61,7 @@ public:
                                  t == TAddressingMode::Indexed; }
                                  
     std::string getValue () const;
+    int getSize () const { return 2 * (isImm () || isMemory () || isIndexed ()); }
     
     std::string label;
     T9900Reg reg;
@@ -73,6 +74,7 @@ public:
     T9900Operation (T9900Op, T9900Operand = T9900Operand (), T9900Operand = T9900Operand (), const std::string &comment = std::string ());
     
     std::string makeString () const;
+    int getSize () const;
     
     T9900Op operation;
     T9900Operand operand1, operand2;

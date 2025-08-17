@@ -89,7 +89,8 @@ const std::vector<T9900OpDescription> opDescription = {
     {T9900Op::comment,   0, "",     T9900Format::F_None},
     {T9900Op::stri,      0, "stri", T9900Format::F_None},
     {T9900Op::data,      0, "data", T9900Format::F_None},
-    {T9900Op::byte,      0, "byte", T9900Format::F_None}
+    {T9900Op::byte,      0, "byte", T9900Format::F_None},
+    {T9900Op::end,       0, "end",  T9900Format::F_None}
 };
 
 T9900Operand::T9900Operand ():
@@ -196,6 +197,21 @@ std::string T9900Operation::makeString () const {
                 return res + "; " + comment;
             } else
                 return res;}
+    }
+}
+
+int T9900Operation::getSize () const {
+    switch (opDescription [static_cast<std::size_t> (operation)].format) {
+        case T9900Format::F2:
+        case T9900Format::F2M:
+        case T9900Format::F5:
+            return 2;
+        case T9900Format::F4:
+            return 2 + operand1.getSize ();
+        case T9900Format::F_None:
+            return 0;
+        default:
+            return 2 + operand1.getSize () + operand2.getSize ();
     }
 }
 
