@@ -118,7 +118,6 @@ already working.
 
 Compiling a program in this mode produces the assembler source *out.a99*,
 which is included by *ti99units/carts.a99* to produce a cartridge image.
-Additional assembler routines are provided in the file *runtime.a99*.
 
 ```
 user@host:~/src/statpascal> obj/sp tests/ti99/sieve.pas 
