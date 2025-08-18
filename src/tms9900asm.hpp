@@ -15,7 +15,7 @@ enum class T9900Op {
     jmp, jlt, jle, jeq, jhe, jgt, jne, jnc, joc, jno, jl, jh, jop, sbo, sbz, tb, coc, czc,
     xor_, xop, ldcr, stcr, mpy, div, szc, szcb, s, sb, c, cb, a, ab, mov, movb, soc, socb,
     // Pseude ops 
-    def_label, comment, stri, data, byte, end
+    aorg, even, def_label, comment, stri, data, byte, text, end
 };
 
 enum class T9900Reg {
@@ -47,7 +47,7 @@ public:
     T9900Operand (const std::string &label);	// immediate
     T9900Operand (const std::string &label, T9900Reg reg);	// memory (R0) or indexed
 
-    std::string makeString () const;
+    std::string makeString (bool hex = false) const;
     
     bool isValid () const { return t != TAddressingMode::Invalid; }
     bool isLabel () const { return !label.empty (); }
@@ -60,7 +60,7 @@ public:
                                  t == TAddressingMode::RegIndInc ||
                                  t == TAddressingMode::Indexed; }
                                  
-    std::string getValue () const;
+    std::string getValue (bool hex = false) const;
     int getSize () const { return 2 * (isImm () || isMemory () || isIndexed ()); }
     
     std::string label;

@@ -117,11 +117,11 @@ runtime library. The *tests/ti99* directory shows what is
 already working.
 
 Compiling a program in this mode produces the assembler source *out.a99*,
-which is included by *ti99units/carts.a99* to produce a cartridge image.
+which can be assembled with xas99.
 
 ```
 user@host:~/src/statpascal> obj/sp tests/ti99/sieve.pas 
-user@host:~/src/statpascal> ~/ti99/xdt99/xas99.py -R -b -q ti99units/cart.a99 -o cart.bin
+user@host:~/src/statpascal> ~/ti99/xdt99/xas99.py -R -b -q out.a99 -o cart.bin
 user@host:~/src/statpascal> ls -l cart.bin 
 -rw-r--r--. 1 user user 1088 Jul 28 14:11 cart.bin
 ```

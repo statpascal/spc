@@ -24,7 +24,7 @@ end;
 
 begin
     c := 2;
-    writeln ('5 + 7= ', add (5, 7));
+    writeln ('5 + 7 = ', add (5, 7));
     setC (9);
     writeln ('c = ', c);
     waitkey

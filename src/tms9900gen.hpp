@@ -125,7 +125,6 @@ private:
     // keep track of SP for 16 byte stack alignment 
     void codePush (T9900Operand);
     void codePop (T9900Operand);
-    void codeModifySP (ssize_t);
     
     void saveReg (T9900Reg);
     void loadReg (T9900Reg);

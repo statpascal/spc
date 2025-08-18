@@ -305,7 +305,7 @@ void TBaseGenerator::initStaticGlobals (TSymbolList &globalSymbols) {
             initStaticVariable (reinterpret_cast<char *> (s->getOffset ()), s->getType (), s->getConstant ());
 }
 
-std::vector<std::string> TBaseGenerator::createSymbolList (const std::string &routineName, std::size_t level, TSymbolList &symbolList, const std::vector<std::string> &regNames) {
+std::vector<std::string> TBaseGenerator::createSymbolList (const std::string &routineName, std::size_t level, TSymbolList &symbolList, const std::vector<std::string> &regNames, int offset) {
     std::vector<std::string> headerListing;
     std::stringstream ss;
     switch (level) {
@@ -325,17 +325,13 @@ std::vector<std::string> TBaseGenerator::createSymbolList (const std::string &ro
         for (const TSymbol *s: *symbols)
             if (s->checkSymbolFlag (TSymbol::Variable) || s->checkSymbolFlag (TSymbol::Parameter) || s->checkSymbolFlag (TSymbol::Absolute)) {
                 ss.str (std::string ());
-                if (symbolList.getLevel () == 1)
-                    ss << "  " << std::setw (4) << std::hex << std::setfill ('0');
-                else
-                    ss << std::setw (6);
+#ifdef CREATE_9900                
+                ss << "  " << std::setw (4) << std::hex << std::setfill ('0') << static_cast<std::int16_t> (s->getOffset () + offset) << "  ";
+#endif                
                 if (s->getRegister () != TSymbol::InvalidRegister)
                     ss << regNames [s->getRegister ()];
                 else
-                    ss << s->getOffset ();
-                ss << "  ";
-                if (symbolList.getLevel () == 1)
-                    ss << std::setfill (' ') << std::dec << std::setw (6) << s->getOffset () << "  ";
+                    ss << std::setfill (' ') << std::dec << std::setw (6) << s->getOffset () + offset << "  ";
                 if (s->getType ()->isReference ())
                     ss << "var ";
                 ss << s->getName () << ": " << s->getType ()->getName ();;

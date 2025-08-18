@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <limits>
 #include <iostream>
+#include <algorithm>
 
 #include "tms9900gen.hpp"
 
@@ -57,6 +58,8 @@ Stack layout of activation frame:
 namespace statpascal {
 
 namespace {
+
+const std::uint16_t workspace = 0x8300;
 
 std::string toHexString (std::uint64_t n) {
     std::stringstream ss;
@@ -301,6 +304,12 @@ void T9900Generator::optimizePeepHole (TCodeSequence &code) {
             removeLines (code, line1, 1);
             if (line != code.begin ()) --line;
         }
+        
+        // ai reg, 0
+        // -> 
+        // remove
+        else if (op1 == T9900Op::ai && !op_1_2.isLabel () && !op_1_2.val)
+            removeLines (code, line, 1);
         
         // li reg, imm
         // mov|movb *reg, reg
@@ -1196,8 +1205,7 @@ void T9900Generator::codeSymbol (const TSymbol *s, const T9900Reg reg) {
 
 void T9900Generator::codeStoreMemory (TType *const t, T9900Operand destMem, T9900Reg srcReg) {
     if (t == &stdType.Uint8 || t == &stdType.Int8) {
-        // WP should always be at 8300 so code direct mov?
-        outputCode (T9900Op::movb, T9900Operand (T9900Reg::r0, 0x8300 + 2 * static_cast<int> (srcReg) + 1), destMem, "low R" + std::to_string (static_cast<std::size_t> (srcReg)));
+        outputCode (T9900Op::movb, T9900Operand (T9900Reg::r0, workspace + 2 * static_cast<int> (srcReg) + 1), destMem, "low R" + std::to_string (static_cast<std::size_t> (srcReg)));
 //        outputCode (T9900Op::swpb, srcReg);
 //        outputCode (T9900Op::movb, srcReg, destMem);
 //        outputCode (T9900Op::swpb, srcReg);
@@ -1342,11 +1350,6 @@ void T9900Generator::setRegUsed (T9900Reg r) {
 
 bool T9900Generator::isRegUsed (const T9900Reg r) const {
     return regsUsed [static_cast<std::size_t> (r)];
-}
-
-void T9900Generator::codeModifySP (ssize_t n) {
-    if (n)
-        outputCode (T9900Op::ai, T9900Reg::r10, n);
 }
 
 void T9900Generator::generateCode (TVariable &variable) {
@@ -1651,8 +1654,36 @@ void T9900Generator::generateCode (TUnit &unit) {
 void T9900Generator::generateCode (TProgram &program) {
     stackPositions = 0;
     TSymbolList &globalSymbols = program.getBlock ()->getSymbols ();
+
+    setOutput (&this->program);
+    T9900Operand e;	// empty
     
-    // TODO: error if not found !!!!
+    const std::string proglist = getNextLocalLabel ();
+    outputCode (T9900Op::aorg, 0x6000, e, "cartride address space");
+    outputComment (std::string ());
+    outputCode (T9900Op::data, 0xaa01, e, "standard header");
+    outputCode (T9900Op::data, 0x0100, e, "number of programs");
+    outputCode (T9900Op::data, 0x0000, e, "power up list");
+    outputCode (T9900Op::data, proglist, e, "program list");	
+    outputCode (T9900Op::data, 0x0000, e, "DSR list");
+    outputCode (T9900Op::data, 0x0000, e, "subprogram list");
+    outputCode (T9900Op::data, 0x0000, e, "ISR list");
+    
+    outputCode (T9900Op::def_label, proglist);
+    outputCode (T9900Op::data, 0x0000, e, "no next program");
+    const std::string progstart = getNextLocalLabel ();
+    outputCode (T9900Op::data, progstart, e, "program address");
+    
+    std::string progname = program.getBlock ()->getSymbol ()->getName ();
+    std::transform (progname.begin (), progname.end (), progname.begin (), [] (char c) {return c == '_' ? ' ' : std::toupper (c);});
+    outputCode (T9900Op::byte, progname.length ());
+    outputCode (T9900Op::text, progname);
+    outputCode (T9900Op::even);
+    
+    outputCode (T9900Op::def_label, progstart);
+    outputCode (T9900Op::lwpi, workspace);
+    outputCode (T9900Op::limi, 0);
+    
     generateBlock (*program.getBlock ());
     
     setOutput (&this->program);
@@ -1698,7 +1729,7 @@ void T9900Generator::externalRoutine (TSymbol *s) {
         outputComment (std::string ());
 //        TRoutineType *type = static_cast<TRoutineType *> (s->getType ());
 //        std::cout << s->getName () << ": " <<  type->getName () << (type->isFarCall () ? ": FAR" : ": NEAR") << std::endl;
-        for (const std::string &s: createSymbolList (s->getName (), symbols.getLevel (), symbols, {}))
+        for (const std::string &s: createSymbolList (s->getName (), symbols.getLevel (), symbols, {}, -4))
             outputComment (s);
         outputComment (std::string ());
         outputLabel (s->getName ());
@@ -1788,8 +1819,6 @@ void T9900Generator::assignParameterOffsets (TBlock &block) {
     TSymbol *s = block.getSymbol ();
 //    TRoutineType *type = static_cast<TRoutineType *> (s->getType ());
 //    std::cout << s->getName () << ": " <<  type->getName () << (type->isFarCall () ? ": FAR" : ": NEAR") << std::endl;
-
-
 
     TSymbolList &symbolList = block.getSymbols ();
     

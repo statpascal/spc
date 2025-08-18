@@ -11,7 +11,7 @@ namespace statpascal {
                "blwp", "b", "x", "clr", "neg", "inv", "inc", "inct", "dec", "dect", "bl", "swpb", "seto", "abs", "sra", "srl", "sla", "src",
                "jmp", "jlt", "jle", "jeq", "jhe", "jgt", "jne", "jnc", "joc", "jno", "jl", "jh", "jop", "sbo", "sbz", "tb", "coc", "czc",
                "xor", "xop", "ldcr", "stcr", "mpy", "div", "szc", "szcb", "s", "sb", "c", "cb", "a", "ab", "mov", "movb", "soc", "socb",
-               "", "", "stri", "data", "byte", "end"};
+               "aorg", "even", "", "", "stri", "data", "byte", "end"};
 */
                
 const std::vector<T9900OpDescription> opDescription = {
@@ -85,11 +85,14 @@ const std::vector<T9900OpDescription> opDescription = {
     {T9900Op::soc,  0xe000, "soc",  T9900Format::F1},
     {T9900Op::socb, 0xf000, "socb", T9900Format::F1},
     // pseudo ops
+    {T9900Op::aorg,      0, "aorg", T9900Format::F_None},
+    {T9900Op::even,      0, "even", T9900Format::F_None},
     {T9900Op::def_label, 0, "",     T9900Format::F_None},
     {T9900Op::comment,   0, "",     T9900Format::F_None},
     {T9900Op::stri,      0, "stri", T9900Format::F_None},
     {T9900Op::data,      0, "data", T9900Format::F_None},
     {T9900Op::byte,      0, "byte", T9900Format::F_None},
+    {T9900Op::text,      0, "text", T9900Format::F_None},
     {T9900Op::end,       0, "end",  T9900Format::F_None}
 };
 
@@ -129,11 +132,19 @@ T9900Operand::T9900Operand (const std::string &label, const T9900Reg reg):
   val (0) {
 }
 
-std::string T9900Operand::getValue () const {
-    return label.empty () ? std::to_string (val) : label;
+std::string T9900Operand::getValue (bool hex) const {
+    if (label.empty ())
+        if (hex) {
+            std::stringstream ss;
+            ss << '>' << std::hex << std::setfill ('0') << std::setw (4) << val;
+            return ss.str ();
+        } else
+        return std::to_string (val);
+    else
+        return label;
 }
   
-std::string T9900Operand::makeString () const {
+std::string T9900Operand::makeString (bool hex) const {
     switch (t) {
         case TAddressingMode::Invalid:
             return std::string ();
@@ -144,11 +155,11 @@ std::string T9900Operand::makeString () const {
         case TAddressingMode::RegIndInc:
             return "*" + regname [static_cast<std::size_t> (reg)] + "+";
         case TAddressingMode::Memory:
-            return "@" + getValue ();
+            return "@" + getValue (hex);
         case TAddressingMode::Indexed:
-            return "@" + getValue () + "(" + regname [static_cast<std::size_t> (reg)] + ")";
+            return "@" + getValue (hex) + "(" + regname [static_cast<std::size_t> (reg)] + ")";
         case TAddressingMode::Imm:
-            return getValue ();
+            return getValue (hex);
     }
     return std::string ();
 }
@@ -177,21 +188,28 @@ std::string T9900Operation::makeString () const {
             return operand1.makeString () + " text >" + res.str () + "    ; " + operand2.label; }
         case T9900Op::byte: {
             std::stringstream res;
+            if (operand1.label.empty ()) {
+                res << std::string (8, ' ') << "byte >" << std::setfill ('0') << std::hex << std::setw (2) << operand1.val;
+                return res.str ();
+            }
             auto append = [&res] (char c) {
                 res << std::hex << std::setfill ('0') << std::setw (2) << std::nouppercase << static_cast<unsigned> (c);
             };
             for (const char c: operand1.label)
                 append (c);
             return std::string (8, ' ') +  "text >" + res.str (); }
+        case T9900Op::text:
+            return std::string (8, ' ') + "text '" + operand1.label + "'";
         case T9900Op::end:
             return "";
         default: {
-            std::string res = std::string (8, ' ') + opDescription [static_cast<std::size_t> (operation)].name;
+            const T9900OpDescription &od = opDescription [static_cast<std::size_t> (operation)];
+            std::string res = std::string (8, ' ') + od.name;
             res.resize (13, ' ');
             if (operand1.isValid ())
-                res += " " + operand1.makeString ();
+                res += " " + operand1.makeString (true);
             if (operand2.isValid ())
-                res += ", " + operand2.makeString ();
+                res += ", " + operand2.makeString (od.format != T9900Format::F5 && od.format != T9900Format::F2M && od.format != T9900Format::F4);
             if (!comment.empty ()) {
                 res.resize (40, ' ');
                 return res + "; " + comment;

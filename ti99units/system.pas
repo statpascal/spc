@@ -282,7 +282,7 @@ procedure __write_int (var f: text; n, length, precision: integer);
                         dec (p)
                     end;
                 p^ := chr (integer (addr (buf [6])) - integer (p));
-                __write_string (f, p, length, precision)
+                __write_string (f, p, length, -1)
             end
     end;
     
@@ -292,7 +292,7 @@ procedure __write_char (var f: text; ch: char; length, precision: integer);
     begin
         s [0] := #1;
         s [1] := ch;
-        __write_string (f, s, length, precision);
+        __write_string (f, s, length, -1);
     end;
     
 procedure __write_blank (length: integer); assembler;
@@ -336,10 +336,11 @@ procedure __write_string (var f: text; p: PChar; length, precision: integer);
     end;
     
 procedure __write_boolean (var f: text; b: boolean; length, precision: integer);
-    const
-        s: array [boolean] of string [5] = ('false', 'true');
     begin
-        __write_string (f, s [b], length, precision)
+        if b then
+            __write_string (f, 'true', length, -1)
+        else
+            __write_string (f, 'false', length, -1) 
     end;
 
 function min (a, b: integer): integer; assembler;

@@ -113,7 +113,7 @@ protected:
     TType *getMemoryOperationType (TType *type);
     bool getSetTypeLimit (const TExpressionBase *, std::int64_t &minval, std::int64_t &maxval);
     
-    std::vector<std::string> createSymbolList (const std::string &routineName, std::size_t level, TSymbolList &, const std::vector<std::string> &regNames);
+    std::vector<std::string> createSymbolList (const std::string &routineName, std::size_t level, TSymbolList &, const std::vector<std::string> &regNames, int offset = 0);
 
     // TODO: private after A64 modificiation    
     void allocateGlobalDataArea (std::size_t n);
