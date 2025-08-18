@@ -139,8 +139,6 @@ private:
     bool is32BitLimit (std::int64_t);
 
     bool codeRangeCheck, createCompilerListing;
-    TRuntimeData &runtimeData;
-    TSymbol *globalRuntimeDataSymbol;
     std::size_t currentLevel;
     
     std::size_t intStackCount, xmmStackCount;
@@ -201,6 +199,7 @@ private:
     // peep hole optimizer
     
     void optimizePeepHole (TCodeSequence &);
+    void optimizeSingleLine (TCodeSequence &);
     
     std::map<std::string, std::int64_t> jmpLabels;
     void optimizeJumps (TCodeSequence &);

@@ -78,7 +78,6 @@ const std::size_t
     intStackRegs = intStackReg.size ();
     
 const std::string 
-    globalRuntimeDataName = "__globalruntimedata",
     dblAbsMask = "__dbl_abs_mask";
 
 }  // namespace
@@ -88,7 +87,6 @@ static std::array<TToken, 6> relOps = {TToken::Equal, TToken::GreaterThan, TToke
 
 T9900Generator::T9900Generator (TRuntimeData &runtimeData, bool codeRangeCheck, bool createCompilerListing):
   inherited (runtimeData),
-  runtimeData (runtimeData),
   currentLevel (0),
   intStackCount (0),
   xmmStackCount (0),
@@ -118,10 +116,6 @@ bool T9900Generator::isSameReg (const T9900Operand &op1, const T9900Operand &op2
 bool T9900Generator::isSameCalcStackReg (const T9900Operand &op1, const T9900Operand &op2) {
     return isCalcStackReg (op1) && isCalcStackReg (op2) && op1.reg == op2.reg;
 }
-
-//bool T9900Generator::isRegisterIndirectAddress (const T9900Operand &op) {
-//    return op.isPtr && op.index == TX64Reg::none && op.offset == 0;
-//}
 
 void T9900Generator::removeLines (TCodeSequence &code, TCodeSequence::iterator &line, std::size_t count) {
     for (std::size_t i = 0; i < count && line != code.end (); ++i)
@@ -186,7 +180,7 @@ void T9900Generator::optimizeJumps (TCodeSequence &code) {
         offset += line->getSize ();
         if (skip)
             --skip;
-        else if (line->operation >= T9900Op::jmp && line->operation <= T9900Op::jop || line->operation == T9900Op::b) {
+        else if ((line->operation >= T9900Op::jmp && line->operation <= T9900Op::jop) || line->operation == T9900Op::b) {
             T9900Op op [4];
             std::string label [4];
             TCodeSequence::iterator it = line;
@@ -220,6 +214,23 @@ void T9900Generator::optimizeJumps (TCodeSequence &code) {
     }
     while (!code.empty () && code.back ().operation == T9900Op::end)
         code.pop_back ();
+}
+
+void T9900Generator::optimizeSingleLine (TCodeSequence &code) {
+    for (T9900Operation &line: code) 
+        if (line.operation == T9900Op::li && !line.operand2.isLabel ()) {
+            if (!line.operand2.val) {
+                line.operation = T9900Op::clr;
+                line.operand2 = T9900Operand ();
+            } else if (line.operand2.val == 0xffff) {
+                line.operation = T9900Op::seto;
+                line.operand2 = T9900Operand ();
+            }
+        } else if (line.operation == T9900Op::ai && !line.operand2.isLabel () && static_cast<std::int16_t> (line.operand2.val) >= -2 && static_cast<std::int16_t> (line.operand2.val) <= 2 && line.operand2.val) {
+            T9900Op ops [5] = {T9900Op::dect, T9900Op::dec, T9900Op::ai, T9900Op::inc, T9900Op::inct};
+            line.operation = ops [static_cast<std::int16_t> (line.operand2.val) + 2];
+            line.operand2 = T9900Operand ();
+        }
 }
 
 void T9900Generator::optimizePeepHole (TCodeSequence &code) {
@@ -354,12 +365,23 @@ void T9900Generator::optimizePeepHole (TCodeSequence &code) {
             removeLines (code, line1, 2);
         }
         
+        // li reg, >ffff
+        // mov reg, op
+        // ->
+        // seto op
+        else if (op1 == T9900Op::li && op2 == T9900Op::mov && !op_1_2.isLabel () && op_1_2.val == 0xffff) {
+            op2 = T9900Op::seto;
+            op_2_1 = op_2_2;
+            op_2_2 = T9900Operand ();
+            removeLines (code, line, 1);
+        }
+        
         // li reg, imm1
         // mov reg, op
         // li reg, imm1
         // ->
         // remove redundant load
-        else if (op1 == T9900Op::li && op2 == T9900Op::mov && op3 == T9900Op::li && op_1_2.isImm () && op_3_2.isImm () && op_1_2.getValue () == op_3_2.getValue () &&
+        else if (op1 == T9900Op::li && op2 == T9900Op::mov && op3 == T9900Op::li && op_1_2.isImm () && op_3_2.isImm () && op_1_2.getValue () == op_3_2.getValue () && !op_1_2.isLabel () && !op_3_2.isLabel () &&
                  isSameCalcStackReg (op_1_1, op_2_1) && isSameCalcStackReg (op_2_1, op_3_1)) {
             removeLines (code, line2, 1);
         }
@@ -1270,7 +1292,7 @@ void T9900Generator::codeMove (const TType *type) {
 }
 
 void T9900Generator::codePush (const T9900Operand op) {
-    outputCode (T9900Op::dect, T9900Reg::r10);
+    outputCode (T9900Op::ai, T9900Reg::r10, -2);
     outputCode (T9900Op::mov, op, T9900Operand (T9900Reg::r10, T9900Operand::TAddressingMode::RegInd));
 }
 
@@ -1492,14 +1514,13 @@ void T9900Generator::generateCode (TAssignment &assignment) {
     visit (expression);
     visit (lValue);
     if (st != &stdType.UnresOverload) {
-        T9900Operand operand = T9900Operand (fetchReg (intScratchReg1), T9900Operand::TAddressingMode::RegInd);
+        T9900Operand operand = T9900Operand (fetchReg (intScratchReg2), T9900Operand::TAddressingMode::RegInd);
+        T9900Reg reg = fetchReg (intScratchReg1);
         if (st == &stdType.Real || st == &stdType.Single) {
-        /*
-            codeStoreMemory (st, operand, fetchXmmReg (xmmScratchReg1));
-        */            
+            //
         } else
-            codeStoreMemory (st, operand, fetchReg (intScratchReg1));
-    } else 
+            codeStoreMemory (st, operand, reg);
+    } else
         codeMove (type);
 }
 
@@ -1630,7 +1651,6 @@ void T9900Generator::generateCode (TUnit &unit) {
 void T9900Generator::generateCode (TProgram &program) {
     stackPositions = 0;
     TSymbolList &globalSymbols = program.getBlock ()->getSymbols ();
-    globalRuntimeDataSymbol = globalSymbols.searchSymbol ("__globalruntimedata");
     
     // TODO: error if not found !!!!
     generateBlock (*program.getBlock ());
@@ -1874,6 +1894,7 @@ void T9900Generator::codeBlock (TBlock &block, bool hasStackFrame, TCodeSequence
     
     removeUnusedLocalLabels (blockCode);
     optimizePeepHole (blockCode);
+    optimizeSingleLine (blockCode);
     optimizeJumps (blockCode);
 //    tryLeaveFunctionOptimization (blockCode);
     
@@ -1890,17 +1911,13 @@ void T9900Generator::codeBlock (TBlock &block, bool hasStackFrame, TCodeSequence
     
     setOutput (&blockPrologue);    
     beginRoutineBody (block.getSymbol ()->getName (), blockSymbols.getLevel (), blockSymbols, saveRegs, hasStackFrame);
-    optimizePeepHole (blockPrologue);
     
     setOutput (&blockEpilogue);
     endRoutineBody (blockSymbols.getLevel (), blockSymbols, saveRegs, hasStackFrame);
-    optimizePeepHole (blockEpilogue);
     outputLocalJumpTables ();
     
-    if (!globalInits.empty ()) {
-        optimizePeepHole (globalInits);
+    if (!globalInits.empty ()) 
         std::move (globalInits.begin (), globalInits.end (), std::back_inserter (blockEpilogue));
-    }
     
     blockStatements.clear ();    
     // blockStatements.reserve (blockPrologue.size () + blockCode.size () + blockEpilogue.size ());
@@ -1908,6 +1925,9 @@ void T9900Generator::codeBlock (TBlock &block, bool hasStackFrame, TCodeSequence
     std::move (blockCode.begin (), blockCode.end (), std::back_inserter (blockStatements));
     std::move (blockEpilogue.begin (), blockEpilogue.end (), std::back_inserter (blockStatements));
     
+    optimizePeepHole (blockStatements);
+    optimizeSingleLine (blockStatements);
+    optimizeJumps (blockStatements);
 }
 
 void T9900Generator::generateBlock (TBlock &block) {
