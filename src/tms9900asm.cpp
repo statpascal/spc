@@ -218,7 +218,7 @@ std::string T9900Operation::makeString () const {
     }
 }
 
-int T9900Operation::getSize () const {
+int T9900Operation::getSize (std::int64_t offset) const {
     switch (opDescription [static_cast<std::size_t> (operation)].format) {
         case T9900Format::F2:
         case T9900Format::F2M:
@@ -227,7 +227,20 @@ int T9900Operation::getSize () const {
         case T9900Format::F4:
             return 2 + operand1.getSize ();
         case T9900Format::F_None:
-            return 0;
+            switch (operation) {
+                case T9900Op::even:
+                    return offset & 1;
+                case T9900Op::stri:
+                    return operand2.label.length () + 1;
+                case T9900Op::data:
+                    return 2;
+                case T9900Op::byte:
+                    return 1;
+                case T9900Op::text:
+                    return operand1.label.length ();
+                default:
+                    return 0;
+            }
         default:
             return 2 + operand1.getSize () + operand2.getSize ();
     }

@@ -74,7 +74,7 @@ public:
     T9900Operation (T9900Op, T9900Operand = T9900Operand (), T9900Operand = T9900Operand (), const std::string &comment = std::string ());
     
     std::string makeString () const;
-    int getSize () const;
+    int getSize (std::int64_t offset) const;
     
     T9900Op operation;
     T9900Operand operand1, operand2;

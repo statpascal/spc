@@ -140,13 +140,10 @@ private:
     bool codeRangeCheck, createCompilerListing;
     std::size_t currentLevel;
     
-    std::size_t intStackCount, xmmStackCount;
-    std::size_t stackPositions;		// align RSP on funciton call
+    std::size_t intStackCount;
     std::array<bool, static_cast<std::size_t> (T9900Reg::nrRegs)> regsUsed;
     
     std::size_t dblConstCount;
-    std::unordered_map<std::string, std::size_t> labelDefinitions, relLabelDefinitions;
-    std::vector<TGlobalDefinition> globalDefinitions;
     std::vector<TConstantDefinition> constantDefinitions;
     std::vector<TSetDefinition> setDefinitions;
     std::vector<TStringDefinition> stringDefinitions;
@@ -168,7 +165,7 @@ private:
     void outputGlobal (const std::string &name, std::size_t size);
     void outputComment (const std::string &);
     
-    void outputLocalJumpTables ();
+    void outputLocalDefinitions ();
     void outputGlobalConstants ();
     
     std::string registerConstant (double);

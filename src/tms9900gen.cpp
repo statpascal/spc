@@ -92,7 +92,6 @@ T9900Generator::T9900Generator (TRuntimeData &runtimeData, bool codeRangeCheck, 
   inherited (runtimeData),
   currentLevel (0),
   intStackCount (0),
-  xmmStackCount (0),
   dblConstCount (0) {
 }
 
@@ -158,7 +157,7 @@ void T9900Generator::adjustJumpLabels (std::size_t offset, std::size_t val) {
 void T9900Generator::removeJmpLines (TCodeSequence &code, TCodeSequence::iterator it, std::size_t count, std::size_t beginOffset) {
     std::size_t val = 0;
     while (count-- > 0) {
-        val += it->getSize ();
+        val += it->getSize (0);
         it = code.erase (it);
     }
     adjustJumpLabels (beginOffset, -val);
@@ -167,7 +166,7 @@ void T9900Generator::removeJmpLines (TCodeSequence &code, TCodeSequence::iterato
 void T9900Generator::optimizeJumps (TCodeSequence &code) {
     std::int64_t offset = 0;
     for (const T9900Operation &op: code) {
-        offset += op.getSize ();
+        offset += op.getSize (offset);
         if (op.operation == T9900Op::def_label) 
             jmpLabels [op.operand1.label] = offset;
     }
@@ -180,7 +179,7 @@ void T9900Generator::optimizeJumps (TCodeSequence &code) {
     TCodeSequence::iterator line = code.begin ();
     int skip = 0;
     while (line->operation != T9900Op::end) {
-        offset += line->getSize ();
+        offset += line->getSize (offset);
         if (skip)
             --skip;
         else if ((line->operation >= T9900Op::jmp && line->operation <= T9900Op::jop) || line->operation == T9900Op::b) {
@@ -561,15 +560,15 @@ void T9900Generator::outputLabel (const std::string &label) {
     outputCode (T9900Op::def_label, label);
 }
 
-void T9900Generator::outputGlobal (const std::string &name, const std::size_t size) {
-    globalDefinitions.push_back ({name, size});
-}
+//void T9900Generator::outputGlobal (const std::string &name, const std::size_t size) {
+//    globalDefinitions.push_back ({name, size});
+//}
 
 void T9900Generator::outputComment (const std::string &s) {
     outputCode (T9900Op::comment, T9900Operand (), T9900Operand (), s);
 }
 
-void T9900Generator::outputLocalJumpTables () {
+void T9900Generator::outputLocalDefinitions () {
     if (!jumpTableDefinitions.empty ()) {
         outputComment ("jump tables for case statements");
         for (const TJumpTable &it: jumpTableDefinitions) {
@@ -579,15 +578,15 @@ void T9900Generator::outputLocalJumpTables () {
         }
         jumpTableDefinitions.clear ();
     }
+    if (!stringDefinitions.empty ()) {
+        outputComment (std::string ());
+        for (const TStringDefinition &s: stringDefinitions)
+            outputCode (T9900Op::stri, T9900Operand (s.label), T9900Operand (s.val));
+        stringDefinitions.clear ();
+    }
 }
 
 void T9900Generator::outputGlobalConstants () {
-    if (!stringDefinitions.empty ()) {
-        outputComment (std::string ());
-        outputComment ("String Constants");
-        for (const TStringDefinition &s: stringDefinitions)
-            outputCode (T9900Op::stri, T9900Operand (s.label), T9900Operand (s.val));
-    }
     if (!staticDataDefinition.label.empty ()) {
         outputComment (std::string ());
         outputComment ("Static variable init data");
@@ -649,9 +648,9 @@ void T9900Generator::registerLocalJumpTable (const std::string &tableLabel, cons
     jumpTableDefinitions.emplace_back (TJumpTable {tableLabel, defaultLabel, std::move (jumpLabels)});
 }
 
-void T9900Generator::outputLabelDefinition (const std::string &label, const std::size_t value) {
-    labelDefinitions [label] = value;
-}
+//void T9900Generator::outputLabelDefinition (const std::string &label, const std::size_t value) {
+//    labelDefinitions [label] = value;
+//}
 
 void T9900Generator::generateCode (TTypeCast &typeCast) {
     TExpressionBase *expression = typeCast.getExpression ();
@@ -1652,7 +1651,6 @@ void T9900Generator::generateCode (TUnit &unit) {
 }
 
 void T9900Generator::generateCode (TProgram &program) {
-    stackPositions = 0;
     TSymbolList &globalSymbols = program.getBlock ()->getSymbols ();
 
     setOutput (&this->program);
@@ -1872,14 +1870,10 @@ void T9900Generator::assignGlobalVariables (TSymbolList &blockSymbols) {
 }
 
 void T9900Generator::codeBlock (TBlock &block, bool hasStackFrame, TCodeSequence &blockStatements) {
-    TSymbolList &blockSymbols = block.getSymbols ();
-    const std::size_t level = blockSymbols.getLevel ();
-    
     TCodeSequence blockPrologue, blockEpilogue, blockCode, globalInits;
 
-    stackPositions = 0;
+    TSymbolList &blockSymbols = block.getSymbols ();
     intStackCount = 0;
-    xmmStackCount = 0;
     currentLevel =  blockSymbols.getLevel ();
     endOfRoutineLabel = getNextLocalLabel ();
 
@@ -1936,14 +1930,12 @@ void T9900Generator::codeBlock (TBlock &block, bool hasStackFrame, TCodeSequence
             saveRegs.insert (op.operand2.reg);
     }
     
-    stackPositions = 0;    
-    
     setOutput (&blockPrologue);    
     beginRoutineBody (block.getSymbol ()->getName (), blockSymbols.getLevel (), blockSymbols, saveRegs, hasStackFrame);
     
     setOutput (&blockEpilogue);
     endRoutineBody (blockSymbols.getLevel (), blockSymbols, saveRegs, hasStackFrame);
-    outputLocalJumpTables ();
+    outputLocalDefinitions ();
     
     if (!globalInits.empty ()) 
         std::move (globalInits.begin (), globalInits.end (), std::back_inserter (blockEpilogue));
@@ -1960,11 +1952,15 @@ void T9900Generator::codeBlock (TBlock &block, bool hasStackFrame, TCodeSequence
 }
 
 void T9900Generator::generateBlock (TBlock &block) {
-//    std::cout << "Entering: " << block.getSymbol ()->getName () << std::endl;
 
     TSymbolList &blockSymbols = block.getSymbols ();
     makeUniqueLabelNames (blockSymbols);
     TCodeSequence blockStatements;
+    
+    currentLevel = blockSymbols.getLevel ();
+
+    std::cout << "Entering: " << block.getSymbol ()->getName () << ", level: " << blockSymbols.getLevel () << std::endl;
+
     
     assignStackOffsets (block);
     clearRegsUsed ();
@@ -1984,7 +1980,6 @@ void T9900Generator::generateBlock (TBlock &block) {
     }
 */    
     
-//    trySingleReplacements (blockStatements);
     std::move (blockStatements.begin (), blockStatements.end (), std::back_inserter (program));
     
     for (TSymbol *s: blockSymbols) 
