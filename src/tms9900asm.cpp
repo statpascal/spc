@@ -93,6 +93,7 @@ const std::vector<T9900OpDescription> opDescription = {
     {T9900Op::data,      0, "data", T9900Format::F_None},
     {T9900Op::byte,      0, "byte", T9900Format::F_None},
     {T9900Op::text,      0, "text", T9900Format::F_None},
+    {T9900Op::text,      0, "bank", T9900Format::F_None},
     {T9900Op::end,       0, "end",  T9900Format::F_None}
 };
 
@@ -112,9 +113,9 @@ T9900Operand::T9900Operand (T9900Reg reg, std::uint16_t base):
   val (base) {
 }
 
-T9900Operand::T9900Operand (std::uint16_t imm):
+T9900Operand::T9900Operand (std::uint16_t imm, TAddressingMode t):
   reg (T9900Reg::r0),
-  t (TAddressingMode::Imm),
+  t (t),
   val (imm) {
 }
 
@@ -200,6 +201,8 @@ std::string T9900Operation::makeString () const {
             return std::string (8, ' ') +  "text >" + res.str (); }
         case T9900Op::text:
             return std::string (8, ' ') + "text '" + operand1.label + "'";
+        case T9900Op::bank:
+//            return std::string (8, ' ') + operand1.val == -1 ? "all" : std::to_string (operand1.val) + ", " + toHexString (operand2.val);
         case T9900Op::end:
             return "";
         default: {
@@ -235,7 +238,9 @@ int T9900Operation::getSize (std::int64_t offset) const {
                 case T9900Op::data:
                     return 2;
                 case T9900Op::byte:
-                    return 1;
+                    if (operand1.label.empty ())
+                        return 1;
+                    // fall through
                 case T9900Op::text:
                     return operand1.label.length ();
                 default:

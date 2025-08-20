@@ -15,7 +15,7 @@ enum class T9900Op {
     jmp, jlt, jle, jeq, jhe, jgt, jne, jnc, joc, jno, jl, jh, jop, sbo, sbz, tb, coc, czc,
     xor_, xop, ldcr, stcr, mpy, div, szc, szcb, s, sb, c, cb, a, ab, mov, movb, soc, socb,
     // Pseude ops 
-    aorg, even, def_label, comment, stri, data, byte, text, end
+    aorg, even, def_label, comment, stri, data, byte, text, bank, end
 };
 
 enum class T9900Reg {
@@ -42,7 +42,7 @@ public:
     T9900Operand ();
     T9900Operand (T9900Reg, TAddressingMode t = TAddressingMode::Reg);
     T9900Operand (T9900Reg, std::uint16_t base);
-    T9900Operand (std::uint16_t imm);
+    T9900Operand (std::uint16_t imm, TAddressingMode = TAddressingMode::Imm);
     
     T9900Operand (const std::string &label);	// immediate
     T9900Operand (const std::string &label, T9900Reg reg);	// memory (R0) or indexed

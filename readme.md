@@ -96,7 +96,7 @@ The next steps will be:
 
 This is work in progress.
 
-The compiler can produce a ROM cartridge for the TI99/4A. The upper memory
+The compiler can produce a bank switched ROM cartridge for the TI99/4A. The upper memory
 (24 KB) is used for global variables and stack frames, the lower memory (8
 KB) as heap for dynamic allocations.
 
@@ -122,8 +122,9 @@ which can be assembled with xas99.
 ```
 user@host:~/src/statpascal> obj/sp tests/ti99/sieve.pas 
 user@host:~/src/statpascal> ~/ti99/xdt99/xas99.py -R -b -q out.a99 -o cart.bin
+user@host:~/src/statpascal> cat cart_b*.bin >cart.bin
 user@host:~/src/statpascal> ls -l cart.bin 
--rw-r--r--. 1 user user 1088 Jul 28 14:11 cart.bin
+-rw-r--r--. 1 user user 40960 Aug 20 19:14 cart.bin
 ```
 
 The following steps are planned:
@@ -131,7 +132,6 @@ The following steps are planned:
 - a standard runtime library
 - floating point operations (probably IEEE-754 binary32)
 - set operations
-- bank switched code in cartridge address range
 - standard Pascal file operations
 
 ## License

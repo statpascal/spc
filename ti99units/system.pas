@@ -8,6 +8,7 @@ type
     string1 = string [1];
     string4 = string [4];
     
+    
 var
     input, output: text;
     memb: array [0..65535] of uint8 absolute $0000;
@@ -134,7 +135,7 @@ procedure _rt_scroll_up; assembler;
         swpb r0
         movb r0, *r13
         li r8, 8
-        li r12, >8320
+        li r12, >8322
         
     _rt_scroll_up_2:
         movb *r14, *r12+
@@ -151,7 +152,7 @@ procedure _rt_scroll_up; assembler;
         movb r0, *r13
 
         li r8, 8
-        li r12, >8320
+        li r12, >8322
         
     _rt_scroll_up_3:
         movb *r12+, *r15
@@ -534,5 +535,7 @@ procedure loadCharset;
 
 begin
     loadCharset;
-    gotoxy (0, 0)
+//    gotoxy (0, 0)
+    vdpWriteAddress := 0;    
+    setVdpAddress (WriteAddr)
 end.

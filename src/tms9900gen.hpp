@@ -82,7 +82,18 @@ private:
     };
     
     using TCodeSequence = std::list<T9900Operation>;
-    TCodeSequence program, *currentOutput;
+    TCodeSequence *currentOutput;
+    
+    struct TCodeBlock {
+        TCodeBlock (TSymbol *s = nullptr): symbol (s) {}
+        TSymbol *symbol;
+        TCodeSequence codeSequence;
+        std::size_t size, address, bank;
+    };
+    std::map<std::string, std::uint16_t> bankMapping;
+
+    TCodeBlock sharedCode, mainProgram;
+    std::vector<TCodeBlock> subPrograms;	// top level subprograms
 
 
     void assignParameterOffsets (TBlock &);
@@ -135,8 +146,6 @@ private:
     void setRegUsed (T9900Reg);
     bool isRegUsed (T9900Reg) const;
     
-    bool is32BitLimit (std::int64_t);
-
     bool codeRangeCheck, createCompilerListing;
     std::size_t currentLevel;
     
@@ -162,11 +171,10 @@ private:
     void outputCode (const T9900Operation &);
     void outputCode (T9900Op, T9900Operand = T9900Operand (), T9900Operand = T9900Operand (), const std::string &comment = std::string ());
     void outputLabel (const std::string &label);
-    void outputGlobal (const std::string &name, std::size_t size);
     void outputComment (const std::string &);
     
     void outputLocalDefinitions ();
-    void outputGlobalConstants ();
+    void outputStaticConstants ();
     
     std::string registerConstant (double);
     std::string registerConstant (const std::array<std::uint64_t, TConfig::setwords> &);
@@ -191,6 +199,11 @@ private:
     T9900Reg parseRegister (TCompilerImpl &compiler, TLexer &lexer);    
     T9900Operand parseInteger (TCompilerImpl &compiler, TLexer &lexer, std::int64_t minval, std::int64_t maxvval);
     T9900Operand parseGeneralAddress (TCompilerImpl &compiler, TLexer &lexer);
+    
+    void calcLength (TCodeBlock &);
+    void assignBank (TCodeBlock &, std::size_t &bank, std::size_t &org);
+    void resolveBankLabels (TCodeBlock &proc);
+    std::string getBankName (const TSymbol *) const;
     
     // peep hole optimizer
     
