@@ -557,12 +557,14 @@ void T9900Generator::calcLength (TCodeBlock &proc) {
 }
 
 void T9900Generator::assignBank (TCodeBlock &proc, std::size_t &bank, std::size_t &org) {
-    if (org + proc.size >= 0x6800) {
+    if (org + proc.size >= 0x7ff0) {
         ++bank;
         org = 0x6000 + sharedCode.size;
     }
+    // TODO: check overflow of bank !!!!
     proc.bank = bank;
     proc.address = org;
+    proc.codeSequence.push_front (T9900Operation (T9900Op::bank, org == 0x6000 ? -1 : bank, org));
     if (proc.symbol)
         bankMapping [getBankName (proc.symbol)] = bank;
     org += (proc.size + 1) & ~1;
@@ -570,9 +572,7 @@ void T9900Generator::assignBank (TCodeBlock &proc, std::size_t &bank, std::size_
     
 void T9900Generator::resolveBankLabels (TCodeBlock &proc) {
     for (T9900Operation &op: proc.codeSequence) 
-        if (op.operand2.label == "__current_bank")
-            op.operand2 = T9900Operand (0x6000 + 2 * proc.bank);
-        else if (op.operand2.label.substr (0, 6) == "$bank_")
+        if (op.operand2.label.substr (0, 6) == "$bank_")
             op.operand2 = T9900Operand (0x6000 + 2 * bankMapping [op.operand2.label]);
 }
 
@@ -592,36 +592,33 @@ void T9900Generator::getAssemblerCode (std::vector<std::uint8_t> &opcodes, bool 
     std::size_t org = 0x6000;
     std::size_t bank = 0;
     assignBank (sharedCode, bank, org);
+    
     assignBank (mainProgram, bank, org);
     for (TCodeBlock &proc: subPrograms)
         assignBank (proc, bank, org);
+        
+    // last word of each bank is filled with bank switching address (to be pushed in far calls)
+    sharedCode.codeSequence.push_back (T9900Operation (T9900Op::comment, T9900Operand (), T9900Operand (),  std::string ("")));
+    sharedCode.codeSequence.push_back (T9900Operation (T9900Op::comment, T9900Operand (), T9900Operand (),  std::string ("Bank ids at end of each page")));
+    for (std::size_t i = 0; i <= bank; ++i) {
+        sharedCode.codeSequence.push_back (T9900Operation (T9900Op::bank, i, 0x7ffe));
+        sharedCode.codeSequence.push_back (T9900Operation (T9900Op::data, 0x6000 + 2 * i));
+    }
+    sharedCode.codeSequence.push_back (T9900Operation (T9900Op::comment, T9900Operand (), T9900Operand (),  std::string ("")));
 
     resolveBankLabels (mainProgram);
     for (TCodeBlock &proc: subPrograms)
         resolveBankLabels (proc);
         
-    for (TCodeBlock &proc: subPrograms)
-        std::cout << proc.symbol->getName () << ": " << std::hex << proc.address << std::dec << std::endl;
-
-    listing.push_back ("        bank all, >6000");    
     for (T9900Operation &op: sharedCode.codeSequence) 
         listing.push_back (op.makeString ());
-    listing.push_back (std::string ());
-    listing.push_back ("        bank 0, >" + toHexString (mainProgram.address));
+    
     for (T9900Operation &op: mainProgram.codeSequence)
         listing.push_back (op.makeString ());
     for (TCodeBlock &codeBlock: subPrograms) {
         listing.push_back (std::string ());
-        listing.push_back ("        bank " + std::to_string (codeBlock.bank) + ", >" + toHexString (codeBlock.address));
         for (T9900Operation &op: codeBlock.codeSequence)
             listing.push_back (op.makeString ());
-    }
-    
-    listing.push_back (std::string ());
-    listing.push_back ("; bank ids");
-    for (std::size_t i = 0; i <= bank; ++i) {
-        listing.push_back ("        bank " + std::to_string (i) + ", >7ffe");
-        listing.push_back ("        data >" + toHexString (0x6000 + 2 * i));
     }
 }
 
@@ -1855,7 +1852,8 @@ void T9900Generator::externalRoutine (TSymbol *s) {
         }
         std::move (it->second.begin (), it->second.end (), std::back_inserter (*currentOutput));
         
-        outputCode (T9900Op::ai, T9900Reg::r10, s->getBlock ()->getSymbols ().getParameterSize ());
+        if (std::size_t size = s->getBlock ()->getSymbols ().getParameterSize ())
+            outputCode (T9900Op::ai, T9900Reg::r10, size);
 //        outputCode (T9900Op::b, T9900Operand (T9900Reg::r11, T9900Operand::TAddressingMode::RegInd));
         outputCode (T9900Op::b, makeLabelMemory (farRet));
     }

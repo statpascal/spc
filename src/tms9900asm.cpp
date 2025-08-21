@@ -201,8 +201,10 @@ std::string T9900Operation::makeString () const {
             return std::string (8, ' ') +  "text >" + res.str (); }
         case T9900Op::text:
             return std::string (8, ' ') + "text '" + operand1.label + "'";
-        case T9900Op::bank:
-//            return std::string (8, ' ') + operand1.val == -1 ? "all" : std::to_string (operand1.val) + ", " + toHexString (operand2.val);
+        case T9900Op::bank: {
+            std::stringstream res;
+            res << std::string (8, ' ') << "bank " << (operand1.val == 0xffff ? "all" : std::to_string (operand1.val)) << ", >" << std::hex <<  operand2.val;
+            return res.str (); }
         case T9900Op::end:
             return "";
         default: {
