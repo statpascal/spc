@@ -4,6 +4,7 @@ var
     i: integer;
 
 begin
+    // jump table with else branch    
     for i := -3 to 12 do
         begin
             gotoxy (0, i + 3);
@@ -21,6 +22,8 @@ begin
                     write ('else')
             end
         end;
+        
+    // sequence of comparisons with else branch
     for i := -3 to 12 do
         begin
             gotoxy (12, i + 3);
@@ -39,6 +42,8 @@ begin
                     write ('else')
             end
         end;
+        
+    // jump table without else branch
     for i := -3 to 12 do
         begin
             gotoxy (18, i + 3);
@@ -53,6 +58,8 @@ begin
                     write ('7..8')
             end
         end;
+        
+    // sequence of comparisons without else branch
     for i := -3 to 12 do
         begin
             gotoxy (24, i + 3);

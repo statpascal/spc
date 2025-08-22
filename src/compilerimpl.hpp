@@ -215,6 +215,7 @@ public:
     void checkAndSynchronize (TToken t, const std::string &errorMessage);
 
     void setUnitSearchPathes (const std::vector<std::string> &);    
+    std::string searchUnitPathes (const std::string &);
     TUnit *loadUnit (const std::string &unitname);
     TUnit *getSystemUnit ();
     

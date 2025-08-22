@@ -298,6 +298,13 @@ void TBlock::parseExternalDeclaration (std::string &libName, std::string &symbol
                 libName = lib->getString ();
             // TODO: error if not string
             checkSymbolName (symbolName);
+#ifdef CREATE_9900
+            const std::string s = compiler.searchUnitPathes (libName);
+            if (s.empty ())
+                compiler.errorMessage (TCompilerImpl::FileNotFound, "Cannot find external file " + libName);
+            else
+                libName = s;
+#endif            
         }
     }
 }
@@ -1278,6 +1285,15 @@ void TCompilerImpl::checkAndSynchronize (TToken t, const std::string &msg) {
 
 void TCompilerImpl::setUnitSearchPathes (const std::vector<std::string> &pathes) {
     unitSearchPathes = pathes;
+}
+
+std::string TCompilerImpl::searchUnitPathes (const std::string &s) {
+    for (const std::string &path: unitSearchPathes) {
+        const std::string fn = path + '/' + s;
+        if (std::filesystem::exists (fn))
+            return fn;
+    }
+    return std::string ();
 }
 
 TUnit *TCompilerImpl::loadUnit (const std::string &unitname) {

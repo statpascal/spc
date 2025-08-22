@@ -535,7 +535,5 @@ procedure loadCharset;
 
 begin
     loadCharset;
-//    gotoxy (0, 0)
-    vdpWriteAddress := 0;    
-    setVdpAddress (WriteAddr)
+    gotoxy (0, 0);
 end.

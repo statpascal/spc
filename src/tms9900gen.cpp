@@ -10,6 +10,7 @@
 #include <limits>
 #include <iostream>
 #include <algorithm>
+#include <filesystem>
 
 #include "tms9900gen.hpp"
 
@@ -398,6 +399,17 @@ void T9900Generator::optimizePeepHole (TCodeSequence &code) {
             removeLines (code, line, 1);
         }
         
+        // li reg, 0
+        // mov reg, op
+        // ->
+        // clr @op
+        else if (op1 == T9900Op::li && !op_1_2.val && !op_1_2.isLabel () && op2 == T9900Op::mov && isSameCalcStackReg (op_1_1, op_2_1)) {
+            op2 = T9900Op::clr;
+            op_2_1 = op_2_2;
+            op_2_2 = T9900Operand ();
+            removeLines (code, line, 1);
+        }
+        
         // li reg, imm1
         // mov reg, op
         // li reg, imm1
@@ -440,17 +452,6 @@ void T9900Generator::optimizePeepHole (TCodeSequence &code) {
             removeLines (code, line, 2);
         }
         
-        // li reg, 0
-        // mov reg, op
-        // ->
-        // clr @op
-        else if (op1 == T9900Op::li && !op_1_2.val && !op_1_2.isLabel () && op2 == T9900Op::mov && isSameCalcStackReg (op_1_1, op_2_1)) {
-            op2 = T9900Op::clr;
-            op_2_1 = op_2_2;
-            op_2_2 = T9900Operand ();
-            removeLines (code, line, 1);
-        }
-        
         // li reg, imm
         // a op, reg
         // . x, *reg
@@ -486,8 +487,8 @@ void T9900Generator::optimizePeepHole (TCodeSequence &code) {
                  !op_1_2.isLabel () && !op_2_2.isLabel () && op_2_2.val > 0) {
             op2 = op1;
             op_2_2.val = op_1_2.val << op_2_2.val;
-            removeLines (code, line, 1);
             comm_2 = comm_1;
+            removeLines (code, line, 1);
         }
         
         // inv reg
@@ -1833,8 +1834,9 @@ void T9900Generator::resolvePascalSymbol (T9900Operand &operand, TSymbolList &sy
 }
     
 void T9900Generator::externalRoutine (TSymbol *s) {
+    std::cout << "External: " << s->getName () << ", level: " << s->getLevel () << ", libname: " << s->getExtLibName () << std::endl;
     std::map<TSymbol *, TCodeSequence>::iterator it = assemblerBlocks.find (s);
-    if (it != assemblerBlocks.end ()) {
+    if (it != assemblerBlocks.end () || !s->getExtLibName ().empty ()) {
         TBlock &block = *s->getBlock ();
         TSymbolList &symbols = block.getSymbols ();
         assignParameterOffsets (block);
@@ -1846,16 +1848,29 @@ void T9900Generator::externalRoutine (TSymbol *s) {
         outputComment (std::string ());
         outputLabel (s->getName ());
         
-        for (T9900Operation &op: it->second) {
-            resolvePascalSymbol (op.operand1, symbols);
-            resolvePascalSymbol (op.operand2, symbols);
+        if (it != assemblerBlocks.end ()) {
+            for (T9900Operation &op: it->second) {
+                resolvePascalSymbol (op.operand1, symbols);
+                resolvePascalSymbol (op.operand2, symbols);
+            }
+            std::move (it->second.begin (), it->second.end (), std::back_inserter (*currentOutput));
+            
+            if (std::size_t size = s->getBlock ()->getSymbols ().getParameterSize ())
+                outputCode (T9900Op::ai, T9900Reg::r10, size);
+            // TODO: check far flag for level 1 routines
+            if (s->getLevel () > 1)
+                outputCode (T9900Op::b, T9900Operand (T9900Reg::r11, T9900Operand::TAddressingMode::RegInd));
+            else
+                outputCode (T9900Op::b, makeLabelMemory (farRet));
+        } else {
+            std::string binData;
+            binData.reserve (std::filesystem::file_size (s->getExtLibName ()));	
+            std::ifstream f (s->getExtLibName (), std::ios::binary);
+            binData.assign (std::istreambuf_iterator<char> (f), std::istreambuf_iterator<char> ());
+            for (std::size_t i = 0; i < binData.length (); i += 32)
+                outputCode (T9900Op::byte, binData.substr (i, 32));
+            outputCode (T9900Op::even);
         }
-        std::move (it->second.begin (), it->second.end (), std::back_inserter (*currentOutput));
-        
-        if (std::size_t size = s->getBlock ()->getSymbols ().getParameterSize ())
-            outputCode (T9900Op::ai, T9900Reg::r10, size);
-//        outputCode (T9900Op::b, T9900Operand (T9900Reg::r11, T9900Operand::TAddressingMode::RegInd));
-        outputCode (T9900Op::b, makeLabelMemory (farRet));
     }
     
 }
@@ -2064,6 +2079,7 @@ void T9900Generator::codeBlock (TBlock &block, bool hasStackFrame, TCodeSequence
     optimizeJumps (blockStatements);
     
     std::move (blockStatements.begin (), blockStatements.end (), std::back_inserter (output));
+    setOutput (&output);
 }
 
 void T9900Generator::generateBlock (TBlock &block) {
@@ -2104,10 +2120,9 @@ void T9900Generator::generateBlock (TBlock &block) {
                 subPrograms.push_back (TCodeBlock {s});
                 setOutput (&subPrograms.back ().codeSequence);
             }
-            if (s->checkSymbolFlag (TSymbol::External)) {
-                currentLevel = 2;
+            if (s->checkSymbolFlag (TSymbol::External))
                 externalRoutine (s);
-            } else 
+            else 
                 visit (s->getBlock ());
         }
     }
