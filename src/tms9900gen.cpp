@@ -671,7 +671,7 @@ void T9900Generator::outputStaticConstants () {
         outputLabel (staticDataDefinition.label);
         std::string val;
         for (char c: staticDataDefinition.values) {
-            val.push_back (c);
+            val.push_back (static_cast<char> (c));
             if (val.size () == 16) {
                 outputCode (T9900Op::byte, val);
                 val.clear ();
@@ -823,7 +823,7 @@ void T9900Generator::outputBooleanCheck (TExpressionBase *expr, const std::strin
         for (T9900Op op: (branchOnFalse ? intFalseJmp : intTrueJmp).at (condition->getOperation ()))
             outputCode (op, ll);
         outputCode (T9900Op::b, makeLabelMemory (label));
-        outputCode (T9900Op::def_label, ll);
+        outputLabel (ll);
     } else if (condition && condition->getLeftExpression ()->getType ()->isReal ()) {
         //
     } else {
@@ -832,7 +832,7 @@ void T9900Generator::outputBooleanCheck (TExpressionBase *expr, const std::strin
         outputCode (T9900Op::ci, reg, 0);
         outputCode (branchOnFalse ? T9900Op::jne : T9900Op::jeq, ll);
         outputCode (T9900Op::b, makeLabelMemory (label));
-        outputCode (T9900Op::def_label, ll);
+        outputLabel (ll);
     }
 }
 
@@ -917,7 +917,7 @@ void T9900Generator::outputIntegerCmpOperation (TToken operation, TExpressionBas
     for (T9900Op op: cmpOperation.at (operation))
         outputCode (op, ll);
     outputCode (T9900Op::inc, r3);
-    outputCode (T9900Op::def_label, ll);
+    outputLabel (ll);
     saveReg (r3);
 }
 
@@ -940,19 +940,10 @@ void T9900Generator::outputIntegerOperation (TToken operation, TExpressionBase *
         return;
     }
 
-
     visit (left);
     visit (right);
     
     switch (operation) {
-        case TToken::DivInt:
-        case TToken::Mod: {
-            T9900Reg r = fetchReg (intScratchReg1);
-            loadReg (intScratchReg3);
-            outputCode (T9900Op::clr, intScratchReg2);
-            outputCode (T9900Op::div, r, intScratchReg2);
-            saveReg (operation == TToken::DivInt ? intScratchReg2 : intScratchReg3);
-            break; }
         case TToken::Mul: {
             T9900Reg right = fetchReg (intScratchReg2),
                      left = fetchReg (intScratchReg1);
@@ -963,8 +954,11 @@ void T9900Generator::outputIntegerOperation (TToken operation, TExpressionBase *
         case TToken::Shl:
         case TToken::Shr: {
             loadReg (T9900Reg::r0);
+            const std::string ll = getNextLocalLabel ();
+            outputCode (T9900Op::jeq, ll);
             T9900Reg r = fetchReg (intScratchReg2);
             outputCode (operation == TToken::Shl ? T9900Op::sla : T9900Op::sra, r, T9900Reg::r0);
+            outputLabel (ll);
             saveReg (r);
             break; }
         default: {
@@ -1356,7 +1350,7 @@ void T9900Generator::codeMultiplyConst (const T9900Reg reg, const std::size_t n)
 
 void T9900Generator::inlineMove (T9900Reg src, T9900Reg dst, T9900Reg count) {            
     const std::string ll = getNextLocalLabel ();
-    outputCode (T9900Op::def_label, ll);
+    outputLabel (ll);
     outputCode (T9900Op::movb, T9900Operand (src, T9900Operand::TAddressingMode::RegIndInc), T9900Operand (dst, T9900Operand::TAddressingMode::RegIndInc));
     outputCode (T9900Op::dec, count);
     outputCode (T9900Op::jne, ll);
@@ -1374,13 +1368,13 @@ void T9900Generator::codeMove (const TType *type) {
         const std::string ll1 = getNextLocalLabel ();
         outputCode (T9900Op::jl, ll1);
         outputCode (T9900Op::mov, intScratchReg1, count);
-        outputCode (T9900Op::def_label, ll1);
+        outputLabel (ll1);
         outputCode (T9900Op::movb, count, T9900Operand (dst, T9900Operand::TAddressingMode::RegIndInc));
         const std::string ll2 = getNextLocalLabel ();
         outputCode (T9900Op::jeq, ll2);
         outputCode (T9900Op::srl, count, 8);
         inlineMove (src, dst, count);
-        outputCode (T9900Op::def_label, ll2);
+        outputLabel (ll2);
     } else {
         T9900Reg count = getSaveReg (intScratchReg2);
         outputCode (T9900Op::li, count, n);
@@ -1759,7 +1753,7 @@ void T9900Generator::generateCode (TProgram &program) {
     outputCode (T9900Op::data, 0x0000, e, "subprogram list");
     outputCode (T9900Op::data, 0x0000, e, "ISR list");
     
-    outputCode (T9900Op::def_label, proglist);
+    outputLabel (proglist);
     outputCode (T9900Op::data, 0x0000, e, "no next program");
     const std::string progstart = getNextLocalLabel ();
     outputCode (T9900Op::data, progstart, e, "program address");
@@ -1771,24 +1765,24 @@ void T9900Generator::generateCode (TProgram &program) {
     outputCode (T9900Op::even);
     
     outputComment (std::string ());
-    outputCode (T9900Op::def_label, farCall);
+    outputLabel (farCall);
     outputCode (T9900Op::clr, T9900Operand (intScratchReg2, T9900Operand::TAddressingMode::RegInd), T9900Operand (), "switch bank");
     outputCode (T9900Op::b, T9900Operand (intScratchReg3, T9900Operand::TAddressingMode::RegInd));
     
     outputComment (std::string ());
-    outputCode (T9900Op::def_label, farRet);
+    outputLabel (farRet);
     codePop (intScratchReg2);
     outputCode (T9900Op::clr, T9900Operand (intScratchReg2, T9900Operand::TAddressingMode::RegInd), T9900Operand (), "switch bank");
     outputCode (T9900Op::b, T9900Operand (T9900Reg::r11, T9900Operand::TAddressingMode::RegInd));
     
-    outputCode (T9900Op::def_label, progstart);
+    outputLabel (progstart);
     outputCode (T9900Op::lwpi, workspace);
     outputCode (T9900Op::limi, 0);
     outputCode (T9900Op::clr, T9900Operand (0x6000, T9900Operand::TAddressingMode::Memory), T9900Operand (), "activate bank 0");
     outputCode (T9900Op::b, makeLabelMemory ("__main_start"));
     
     setOutput (&mainProgram.codeSequence);
-    outputCode (T9900Op::def_label, std::string ("__main_start"));
+    outputLabel ("__main_start");
     generateBlock (*program.getBlock ());
 
     setOutput (&mainProgram.codeSequence);

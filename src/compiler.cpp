@@ -1298,10 +1298,12 @@ std::string TCompilerImpl::searchUnitPathes (const std::string &s) {
 
 TUnit *TCompilerImpl::loadUnit (const std::string &unitname) {
     TUnitDescription &unitDescription = unitMap [unitname];
-    if (!unitDescription.unit)
-        for (const std::string &path: unitSearchPathes) {
-            const std::string fn = path + '/' + unitname + ".pas";
-            if (std::filesystem::exists (fn)) {
+    if (!unitDescription.unit) {
+        const std::string fn = searchUnitPathes (unitname + ".pas");
+        if (!fn.empty ()) {
+//        for (const std::string &path: unitSearchPathes) {
+//            const std::string fn = path + '/' + unitname + ".pas";
+//            if (std::filesystem::exists (fn)) {
                 lexerStack.push (&unitDescription.lexer);
                 unitDescription.lexer.setFilename (fn);
                 unitDescription.unit = memoryPoolFactory.create<TUnit> (*this, predefinedSymbols);

@@ -244,6 +244,7 @@ void TBaseGenerator::initStaticVariable (char *addr, const TType *t, const TCons
 #ifdef CREATE_9900
         if (t->getSize () == 2)
             n = htons (n);
+            std::cout << "Setting: " << n << ", size: " << t->getSize () << std::endl;
 #endif        
         memcpy (addr, &n, t->getSize ());
     } else if (t->isReal ())

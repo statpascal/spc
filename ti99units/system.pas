@@ -8,6 +8,7 @@ type
     string1 = string [1];
     string4 = string [4];
     
+    TVdpRegList = array [0..7] of uint8;
     
 var
     input, output: text;
@@ -15,10 +16,14 @@ var
     memw: array [0..32767] of integer absolute $0000;
     
 procedure gotoxy (x, y: integer);
+procedure clrscr;
 
 procedure move (var src, dest; length: integer);
-procedure vmbw (var src; dest, length: integer);
-procedure vmbr (var dest; src, length: integer);
+procedure vmbw (var src; dest, length: integer);	// video multiple byte write
+procedure vmbr (var dest; src, length: integer);	// video multiple byte read
+procedure vrbw (val: uint8; length: integer);		// video repeated byte write
+procedure writeV (addr: integer; val: uint8);
+function readV (addr: integer): uint8;
 
 function min (a, b: integer): integer;
 function max (a, b: integer): integer;
@@ -54,25 +59,30 @@ procedure release (p: pointer);
 
 procedure setCRUBit (addr: integer; val: boolean);
 
-function hexstr (n: integer): string4;
-
-    
-implementation
-
 const
     WriteAddr = $4000;
-
-type
-    PPChar = ^PChar;
     
-var 
-    vdpWriteAddress: integer;
+var
     vdprd:  char absolute $8800;
     vdpsta: char absolute $8802;
     vdpwd:  char absolute $8c00;
     vdpwa:  char absolute $8c02;
     gromwa: char absolute $9c02;
     gromrd: char absolute $9800;
+    
+procedure setVdpRegs (var vdpRegs: TVdpRegList);
+procedure setVdpAddress (n: integer);
+
+function hexstr (n: integer): string4;
+
+    
+implementation
+
+type
+    PPChar = ^PChar;
+    
+var 
+    vdpWriteAddress: integer;
     
 // simple UCSD-like heap managment in lower memory
 
@@ -189,11 +199,50 @@ procedure move (var src, dest; length: integer); assembler;
     move_2:
 end;
     
+procedure vrbw (val: uint8; length: integer); assembler;
+        mov @length, r12
+        li r13, vdpwd
+        movb @val, r14
+    vrbw_1:
+        movb r14, *r13
+        dec r12
+        jne vrbw_1
+end;
+
+procedure writeV (addr: integer; val: uint8);
+    begin
+        vdpwa := chr (addr and 255);
+        vdpwa := chr (addr shr 8 or $40);
+        vdpwd := chr (val)
+    end;
+    
+function readV (addr: integer): uint8;
+    begin
+        vdpwa := chr (addr and 255);
+        vdpwa := chr (addr shr 8);
+        readV := ord (vdprd)
+    end;
+
+procedure __write_data (p: pointer; length: integer); assembler;
+        mov @length, r12
+        jeq __write_data_2
+        mov @p, r13
+        li r14, vdpwd
+        inc r13
+    __write_data_1:
+        movb *r13+, *r14
+        dec r12
+        jne __write_data_1
+    __write_data_2
+end;
+
 procedure vmbw (var src; dest, length: integer); assembler;
-        mov @src, r12
-        mov @dest, r13
         mov @length, r14
         jeq vmbw_2
+        
+        mov @src, r12
+        mov @dest, r13
+        li r15, vdpwd
 
         ori r13, >4000
         swpb r13
@@ -202,7 +251,7 @@ procedure vmbw (var src; dest, length: integer); assembler;
         movb r13, @vdpwa
 
     vmbw_1:
-        movb *r12+, @vdpwd
+        movb *r12+, *r15
         dec r14
         jne vmbw_1
         
@@ -210,19 +259,20 @@ procedure vmbw (var src; dest, length: integer); assembler;
 end;
     
 procedure vmbr (var dest; src, length: integer); assembler;
-        mov @dest, r12
-        mov @src, r13
         mov @length, r14
         jeq vmbr_2
+        
+        mov @dest, r12
+        mov @src, r13
+        li r15, vdprd
 
-        ori r13, >4000
         swpb r13
         movb r13, @vdpwa
         swpb r13
         movb r13, @vdpwa
 
     vmbr_1:
-        movb *r12+, @vdpwd
+        movb *r15, *r12+
         dec r14
         jne vmbr_1
     vmbr_2:
@@ -232,6 +282,13 @@ procedure gotoxy (x, y: integer);
     begin
         vdpWriteAddress := y shl 5 + x;
         setVdpAddress (vdpWriteAddress or WriteAddr)
+    end;
+    
+procedure clrscr;
+    begin
+        setVdpAddress (WriteAddr);
+        vrbw (32, 768);
+        gotoxy (0, 0)
     end;
     
 procedure scroll;
@@ -296,29 +353,6 @@ procedure __write_char (var f: text; ch: char; length, precision: integer);
         __write_string (f, s, length, -1);
     end;
     
-procedure __write_blank (length: integer); assembler;
-        mov @length, r12
-        li r13, vdpwd
-        li r14, >2000
-    __write_blank_1:
-        movb r14, *r13
-        dec r12
-        jne __write_blank_1
-end;
-
-procedure __write_data (p: pointer; length: integer); assembler;
-        mov @length, r12
-        jeq __write_data_2
-        mov @p, r13
-        li r14, vdpwd
-        inc r13
-    __write_data_1:
-        movb *r13+, *r14
-        dec r12
-        jne __write_data_1
-    __write_data_2
-end;
-
 procedure __write_string (var f: text; p: PChar; length, precision: integer);
     var
         len, outlen: integer;
@@ -332,7 +366,7 @@ procedure __write_string (var f: text; p: PChar; length, precision: integer);
         setVdpAddress (vdpWriteAddress or WriteAddr);
         inc (vdpWriteAddress, outlen);
         if outlen > len then
-            __write_blank (outlen - len);
+            vrbw (32, outlen - len);
         __write_data (p, len)
     end;
     
@@ -530,6 +564,19 @@ procedure loadCharset;
                 for j := 1 to 7 do
                     vdpwd := gromrd;
                 vdpwd := chr (0)
+            end
+    end;
+
+procedure setVdpRegs (var vdpRegs: TVdpRegList);
+    var 
+        i: integer;
+        dummy: char;
+    begin
+        dummy := vdpsta;
+        for i := 0 to 7 do
+            begin
+                vdpwa := chr (vdpRegs [i]);
+                vdpwa := chr ($80 + i)
             end
     end;
 

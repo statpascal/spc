@@ -180,7 +180,7 @@ std::string T9900Operation::makeString () const {
             return comment.empty () ? comment : "; " + comment;
         case T9900Op::stri: {
             std::stringstream res;
-            auto append = [&res] (char c) {
+            auto append = [&res] (unsigned char c) {
                 res << std::hex << std::setfill ('0') << std::setw (2) << std::nouppercase << static_cast<unsigned> (c);
             };
             append (operand2.label.length ());
@@ -193,7 +193,7 @@ std::string T9900Operation::makeString () const {
                 res << std::string (8, ' ') << "byte >" << std::setfill ('0') << std::hex << std::setw (2) << operand1.val;
                 return res.str ();
             }
-            auto append = [&res] (char c) {
+            auto append = [&res] (unsigned char c) {
                 res << std::hex << std::setfill ('0') << std::setw (2) << std::nouppercase << static_cast<unsigned> (c);
             };
             for (const char c: operand1.label)
