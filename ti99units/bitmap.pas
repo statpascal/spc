@@ -56,14 +56,20 @@ procedure setBkColor (color: TColor);
     begin
         // write VDP reg
     end;
-
+    
+const
+    invalid = -1;
+    cachedChar: integer = invalid;
 var
     cacheChar, cacheColor: array [0..7] of uint8;
+    
+procedure flushCache;
+    begin
+        vmbw (cacheChar, cachedChar, 8);
+        vmbw (cacheColor, colorTable + cachedChar, 8)
+    end;
 
 procedure plot (x, y: integer);
-    const
-        invalid = -1;
-        cachedChar: integer = invalid;
     var
         offset: integer;
     begin
@@ -71,10 +77,7 @@ procedure plot (x, y: integer);
         if offset <> cachedChar then
             begin
                 if cachedChar <> invalid then
-                    begin
-                        vmbw (cacheChar, cachedChar, 8);
-                        vmbw (cacheColor, colorTable + cachedChar, 8)
-                    end;
+                    flushCache;
                 cachedChar := offset;
                 vmbr (cacheChar, offset, 8);
                 vmbr (cacheColor, colorTable + offset, 8);
@@ -141,7 +144,8 @@ procedure line (x0, y0, x1, y1: integer);
                         dec (d, dx)
                     end;
                 inc (d, dy)
-            end
+            end;
+        flushCache
     end;
 
 end.

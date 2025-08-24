@@ -1896,23 +1896,51 @@ void T9900Generator::beginRoutineBody (const std::string &routineName, std::size
         outputLabel (routineName);
 
     if (level > 1) {    
+    
+        
+    
         if (hasStackFrame) {    
-            codePush (T9900Reg::r11);
-            codePush (T9900Reg::r9);
-            if (level > 2)
-                outputCode (T9900Op::mov, T9900Reg::r9, intScratchReg2);
-            outputCode (T9900Op::mov, T9900Reg::r10, T9900Reg::r9);
+            int stackCount = 4;
+//-            outputCode (T9900Op::mov, T9900Reg::r11, T9900Operand (T9900Reg::r10, -2));
+//-            outputCode (T9900Op::mov, T9900Reg::r9,  T9900Operand (T9900Reg::r10, -4));
+//            codePush (T9900Reg::r11);
+//            codePush (T9900Reg::r9);
+//            if (level > 2)
+//                outputCode (T9900Op::mov, T9900Reg::r9, intScratchReg2);
+//            outputCode (T9900Op::mov, T9900Reg::r10, T9900Reg::r9);
+    // r9 <- r10 - 4
             
             if (level > 1) {
-                for (std::size_t i = 0; i < level - 2; ++i)
-                    codePush (T9900Operand (intScratchReg2, -2 * i));
-//                codePush (T9900Reg::r9);
-                if (symbolList.getLocalSize ())
-                    outputCode (T9900Op::ai, T9900Reg::r10, -symbolList.getLocalSize (), "local vars");
+                for (std::size_t i = 0; i < level - 2; ++i) {
+                    stackCount += 2;
+//                    codePush (T9900Operand (intScratchReg2, -2 * i));
+//-                    outputCode (T9900Op::mov, i ? T9900Operand (T9900Reg::r9, -2 * i) : T9900Operand (T9900Reg::r9, T9900Operand::TAddressingMode::RegInd), T9900Operand (T9900Reg::r10, -stackCount));
+                }
+//                if (symbolList.getLocalSize ())
+//                    outputCode (T9900Op::ai, T9900Reg::r10, -symbolList.getLocalSize (), "local vars");
+                stackCount += symbolList.getLocalSize ();
             }
+        for (T9900Reg reg: saveRegs) {
+            stackCount += 2;
+//-            outputCode (T9900Op::mov, reg, T9900Operand (T9900Reg::r10, -stackCount));
+//            codePush (reg);
         }
-        for (T9900Reg reg: saveRegs)
-            codePush (reg);
+//-        outputCode (T9900Op::mov, T9900Reg::r10, T9900Reg::r9);
+//-        outputCode (T9900Op::ai, T9900Reg::r9, -4);
+        outputCode (T9900Op::ai, T9900Reg::r10, -stackCount);
+        
+        
+        outputCode (T9900Op::mov, T9900Reg::r10, T9900Reg::r12);
+        const T9900Operand op (T9900Operand (T9900Reg::r12, T9900Operand::TAddressingMode::RegIndInc));
+        for (std::set<T9900Reg>::reverse_iterator it = saveRegs.rbegin (); it != saveRegs.rend (); ++it)
+            outputCode (T9900Op::mov, *it, op);
+        outputCode (T9900Op::ai, T9900Reg::r12, symbolList.getLocalSize ());
+        for (int i = level - 3; i >= 0; --i)
+            outputCode (T9900Op::mov, i ? T9900Operand (T9900Reg::r9, -2 * i) : T9900Operand (T9900Reg::r9, T9900Operand::TAddressingMode::RegInd), op);
+        outputCode (T9900Op::mov, T9900Reg::r9, T9900Operand (T9900Reg::r12, T9900Operand::TAddressingMode::RegInd));
+        outputCode (T9900Op::mov, T9900Reg::r12, T9900Reg::r9);
+        outputCode (T9900Op::mov, T9900Reg::r11, T9900Operand (T9900Reg::r12, 2));
+        }
     } else
         outputCode (T9900Op::li, T9900Reg::r10, 65536 - symbolList.getLocalSize (), "init stack ptr");
 }
