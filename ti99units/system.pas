@@ -102,9 +102,6 @@ function __set_super_not_equal (var s, t: __set_array): boolean;
     
 implementation
 
-type
-    PPChar = ^PChar;
-    
 var 
     vdpWriteAddress: integer;
     
@@ -459,24 +456,18 @@ function sqr (a: integer): integer;
     end;
     
 function __short_str_char (ch: char): string1;
-    var
-        res: PChar;
     begin
-        res := PPChar (addr (ch) + (-1))^;      // addr of result is on stack before a
-        res [0] := #1;
-        res [1] := ch
+        result [0] := #1;
+        result [1] := ch
     end;
 
 // TODO: pass max. length of result string - this will crash if too short
 
 function __short_str_concat (a, b: PChar): string;
-    var
-        res: PChar;
     begin
-        res := PPChar (addr (a) + (-1))^;       // addr of result is on stack before a
-        move (a^, res^, ord (a^) + 1);
-        move (b [1], res [ord (a^) + 1], min (ord (b^), 255 - ord (a^)));
-        res^ := chr (min (255, ord (a^) + ord (b^)))
+        move (a^, result, ord (a^) + 1);
+        move (b [1], result [ord (a^) + 1], min (ord (b^), 255 - ord (a^)));
+        result [0] := chr (min (255, ord (a^) + ord (b^)))
     end;
 
 function strCompare (s, t: PChar): integer;
@@ -543,20 +534,18 @@ function pos (ch: char; s: PChar): integer;
 // TODO: pass max. length of result string - this will crash if too short
 
 function copy (s: PChar; start, len: integer): string;
-    var
-        res: PChar;
     begin
-        res := PPChar (addr (s) + (-1))^;       // addr of result is on stack before a
         if start <= ord (s^) then
             begin
                 if start + len > succ (ord (s^)) then
                     len := succ (ord (s^) - start);
-                move (s [start], res [1], len);
-                res^ := chr (len)
+                move (s [start], result [1], len);
+                result [0] := chr (len)
             end
         else
-            res^ := #0
+            result [0] := #0
     end;
+
 
 function hexstr (n: integer): string4;
     const 

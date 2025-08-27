@@ -27,6 +27,8 @@ begin
     writeln ('Truncated: ', a);
     
     writeln (length (s), ': ', s);
+    writeln (copy (s, 1, 6));
+    writeln (copy (s, 8, 100));
     
     a [0] := chr (10);
     for i := 1 to 10 do
