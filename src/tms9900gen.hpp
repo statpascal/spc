@@ -115,7 +115,6 @@ private:
     void outputIntegerOperation (TToken operation, TExpressionBase *left, TExpressionBase *right);
     void outputIntegerCmpOperation (TToken operation, TExpressionBase *left, TExpressionBase *right);
     void outputBinaryOperation (TToken operation, TExpressionBase *left, TExpressionBase *right);
-    void outputCompare (const T9900Operand &, const std::int64_t);
     
     void codeSymbol (const TSymbol *, T9900Reg reg);	// address -> regName
     void codeLoadMemory (TType *, T9900Reg destReg, T9900Operand srcMem);

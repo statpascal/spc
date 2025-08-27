@@ -588,7 +588,7 @@ void T9900Generator::assignBank (TCodeBlock &proc, std::size_t &bank, std::size_
 void T9900Generator::resolveBankLabels (TCodeBlock &proc) {
     for (T9900Operation &op: proc.codeSequence) {
         if (op.operand1.label.substr (0, 6) == "$bank_")
-            op.operand1 = T9900Operand (0x6000 + 2 * bankMapping [op.operand2.label]);
+            op.operand1 = T9900Operand (0x6000 + 2 * bankMapping [op.operand1.label]);
         if (op.operand2.label.substr (0, 6) == "$bank_")
             op.operand2 = T9900Operand (0x6000 + 2 * bankMapping [op.operand2.label]);
     }
@@ -670,6 +670,22 @@ void T9900Generator::outputLocalDefinitions () {
         }
         jumpTableDefinitions.clear ();
     }
+    if (!setDefinitions.empty ()) {
+        outputComment (std::string ());
+        outputComment ("; Set Constants");
+        for (const TSetDefinition &s: setDefinitions) {
+            outputLabel (s.label);
+            std::string t;
+            for (std::uint64_t v: s.val)
+                for (int i = 0; i < 8; i += 2) {	// words to big endian
+                    t.push_back (reinterpret_cast<const char *> (&v) [i + 1]);
+                    t.push_back (reinterpret_cast<const char *> (&v) [i]);
+                }
+            outputCode (T9900Op::byte, t);
+        }    
+        setDefinitions.clear ();
+    }
+    
 /*    
     if (!stringDefinitions.empty ()) {
         outputComment (std::string ());
@@ -707,14 +723,6 @@ void T9900Generator::outputStaticConstants () {
         outputLabel (c.label);
         d = c.val;
         outputCode (TX64Op::data_dq, n, TX64Operand (), std::to_string (d));
-    }
-    if (!setDefinitions.empty ()) {
-        outputComment ("; Set Constants");
-        for (const TSetDefinition &s: setDefinitions) {
-            outputLabel (s.label);
-            for (std::uint64_t v: s.val)
-                outputCode (TX64Op::data_dq, v);
-        }    
     }
 */    
 }
@@ -1262,13 +1270,13 @@ void T9900Generator::generateCode (TFunctionCall &functionCall) {
 }
 
 void T9900Generator::generateCode (TConstantValue &constant) {
-    if (constant.getType ()->isSet ()) {
-        //    
-    } else if (constant.getType () == &stdType.Real) {
+    if (constant.getType () == &stdType.Real) {
         //
-    } else if (constant.getConstant ()->getType () == &stdType.String) {
+    } else if (constant.getConstant ()->getType () == &stdType.String || constant.getType ()->isSet ()) {
         T9900Reg reg = getSaveReg (intScratchReg1);
-        const std::string label = registerConstant (constant.getConstant ()->getString ());
+        const std::string label = constant.getType ()->isSet () ?
+            registerConstant (constant.getConstant ()->getSetValues ()) :
+            registerConstant (constant.getConstant ()->getString ());
         outputCode (T9900Op::li, reg, label);
         saveReg (reg);
     } else {
@@ -1730,10 +1738,6 @@ void T9900Generator::generateCode (TStatementSequence &statementSequence) {
         visit (statement);
 }
 
-void T9900Generator::outputCompare (const T9900Operand &var, const std::int64_t n) {
-    outputCode (T9900Op::ci, var, n);
-}
-
 void T9900Generator::generateCode (TLabeledStatement &labeledStatement) {
     outputLabel (labeledStatement.getLabel ()->getName ());
     visit (labeledStatement.getStatement ());
@@ -1917,7 +1921,10 @@ void T9900Generator::beginRoutineBody (const std::string &routineName, std::size
 void T9900Generator::endRoutineBody (std::size_t level, TSymbolList &symbolList, const std::set<T9900Reg> &saveRegs, bool hasStackFrame) {
     if (level > 1) {
         for (std::set<T9900Reg>::reverse_iterator it = saveRegs.rbegin (); it != saveRegs.rend (); ++it)
-            codePop (*it);
+            if (std::next (it) != saveRegs.rend ())
+                codePop (*it);
+            else
+                outputCode (T9900Op::mov, T9900Operand (T9900Reg::r10, T9900Operand::TAddressingMode::RegInd), *it);
 
         if (hasStackFrame) {
             outputCode (T9900Op::mov, T9900Reg::r9, T9900Reg::r10);

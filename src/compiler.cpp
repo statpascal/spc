@@ -902,7 +902,8 @@ void TBlock::parseSubroutine (bool isFunction) {
             TType *retType = routineType->getReturnType ();
             TSymbolList::TAddSymbolResult result;
             TExpressionBase *resultLValue;
-            const std::string retTempName = "$f_ret_" + identifier;
+//            const std::string retTempName = "$f_ret_" + identifier;
+            const std::string retTempName = "result";
             if (getCompiler ().getCodeGenerator ().classifyReturnType (retType) == TCodeGenerator::TReturnLocation::Reference) {
                 result = subRoutineSymbols->addParameter (retTempName, compiler.createMemoryPoolObject<TReferenceType> (retType));
                 resultLValue = compiler.createMemoryPoolObject<TReferenceVariable> (result.symbol, *this);

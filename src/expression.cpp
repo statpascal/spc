@@ -812,9 +812,10 @@ TExpressionBase *TFactor::parseIdentifier (TBlock &block) {
         if (TSymbol *symbol = block.getSymbols ().searchSymbol (identifier))
             if (symbol->checkSymbolFlag (TSymbol::Constant)) {
                 expr = compiler.createMemoryPoolObject<TConstantValue> (symbol);
-                if (false && symbol->getType ()->isSet ())
-                    expr = createRuntimeCall ("__set_const", symbol->getType (), {expr, TExpressionBase::createVariableAccess (TConfig::globalRuntimeDataPtr, block)}, block, false);
-                else if (symbol->getType () == &stdType.String) {
+//                if (false && symbol->getType ()->isSet ())
+//                    expr = createRuntimeCall ("__set_const", symbol->getType (), {expr, TExpressionBase::createVariableAccess (TConfig::globalRuntimeDataPtr, block)}, block, false);
+//                else 
+                if (symbol->getType () == &stdType.String) {
 #ifndef CREATE_9900                
                     expr = createRuntimeCall ( "__str_make", symbol->getType (), {expr, TExpressionBase::createVariableAccess (TConfig::globalRuntimeDataPtr, block)}, block, false);
 #endif

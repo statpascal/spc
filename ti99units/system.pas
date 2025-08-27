@@ -19,6 +19,8 @@ procedure gotoxy (x, y: integer);
 procedure clrscr;
 
 procedure move (var src, dest; length: integer);
+function compareWord (var src, dest; length: integer): boolean;
+
 procedure vmbw (var src; dest, length: integer);	// video multiple byte write
 procedure vmbr (var dest; src, length: integer);	// video multiple byte read
 procedure vrbw (val: uint8; length: integer);		// video repeated byte write
@@ -74,6 +76,28 @@ procedure setVdpRegs (var vdpRegs: TVdpRegList);
 procedure setVdpAddress (n: integer);
 
 function hexstr (n: integer): string4;
+
+const
+    __set_words = 16;
+
+type
+    __generic_set_type = set of 0..255;
+    __set_array = array [0..__set_words - 1] of integer;
+    
+function __set_add_val (val: integer; var s: __set_array): __generic_set_type; 
+function __set_add_range (minval, maxval: integer; var s: __set_array): __generic_set_type; 
+
+function __in_set (v: integer; var s: __set_array): boolean;
+function __set_union (var s, t: __set_array): __generic_set_type; 
+function __set_intersection (var s, t: __set_array): __generic_set_type;
+function __set_diff (var s, t: __set_array): __generic_set_type;
+
+function __set_equal (var s, t: __set_array): boolean;
+function __set_not_equal (var s, t: __set_array): boolean;
+function __set_sub (var s, t: __set_array): boolean;
+function __set_super (var s, t: __set_array): boolean;
+function __set_sub_not_equal (var s, t: __set_array): boolean;
+function __set_super_not_equal (var s, t: __set_array): boolean;
 
     
 implementation
@@ -197,6 +221,30 @@ procedure move (var src, dest; length: integer); assembler;
         jne move_1
         
     move_2:
+end;
+
+function compareWord (var src, dest; length: integer): boolean; assembler;
+        mov *r10, r15
+        mov @src, r12
+        mov @dest, r13
+        mov @length, r14
+        jeq comparebyte_2
+        
+    comparebyte_1:
+        c *r12+, *r13+
+        jne comparebyte_3
+        dec r14
+        jne comparebyte_1
+        
+    comparebyte_2:
+        li r12, >0100
+        movb r12, *r15
+        b *r11
+        
+    comparebyte_3
+        clr r12
+        movb r12, *r15
+        b *r11
 end;
     
 procedure vrbw (val: uint8; length: integer); assembler;
@@ -498,7 +546,6 @@ function copy (s: PChar; start, len: integer): string;
     var
         res: PChar;
     begin
-
         res := PPChar (addr (s) + (-1))^;       // addr of result is on stack before a
         if start <= ord (s^) then
             begin
@@ -578,6 +625,94 @@ procedure setVdpRegs (var vdpRegs: TVdpRegList);
                 vdpwa := chr (vdpRegs [i]);
                 vdpwa := chr ($80 + i)
             end
+    end;
+    
+    
+type
+    PSet = ^__set_array;
+    PPSet = ^PSet;
+
+function __set_add_val (val: integer; var s: __set_array): __generic_set_type; 
+    begin
+        __set_array (result) := s;
+        __set_array (result) [val shr 4] := __set_array (result) [val shr 4] or (1 shl (val and 15))
+    end;
+        
+
+function __set_add_range (minval, maxval: integer; var s: __set_array): __generic_set_type; 
+    var
+        i: integer;
+    begin
+        __set_array (result) := s;
+        for i := minval to maxval do
+            __set_array (result) [i shr 4] := __set_array (result) [i shr 4] or (1 shl (i and 15))
+    end;
+
+function __in_set (v: integer; var s:__set_array): boolean;
+    begin
+        __in_set := s [v shr 4] and (1 shl (v and 15)) <> 0
+    end;
+    
+function __set_union (var s, t: __set_array): __generic_set_type; 
+    var
+        i: integer;
+    begin
+        for i := 0 to __set_words - 1 do
+            __set_array (result) [i] := s [i] or t [i]
+    end;
+    
+function __set_intersection (var s, t: __set_array): __generic_set_type;
+    var
+        i: integer;
+    begin
+        for i := 0 to __set_words - 1do
+            __set_array (result) [i] := s [i] and t [i]
+    end;
+    
+function __set_diff (var s, t: __set_array): __generic_set_type;
+    var
+        i: integer;
+    begin
+        for i := 0 to __set_words - 1 do
+            __set_array (result) [i] := s [i] and not t [i]
+    end;
+
+function __set_equal (var s, t: __set_array): boolean;
+    begin
+        __set_equal := compareWord (s, t, __set_words)
+    end;
+    
+function __set_not_equal (var s, t: __set_array): boolean;
+    begin
+        __set_not_equal := not compareWord (s, t, __set_words)
+    end;
+    
+function __set_sub (var s, t: __set_array): boolean;
+    begin
+        __set_sub := __set_super (t, s)
+    end;
+    
+function __set_super (var s, t: __set_array): boolean;
+    var
+        i: integer;
+    begin
+        for i := 0 to __set_words do
+            if s [i] and t [i] <> t [i] then
+                begin	// TODO: implement exit (false)
+                    __set_super := false;
+                    exit
+                end;
+        __set_super := true
+    end;
+    
+function __set_sub_not_equal (var s, t: __set_array): boolean;
+    begin
+        __set_sub_not_equal := __set_sub (s, t) and not __set_equal (s, t)
+    end;
+    
+function __set_super_not_equal (var s, t: __set_array): boolean; 
+    begin
+        __set_super_not_equal := __set_super (s, t) and not __set_equal (s, t)
     end;
 
 begin
