@@ -685,6 +685,16 @@ void T9900Generator::outputLocalDefinitions () {
         }    
         setDefinitions.clear ();
     }
+    if (!farCallVectors.empty ()) {
+        outputComment (std::string ());
+        outputComment ("; Far call vectors");
+        for (const TFarCallVec &v: farCallVectors) {
+            outputLabel (v.label);
+            outputCode (T9900Op::data, v.bank);
+            outputCode (T9900Op::data, v.proc);
+        }
+        farCallVectors.clear ();
+    }
     
 /*    
     if (!stringDefinitions.empty ()) {
@@ -702,9 +712,22 @@ void T9900Generator::outputStaticConstants () {
         outputComment (std::string ());
         outputComment ("Static variable init data");
         outputLabel (staticDataDefinition.label);
+        
         std::string val;
-        for (char c: staticDataDefinition.values) {
-            val.push_back (static_cast<char> (c));
+        std::size_t i = 0;
+        std::vector<std::pair<std::uint16_t, std::string>>::iterator it = staticDataDefinition.staticRoutinePtrs.begin ();
+        while (i < staticDataDefinition.values.size ()) {
+            if (it != staticDataDefinition.staticRoutinePtrs.end () && i == it->first) {
+                if (!val.empty ()) {
+                    outputCode (T9900Op::byte, val);
+                    val.clear ();
+                }
+                outputCode (T9900Op::data, "$bank_" + it->second);
+                outputCode (T9900Op::data, it->second);
+                ++it;
+                i += 4;
+            } else
+                val.push_back (staticDataDefinition.values [i++]);
             if (val.size () == 16) {
                 outputCode (T9900Op::byte, val);
                 val.clear ();
@@ -1256,12 +1279,12 @@ void T9900Generator::generateCode (TFunctionCall &functionCall) {
     }
     
     visit (function);
+    const T9900Reg reg = fetchReg (intScratchReg1);
     if (isFarCall) {
-        loadReg (intScratchReg3);
-        loadReg (intScratchReg2);
+        outputCode (T9900Op::mov, T9900Operand (reg, T9900Operand::TAddressingMode::RegIndInc), intScratchReg2);
+        outputCode (T9900Op::mov, T9900Operand (reg, T9900Operand::TAddressingMode::RegInd), intScratchReg3);
         outputCode (T9900Op::bl, makeLabelMemory (farCall));
     } else {
-        const T9900Reg reg = fetchReg (intScratchReg1);
         outputCode (T9900Op::bl, T9900Operand (reg, T9900Operand::TAddressingMode::RegInd));
     }
 
@@ -1288,17 +1311,19 @@ void T9900Generator::generateCode (TConstantValue &constant) {
 }
 
 void T9900Generator::generateCode (TRoutineValue &routineValue) {
-    T9900Reg bank;
     bool isFarCall = static_cast<TRoutineType *> (routineValue.getType ())->isFarCall ();
     TSymbol *s = routineValue.getSymbol ();
     if (isFarCall) {
-        bank = getSaveReg (intScratchReg2);
-        outputCode (T9900Op::li, bank, getBankName (s));
-        saveReg (bank);
+        T9900Reg reg = getSaveReg (intScratchReg2);
+        const std::string label = getNextLocalLabel ();
+        farCallVectors.emplace_back (TFarCallVec {label, getBankName (s), s->getName ()});
+        outputCode (T9900Op::li, reg, label);
+        saveReg (reg);
+    } else {
+        T9900Reg reg = getSaveReg (intScratchReg3);
+        outputCode (T9900Op::li, reg, s->getName ());
+        saveReg (reg);
     }
-    T9900Reg reg = getSaveReg (intScratchReg3);
-    outputCode (T9900Op::li, reg, s->getName ());
-    saveReg (reg);
 }
 
 void T9900Generator::codeSymbol (const TSymbol *s, const T9900Reg reg) {
@@ -1823,10 +1848,10 @@ void T9900Generator::generateCode (TProgram &program) {
 }
 
 void T9900Generator::initStaticRoutinePtr (std::size_t addr, const TRoutineValue *routineValue) {
-/*
-    outputCode (TX64Op::lea, TX64Reg::rax, TX64Operand (routineValue->getSymbol ()->getName (), true));
-    outputCode (TX64Op::mov, TX64Operand (TX64Reg::none, reinterpret_cast<std::uint64_t> (addr)), TX64Reg::rax);
-*/    
+    const std::string name = routineValue->getSymbol ()->getName ();
+    const std::uint16_t pos = addr - reinterpret_cast<std::size_t> (&staticData [0]);
+    std::cout << "Init: " << name << " at " << std::hex << pos << std::endl;
+    staticDataDefinition.staticRoutinePtrs.push_back (std::make_pair (pos, name));
 }
 
 void T9900Generator::resolvePascalSymbol (T9900Operand &operand, TSymbolList &symbols) {
@@ -1943,7 +1968,7 @@ void T9900Generator::endRoutineBody (std::size_t level, TSymbolList &symbolList,
 }
 
 TCodeGenerator::TParameterLocation T9900Generator::classifyType (const TType *type) {
-    if (type->isEnumerated () || type->isPointer () || type->isReference () || type->isRoutine ()) 
+    if (type->isEnumerated () || type->isPointer () || type->isReference ()) 
         return TParameterLocation::IntReg;
     if (type == &stdType.Real || type == &stdType.Single)
         return TParameterLocation::FloatReg;
@@ -2036,12 +2061,12 @@ void T9900Generator::codeBlock (TBlock &block, bool hasStackFrame, TCodeSequence
             std::size_t staticSize = 65536 - firstStatic;
             outputComment (std::string ());
             outputComment ("Init static globals: " + std::to_string (staticSize) + " bytes at address " + std::to_string (firstStatic));
-            std::vector<char> data (staticSize);
+            staticData.resize (staticSize);
             for (TSymbol *s: blockSymbols)
                 if (s->checkSymbolFlag (TSymbol::StaticVariable))
-                    initStaticVariable (&data [s->getOffset () - firstStatic], s->getType (), s->getConstant ());
+                    initStaticVariable (&staticData [s->getOffset () - firstStatic], s->getType (), s->getConstant ());
             staticDataDefinition.label = getNextLocalLabel ();
-            staticDataDefinition.values = std::move (data);
+            staticDataDefinition.values = std::move (staticData);
             outputLabel ("$init_static");
             outputCode (T9900Op::li, T9900Reg::r12, staticDataDefinition.label);
             outputCode (T9900Op::li, T9900Reg::r13, firstStatic);

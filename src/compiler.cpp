@@ -510,12 +510,13 @@ TType *TBlock::parseRoutineType (bool isFunction, bool farCall) {
 
 TType *TBlock::parseFunctionType () {
     lexer.getNextToken ();
-    return parseRoutineType (true);
+    TType *result = parseRoutineType (true, true);
+    return result;
 }
 
 TType *TBlock::parseProcedureType () {
     lexer.getNextToken ();
-    return parseRoutineType (false);
+    return parseRoutineType (false, true);
 }
 
 TType *TBlock::parsePointerType () {

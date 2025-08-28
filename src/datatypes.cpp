@@ -507,7 +507,11 @@ std::string TRoutineType::getName () const {
 }
 
 std::size_t TRoutineType::getSize () const {
+#ifdef CREATE_9900
+    return 4;
+#else
     return sizeof (void (*)());
+#endif    
 }
 
 bool TRoutineType::isSerializable () const {

@@ -76,11 +76,6 @@ private:
     struct TStringDefinition {
         std::string label, val;
     };
-    struct TStaticDataDefinition {
-        std::string label;
-        std::vector<char> values;
-    };
-    
     using TCodeSequence = std::list<T9900Operation>;
     TCodeSequence *currentOutput;
     
@@ -155,7 +150,7 @@ private:
     std::vector<TConstantDefinition> constantDefinitions;
     std::vector<TSetDefinition> setDefinitions;
     std::vector<TStringDefinition> stringDefinitions;
-    TStaticDataDefinition staticDataDefinition;
+    
     
     std::string endOfRoutineLabel;
     
@@ -164,6 +159,12 @@ private:
         std::vector<std::string> jumpLabels;
     };
     std::vector<TJumpTable> jumpTableDefinitions;
+    
+    struct TFarCallVec {
+        std::string label, bank, proc;
+    };
+    std::vector<TFarCallVec> farCallVectors;
+    
     std::map<TSymbol *, TCodeSequence> assemblerBlocks;
 
     void setOutput (TCodeSequence *);
@@ -188,6 +189,14 @@ private:
     bool isCalcStackReg (const T9900Operand &);
     bool isSameReg (const T9900Operand &op1, const T9900Operand &op2);
     bool isSameCalcStackReg (const T9900Operand &op1, const T9900Operand &op2);
+    
+    struct TStaticDataDefinition {
+        std::string label;
+        std::vector<char> values;
+        std::vector<std::pair<std::uint16_t, std::string>> staticRoutinePtrs;
+    };
+    TStaticDataDefinition staticDataDefinition;
+    std::vector<char> staticData;
     
     virtual void initStaticRoutinePtr (std::size_t addr, const TRoutineValue *) override;
     
