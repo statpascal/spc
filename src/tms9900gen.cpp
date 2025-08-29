@@ -594,8 +594,12 @@ void T9900Generator::resolveBankLabels (TCodeBlock &proc) {
     }
 }
 
-std::string T9900Generator::getBankName (const TSymbol *s) const {
-    return "$bank_" + s->getName ();
+std::string T9900Generator::getBankName (const std::string &s) {
+    return "$bank_" + s;
+}
+
+std::string T9900Generator::getBankName (const TSymbol *s) {
+    return getBankName (s->getName ());
 }
 
 void T9900Generator::getAssemblerCode (std::vector<std::uint8_t> &opcodes, bool generateListing, std::vector<std::string> &listing) {
@@ -722,7 +726,7 @@ void T9900Generator::outputStaticConstants () {
                     outputCode (T9900Op::byte, val);
                     val.clear ();
                 }
-                outputCode (T9900Op::data, "$bank_" + it->second);
+                outputCode (T9900Op::data, getBankName (it->second));
                 outputCode (T9900Op::data, it->second);
                 ++it;
                 i += 4;
@@ -1243,13 +1247,9 @@ void T9900Generator::generateCode (TFunctionCall &functionCall) {
 
     if (offCount)
         outputCode (T9900Op::ai, T9900Reg::r10, -offCount);
-        
-    if (isFarCall) {
-//        outputCode (T9900Op::li, intScratchReg2, std::string ("__current_bank"));	// will be replaced by assembler
+    if (isFarCall) 
         outputCode (T9900Op::mov, T9900Operand (0x7ffe, T9900Operand::TAddressingMode::Memory), T9900Operand (T9900Reg::r10, offCount - 2));
-    }
 
-    std::size_t stackCount = 0;
     for (ssize_t i = parameterDescriptions.size () - 1; i >= 0; --i) {
         visit (parameterDescriptions [i].actualParameter);
         if (parameterDescriptions [i].isInteger) {
@@ -1260,7 +1260,6 @@ void T9900Generator::generateCode (TFunctionCall &functionCall) {
                 outputCode (T9900Op::mov, reg, T9900Operand (T9900Reg::r10, parameterDescriptions [i].offset));
             else
                 outputCode (T9900Op::mov, reg, T9900Operand (T9900Reg::r10, T9900Operand::TAddressingMode::RegInd));
-            stackCount += 2;
         } else {
             T9900Reg reg = getSaveReg (intScratchReg1);
             outputCode (T9900Op::mov, T9900Reg::r10, reg);
@@ -1274,8 +1273,6 @@ void T9900Generator::generateCode (TFunctionCall &functionCall) {
         visit (returnStorage);
         const T9900Reg reg = fetchReg (intScratchReg1);
         outputCode (T9900Op::mov, reg, T9900Operand (T9900Reg::r10, T9900Operand::TAddressingMode::RegInd));
-//        codePush (reg);
-        stackCount += 2;
     }
     
     visit (function);

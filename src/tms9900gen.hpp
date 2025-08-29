@@ -211,7 +211,8 @@ private:
     void calcLength (TCodeBlock &);
     void assignBank (TCodeBlock &, std::size_t &bank, std::size_t &org);
     void resolveBankLabels (TCodeBlock &proc);
-    std::string getBankName (const TSymbol *) const;
+    std::string getBankName (const TSymbol *);
+    std::string getBankName (const std::string &);
     
     // peep hole optimizer
     
