@@ -350,40 +350,43 @@ procedure __write_lf (var f: text);
         setVdpAddress (vdpWriteAddress or WriteAddr);
     end;
     
-procedure __div_mod (var divmod); assembler;
-        mov *r10, r0
-        li r12, 10
-        mov *r0, r14
-        clr r13
-        div r12, r13
-        mov r13, *r0+
-        mov r14, *r0
-end;
-    
 procedure __write_int (var f: text; n, length, precision: integer);
+
+    function outint (n: integer; neg: boolean; p: pointer): pointer; assembler;
+            mov @p, r0
+            mov @n, r14
+            li r12, 10
+        
+        outint1:
+            clr r13
+            div r12, r13
+            ai r14, 48
+            swpb r14
+            movb r14, *r0
+            dec r0
+            mov r13, r14
+            jne outint1
+            
+            mov @neg, r13
+            jeq outint2
+            li r13, >2d00
+            movb r13, *r0
+            dec r0
+            
+        outint2:
+            mov *r10, r12
+            mov r0, *r12
+    end;
+        
     var
         buf: string [6];
-        neg: boolean;
         p: PChar;
-        divmod: array [0..1] of integer;
     begin
         if n = -32768 then
             __write_string (f, '-32768', length, precision)
         else
             begin
-                p := addr (buf [6]);
-                neg := n < 0;
-                divmod [0] := abs (n);
-                repeat
-                    __div_mod (divmod);
-                    p^ := chr (divmod [1] + 48);
-                    dec (p);
-                until divmod [0] = 0;
-                if neg then
-                    begin
-                        p^ := '-';
-                        dec (p)
-                    end;
+                p := outint (abs (n), n < 0, addr (buf [6]));
                 p^ := chr (integer (addr (buf [6])) - integer (p));
                 __write_string (f, p, length, -1)
             end

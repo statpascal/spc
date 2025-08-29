@@ -539,7 +539,8 @@ void T9900Generator::optimizePeepHole (TCodeSequence &code) {
             } else
                 ++line;
         }
-        
+
+/*        
         // li r12, bank
         // li r13, subprog
         // bl @farCall
@@ -555,7 +556,7 @@ void T9900Generator::optimizePeepHole (TCodeSequence &code) {
             op_3_1 = op_2_2;
             op_1_2 = op_2_2 = T9900Operand ();
         }
-        
+*/        
         
          else
             ++line;
@@ -1275,14 +1276,23 @@ void T9900Generator::generateCode (TFunctionCall &functionCall) {
         outputCode (T9900Op::mov, reg, T9900Operand (T9900Reg::r10, T9900Operand::TAddressingMode::RegInd));
     }
     
-    visit (function);
-    const T9900Reg reg = fetchReg (intScratchReg1);
-    if (isFarCall) {
-        outputCode (T9900Op::mov, T9900Operand (reg, T9900Operand::TAddressingMode::RegIndInc), intScratchReg2);
-        outputCode (T9900Op::mov, T9900Operand (reg, T9900Operand::TAddressingMode::RegInd), intScratchReg3);
-        outputCode (T9900Op::bl, makeLabelMemory (farCall));
+    if (TRoutineValue *routine = dynamic_cast<TRoutineValue *> (functionCall.getFunction ())) {
+        const std::string name = routine->getSymbol ()->getName ();
+        if (isFarCall) {
+            outputCode (T9900Op::bl, makeLabelMemory (farCallCode));
+            outputCode (T9900Op::data, getBankName (name));
+            outputCode (T9900Op::data, name);
+        } else
+            outputCode (T9900Op::bl, makeLabelMemory (name));
     } else {
-        outputCode (T9900Op::bl, T9900Operand (reg, T9900Operand::TAddressingMode::RegInd));
+        visit (function);
+        const T9900Reg reg = fetchReg (intScratchReg1);
+        if (isFarCall) {
+            outputCode (T9900Op::mov, T9900Operand (reg, T9900Operand::TAddressingMode::RegIndInc), intScratchReg2);
+            outputCode (T9900Op::mov, T9900Operand (reg, T9900Operand::TAddressingMode::RegInd), intScratchReg3);
+            outputCode (T9900Op::bl, makeLabelMemory (farCall));
+        } else 
+            outputCode (T9900Op::bl, T9900Operand (reg, T9900Operand::TAddressingMode::RegInd));
     }
 
     if (functionCall.getType () != &stdType.Void && !functionCall.isIgnoreReturn ())
@@ -1310,15 +1320,22 @@ void T9900Generator::generateCode (TConstantValue &constant) {
 void T9900Generator::generateCode (TRoutineValue &routineValue) {
     bool isFarCall = static_cast<TRoutineType *> (routineValue.getType ())->isFarCall ();
     TSymbol *s = routineValue.getSymbol ();
+    const std::string name = s->getName ();
     if (isFarCall) {
+        std::string label;
+        for (TFarCallVec &vec: farCallVectors)
+            if (vec.proc == name)
+                label = vec.label;
+        if (label.empty ()) {
+            label = getNextLocalLabel ();
+            farCallVectors.emplace_back (TFarCallVec {label, getBankName (name), name});
+        }
         T9900Reg reg = getSaveReg (intScratchReg2);
-        const std::string label = getNextLocalLabel ();
-        farCallVectors.emplace_back (TFarCallVec {label, getBankName (s), s->getName ()});
         outputCode (T9900Op::li, reg, label);
         saveReg (reg);
     } else {
         T9900Reg reg = getSaveReg (intScratchReg3);
-        outputCode (T9900Op::li, reg, s->getName ());
+        outputCode (T9900Op::li, reg, name);
         saveReg (reg);
     }
 }
@@ -1847,7 +1864,6 @@ void T9900Generator::generateCode (TProgram &program) {
 void T9900Generator::initStaticRoutinePtr (std::size_t addr, const TRoutineValue *routineValue) {
     const std::string name = routineValue->getSymbol ()->getName ();
     const std::uint16_t pos = addr - reinterpret_cast<std::size_t> (&staticData [0]);
-    std::cout << "Init: " << name << " at " << std::hex << pos << std::endl;
     staticDataDefinition.staticRoutinePtrs.push_back (std::make_pair (pos, name));
 }
 
