@@ -6,6 +6,7 @@ type
     integer = int16;
     PChar = ^char;
     string1 = string [1];
+    string2 = string [2];
     string4 = string [4];
     
     TVdpRegList = array [0..7] of uint8;
@@ -76,6 +77,7 @@ procedure setVdpRegs (var vdpRegs: TVdpRegList);
 procedure setVdpAddress (n: integer);
 
 function hexstr (n: integer): string4;
+function hexstr2 (n: uint8): string2;
 
 const
     __set_words = 16;
@@ -550,17 +552,23 @@ function copy (s: PChar; start, len: integer): string;
     end;
 
 
+const 
+    hex: string [16] = '0123456789ABCDEF';
+    
 function hexstr (n: integer): string4;
-    const 
-        hex: string [16] = '0123456789ABCDEF';
     var
-        res: string [4];
-        i, j: integer;
+        i: integer;
     begin
         for i := 1 to 4 do
-            res [i] := hex [succ (n shr (16 - i shl 2) and $0f)];
-        res [0] := #4;
-        hexstr := res
+            result [i] := hex [succ (n shr (16 - i shl 2) and $0f)];
+        result [0] := #4
+    end;
+    
+function hexstr2 (n: uint8): string2;
+    begin
+        result [0] := #2;
+        result [1] := hex [succ (n shr 4)];
+        result [2] := hex [succ (n and $0f)]
     end;
     
 function keypressed: boolean; assembler;

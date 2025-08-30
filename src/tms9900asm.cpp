@@ -199,8 +199,30 @@ std::string T9900Operation::makeString () const {
             for (const char c: operand1.label)
                 append (c);
             return std::string (8, ' ') +  "text >" + res.str (); }
-        case T9900Op::text:
-            return std::string (8, ' ') + "text '" + operand1.label + "'";
+        case T9900Op::text: {
+            std::stringstream res;
+            std::string s;
+            bool first = true;
+            for (unsigned char c: operand1.label) {
+                if (c >= 32 && c < 127)
+                    s.push_back (c);
+                else {
+                    if (!first)
+                        res << ", ";
+                    first = false;
+                    if (!s.empty ()) {
+                        res << "'" << s << "', ";
+                        s.clear ();
+                    }
+                    res << std::hex << '>' << static_cast<unsigned> (c);
+                }
+            }
+            if (!s.empty ()) {
+                if (!first)
+                    res << ", ";
+                res << "'" << s << "'";
+            }
+            return std::string (8, ' ') + "text " + res.str (); }
         case T9900Op::bank: {
             std::stringstream res;
             res << std::string (8, ' ') << "bank " << (operand1.val == 0xffff ? "all" : std::to_string (operand1.val)) << ", >" << std::hex <<  operand2.val;

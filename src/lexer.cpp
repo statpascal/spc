@@ -333,10 +333,12 @@ void TLexer::TLexerImpl::parseNumericChar () {
         parseHex ();
     else
         parseNumber ();
+        
     if (currentToken == TToken::IntegerConst && iVal >= 0 && iVal <= 255)
         sVal += static_cast<char> (iVal);
     else
         sVal += '?';
+    currentToken = TToken::StringConst;
 }
 
 void TLexer::TLexerImpl::parseQuotedString () {

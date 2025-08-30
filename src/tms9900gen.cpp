@@ -436,15 +436,20 @@ void T9900Generator::optimizePeepHole (TCodeSequence &code) {
                             op_1_2.val == 1 ? T9900Op::dec : T9900Op::dect;
             removeLines (code, line, 1);
         }
-        
+
         // li reg, imm
         // mov reg, r0
+        // jeq ll
         // sla/sra op, r0
         // ->
         // sla/sra op, imm
-        else if (op1 == T9900Op::li && op2 == T9900Op::mov && (op3 == T9900Op::sla || op3 == T9900Op::sra) && op_3_2.usesReg ()) {
-            op_3_2 = op_1_2;
-            removeLines (code, line, 2);
+        else if (op1 == T9900Op::li && !op_1_2.isLabel () && op2 == T9900Op::mov && op3 == T9900Op::jeq && (op4 == T9900Op::sla || op4 == T9900Op::sra) && op_4_2.usesReg () &&
+                isSameCalcStackReg (op_1_1, op_2_1) && op_2_1.t == T9900Operand::TAddressingMode::Reg && op_2_2.usesReg () && op_2_2.reg == T9900Reg::r0) {
+            if (op_1_2.val) {
+                op_4_2 = op_1_2;
+                removeLines (code, line, 3);
+            } else
+                removeLines (code, line, 4);
         }
         
         // li reg, imm
@@ -811,12 +816,6 @@ void T9900Generator::outputBooleanCheck (TExpressionBase *expr, const std::strin
         {TToken::LessEqual, {T9900Op::jgt}},
         {TToken::NotEqual, {T9900Op::jeq}}
     };
-/*    
-    static const std::map<TToken, TX64Op> realFalseJmp = {
-        {TToken::Equal, TX64Op::jne}, {TToken::GreaterThan, TX64Op::jbe}, {TToken::LessThan, TX64Op::jae}, 
-        {TToken::GreaterEqual, TX64Op::jb}, {TToken::LessEqual, TX64Op::ja}, {TToken::NotEqual, TX64Op::je}
-    };
-*/    
     static const std::map<TToken, std::vector<T9900Op>> intFalseJmp = {
         {TToken::Equal, {T9900Op::jeq}}, 
         {TToken::GreaterThan, {T9900Op::jgt}},
@@ -825,39 +824,11 @@ void T9900Generator::outputBooleanCheck (TExpressionBase *expr, const std::strin
         {TToken::LessEqual, {T9900Op::jlt, T9900Op::jeq}},
         {TToken::NotEqual, {T9900Op::jne}}
     };
-/*    
-    static const std::map<TToken, TX64Op> realTrueJmp = {
-        {TToken::Equal, TX64Op::je}, {TToken::GreaterThan, TX64Op::ja}, {TToken::LessThan, TX64Op::jb}, 
-        {TToken::GreaterEqual, TX64Op::jae}, {TToken::LessEqual, TX64Op::jbe}, {TToken::NotEqual, TX64Op::jne}
-    };
-*/    
-    
     if (TPrefixedExpression *prefExpr = dynamic_cast<TPrefixedExpression *> (expr))
         if (prefExpr->getOperation () == TToken::Not) {
             branchOnFalse = !branchOnFalse;
             expr = prefExpr->getExpression ();
         }
-    
-    if (expr->isFunctionCall ()) {
-        TFunctionCall *functionCall = static_cast<TFunctionCall *> (expr);
-        if (static_cast<TRoutineValue *> (functionCall->getFunction ())->getSymbol ()->getExtSymbolName () == "rt_in_set") {
-/*        
-            visit (functionCall->getArguments () [0]);
-            visit (functionCall->getArguments () [1]);
-            const TX64Reg r1 = fetchReg (intScratchReg2);
-            const TX64Reg r2 = fetchReg (intScratchReg1);
-            std::int64_t minval = 0, maxval = std::numeric_limits<std::int64_t>::max ();
-            getSetTypeLimit (functionCall->getArguments () [0], minval, maxval);
-            if (minval < 0 || maxval >= static_cast<std::int64_t> (TConfig::setLimit)) {
-                outputCode (TX64Op::cmp, r2, 256);
-                outputCode (TX64Op::jae, label);
-            }
-            outputCode (TX64Op::bt, TX64Operand (r1, 0), r2);
-            outputCode (branchOnFalse ? TX64Op::jnc : TX64Op::jc, label);
-            return;
-*/            
-        }
-    }
     
     TExpression *condition = dynamic_cast<TExpression *> (expr);
     
@@ -1031,39 +1002,6 @@ void T9900Generator::outputIntegerOperation (TToken operation, TExpressionBase *
 
 void T9900Generator::outputFloatOperation (TToken operation, TExpressionBase *left, TExpressionBase *right) {
 /*
-    static const std::map<TToken, TX64Op> dblOperation = {
-        {TToken::Add, TX64Op::addsd}, {TToken::Sub, TX64Op::subsd}, {TToken::Mul, TX64Op::mulsd},
-        {TToken::Div, TX64Op::divsd},
-        {TToken::Equal, TX64Op::setz}, {TToken::GreaterThan, TX64Op::seta}, {TToken::LessThan, TX64Op::setb}, 
-        {TToken::GreaterEqual, TX64Op::setae}, {TToken::LessEqual, TX64Op::setbe}, {TToken::NotEqual, TX64Op::setnz}
-    };
-    TX64Reg r1, r2;
-    
-    bool secondFirst = (left->isSymbol () || left->isConstant () || left->isLValueDereference ()) && operation != TToken::Sub && operation != TToken::Div;
-    if (secondFirst) {
-        visit (right);
-        visit (left);
-        r1 = fetchXmmReg (xmmScratchReg1);
-        r2 = fetchXmmReg (xmmScratchReg2);
-    } else {
-        visit (left);
-        visit (right);   	
-        r2 = fetchXmmReg (xmmScratchReg2);
-        r1 = fetchXmmReg (xmmScratchReg1);
-    }
-    
-    if (std::find (std::begin (relOps), std::end (relOps), operation) == std::end (relOps)) {
-        if (secondFirst)
-            std::swap (r1, r2);
-        outputCode (TX64Operation (dblOperation.at (operation), r1, r2));
-        saveXmmReg (r1);
-    } else {
-        TX64Reg reg = getSaveReg (intScratchReg1);
-        outputCode (TX64Op::comisd, r1, r2);
-        outputCode (dblOperation.at (operation), TX64Operand (reg, TX64OpSize::bit8));
-        outputCode (TX64Op::movzx, TX64Operand (reg, TX64OpSize::bit32), TX64Operand (reg, TX64OpSize::bit8));
-        saveReg (reg);
-    }
 */    
 }
 
@@ -1087,14 +1025,6 @@ void T9900Generator::generateCode (TPrefixedExpression &prefixed) {
     const TType *type = prefixed.getExpression ()->getType ();
     if (type == &stdType.Real) {
 /*    
-        TX64Reg resreg = getSaveXmmReg (xmmScratchReg1);
-        outputCode (TX64Operation (TX64Op::pxor, resreg, resreg));
-        saveXmmReg (resreg);
-        visit (prefixed.getExpression ());
-        const TX64Reg r2 = fetchXmmReg (xmmScratchReg1),
-                      r1 = fetchXmmReg (xmmScratchReg2);
-        outputCode (TX64Operation (TX64Op::subsd, r1, r2));
-        saveXmmReg (r1);
 */        
     } else {
         visit (prefixed.getExpression ());
@@ -1135,46 +1065,6 @@ void T9900Generator::codeInlinedFunction (TFunctionCall &functionCall) {
         outputCode (T9900Op::abs, reg);
         saveReg (reg);
     }
-
-/*
-    if (s == "rt_dbl_abs") {
-        visit (args [0]);
-        const TX64Reg reg = fetchXmmReg (xmmScratchReg1);
-        outputCode (TX64Op::andpd, reg, TX64Operand (dblAbsMask, true));
-        saveXmmReg (reg);
-    } else if (s == "sqrt") {
-        visit (args [0]);
-        const TX64Reg reg = fetchXmmReg (xmmScratchReg1);
-        outputCode (TX64Op::sqrtsd, reg, reg);
-        saveXmmReg (reg);
-    } else if (s == "ntohs" || s == "htons") {
-        visit (args [0]);
-        const TX64Reg reg = fetchReg (intScratchReg1);
-        outputCode (TX64Op::ror, TX64Operand (reg, TX64OpSize::bit16), 8);
-        saveReg (reg);
-    } else if (s == "rt_in_set") {
-        visit (args [0]); visit (args [1]);
-        const TX64Reg r1 = fetchReg (intScratchReg2);
-        const TX64Reg r2 = fetchReg (intScratchReg1);
-        const std::string l1 = getNextLocalLabel (), l2 = getNextLocalLabel ();
-        
-        std::int64_t minval = 0, maxval = std::numeric_limits<std::int64_t>::max ();
-        getSetTypeLimit (args [0], minval, maxval);
-        if (minval < 0 || maxval >= static_cast<std::int64_t> (TConfig::setLimit)) {
-            outputCode (TX64Op::cmp, r2, 256);
-            outputCode (TX64Op::jb, l1);
-            outputCode (TX64Op::mov, r1, 0);
-            outputCode (TX64Op::jmp, l2);
-            outputLabel (l1);
-        }
-        outputCode (TX64Op::bt, TX64Operand (r1, 0), r2);
-        outputCode (TX64Op::setc, TX64Operand (r1, TX64OpSize::bit8));
-        outputCode (TX64Op::movsx, r1, TX64Operand (r1, TX64OpSize::bit8));
-        
-        outputLabel (l2);
-        saveReg (r1);
-    }
-*/    
 }
 
 bool T9900Generator::isFunctionCallInlined (TFunctionCall &functionCall) {
@@ -2127,6 +2017,7 @@ void T9900Generator::codeBlock (TBlock &block, bool hasStackFrame, TCodeSequence
     std::move (blockCode.begin (), blockCode.end (), std::back_inserter (blockStatements));
     std::move (blockEpilogue.begin (), blockEpilogue.end (), std::back_inserter (blockStatements));
     
+    removeUnusedLocalLabels (blockStatements);
     optimizePeepHole (blockStatements);
     optimizeSingleLine (blockStatements);
     optimizeJumps (blockStatements);
@@ -2339,7 +2230,17 @@ void T9900Generator::parseAssemblerBlock (TSymbol *symbol, TBlock &block) {
                     op2 = parseRegister (compiler, lexer);
                     break;
                 case T9900Format::F_None:
-                    // byte, data, stri
+                    switch (desc.opcode) {
+                        case T9900Op::text:
+                            if (lexer.getToken () == TToken::StringConst) 
+                                op1 = T9900Operand (lexer.getString ());
+                            else
+                                compiler.errorMessage (TCompilerImpl::AssemblerError, "Expected string after 'text'");
+                            lexer.getNextToken ();
+                            break;
+                        default:
+                            break;
+                    }
                     break;
             }
             output.push_back (T9900Operation (desc.opcode, op1, op2));
