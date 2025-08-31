@@ -1084,6 +1084,39 @@ void T9900Generator::codeInlinedFunction (TFunctionCall &functionCall) {
         outputCode (T9900Op::mov, static_cast<T9900Reg> (static_cast<unsigned> (reg) + 1), reg);
         saveReg (reg);
     }
+    if (s == "__copy_set_const") {
+        visit (args [0]);
+        visit (args [1]);
+        codeMove (functionCall.getType ());
+    }
+    if (s == "__in_set") {
+        visit (args [0]);
+        T9900Reg val = fetchReg (intScratchReg3);
+        outputCode (T9900Op::li, intScratchReg4, 1);
+        outputCode (T9900Op::mov, val, intScratchReg1);
+        outputCode (T9900Op::andi, intScratchReg1, 15);
+        std::string ll = getNextLocalLabel ();
+        outputCode (T9900Op::jeq, ll);
+        outputCode (T9900Op::sla, intScratchReg4, 0);
+        outputLabel (ll);
+        outputCode (T9900Op::sra, val, 3);
+        saveReg (val);
+        
+        visit (args [1]);
+        const T9900Reg set = fetchReg (intScratchReg2);
+        val = fetchReg (intScratchReg3);
+
+        outputCode (T9900Op::a, val, set);
+        outputCode (T9900Op::mov, T9900Operand (set, T9900Operand::TAddressingMode::RegInd), set);
+        outputCode (T9900Op::clr, val);
+        outputCode (T9900Op::coc, intScratchReg4, set);
+        ll = getNextLocalLabel ();
+        outputCode (T9900Op::jne, ll);
+        outputCode (T9900Op::inc, val);
+        saveReg (val);
+        outputLabel (ll);
+        
+    }  
 }
 
 bool T9900Generator::isFunctionCallInlined (TFunctionCall &functionCall) {

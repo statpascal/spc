@@ -89,7 +89,9 @@ type
 function __set_add_val (val: integer; var s: __set_array): __generic_set_type; 
 function __set_add_range (minval, maxval: integer; var s: __set_array): __generic_set_type; 
 
-function __in_set (v: integer; var s: __set_array): boolean;
+function __copy_set_const (var s: __generic_set_type): __generic_set_type;
+
+function __in_set (v: integer; var s: __set_array): boolean; intrinsic;
 function __set_union (var s, t: __set_array): __generic_set_type; 
 function __set_intersection (var s, t: __set_array): __generic_set_type;
 function __set_diff (var s, t: __set_array): __generic_set_type;
@@ -104,6 +106,10 @@ function __set_super_not_equal (var s, t: __set_array): boolean;
     
 implementation
 
+function __copy_set_const (var s: __generic_set_type): __generic_set_type;
+    begin
+        result := s
+    end;
 var 
     vdpWriteAddress: integer;
     
@@ -616,10 +622,13 @@ function __set_add_range (minval, maxval: integer; var s: __set_array): __generi
             __set_array (result) [i shr 4] := __set_array (result) [i shr 4] or (1 shl (i and 15))
     end;
 
-function __in_set (v: integer; var s:__set_array): boolean;
+(*
+function __in_set (v: integer; var s:__set_array): boolean; intrinsic;
+
     begin
         __in_set := s [v shr 4] and (1 shl (v and 15)) <> 0
     end;
+*)    
     
 function __set_union (var s, t: __set_array): __generic_set_type; 
     var
@@ -664,7 +673,7 @@ function __set_super (var s, t: __set_array): boolean;
     var
         i: integer;
     begin
-        for i := 0 to __set_words do
+        for i := 0 to __set_words - 1 do
             if s [i] and t [i] <> t [i] then
                 begin	// TODO: implement exit (false)
                     __set_super := false;
@@ -679,7 +688,7 @@ function __set_sub_not_equal (var s, t: __set_array): boolean;
     end;
     
 function __set_super_not_equal (var s, t: __set_array): boolean; 
-    begin
+    begin 
         __set_super_not_equal := __set_super (s, t) and not __set_equal (s, t)
     end;
 

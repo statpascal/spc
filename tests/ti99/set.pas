@@ -1,6 +1,6 @@
 program settest;
 
-procedure writeset (msg: string; s: set of char);
+procedure writeset (msg: string [5]; s: set of char);
     var
         ch: char;
     begin

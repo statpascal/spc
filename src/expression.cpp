@@ -619,9 +619,9 @@ TExpressionBase *TExpression::parse (TBlock &block) {
             if (TType *type = checkOperatorTypes (left, right, operation, block)) {
                 if (operation == TToken::In) 
                     left = createRuntimeCall ("__in_set", type, {compiler.createMemoryPoolObject<TTypeCast> (&stdType.Int64, left), right}, block, false);
-                else if (left->getType ()->isSet ())
+                else if (left->getType ()->isSet ()) {
                     left = createRuntimeCall (setRuntimeFunc.at (operation), type, {left, right}, block, false);
-                else if (left->getType () == &stdType.String)
+                } else if (left->getType () == &stdType.String)
                     left = createRuntimeCall (strRuntimeFunc.at (operation), type, {left, right}, block, true);
                 else if (left->getType ()->isShortString ())
                     left = createRuntimeCall (shortStrRuntimeFunc.at (operation), type, {left, right}, block, true);
@@ -699,9 +699,9 @@ TExpressionBase *TSimpleExpression::parse (TBlock &block) {
         TExpressionBase *right = TTerm::parse (block);
         if (left && right)
             if (TType *type = checkOperatorTypes (left, right, operation, block)) {
-                if (type->isSet ()) 
+                if (type->isSet ()) {
                     left = createRuntimeCall (operation == TToken::Add ? "__set_union" : "__set_diff", type, {left, right}, block, false);
-                else if (type->isVector ()) {
+                } else if (type->isVector ()) {
                     const TStdType::TScalarTypeCode
                         tca = TStdType::getScalarTypeCode (static_cast<TVectorType *> (left->getType ())->getBaseType ()),
                         tcb = TStdType::getScalarTypeCode (static_cast<TVectorType *> (right->getType ())->getBaseType ());
@@ -749,9 +749,9 @@ TExpressionBase *TTerm::parse (TBlock &block) {
         TExpressionBase *right = TFactor::parse (block);
         if (left && right)
             if (TType *type = checkOperatorTypes (left, right, operation, block)) {
-                if (type->isSet ()) 
+                if (type->isSet ()) {
                     left = createRuntimeCall ("__set_intersection", type, {left, right}, block, false);
-                else if (type->isVector ()) {
+                } else if (type->isVector ()) {
                     const TStdType::TScalarTypeCode
                         tca = TStdType::getScalarTypeCode (static_cast<TVectorType *> (left->getType ())->getBaseType ()),
                         tcb = TStdType::getScalarTypeCode (static_cast<TVectorType *> (right->getType ())->getBaseType ());
@@ -812,10 +812,11 @@ TExpressionBase *TFactor::parseIdentifier (TBlock &block) {
         if (TSymbol *symbol = block.getSymbols ().searchSymbol (identifier))
             if (symbol->checkSymbolFlag (TSymbol::Constant)) {
                 expr = compiler.createMemoryPoolObject<TConstantValue> (symbol);
-//                if (false && symbol->getType ()->isSet ())
-//                    expr = createRuntimeCall ("__set_const", symbol->getType (), {expr, TExpressionBase::createVariableAccess (TConfig::globalRuntimeDataPtr, block)}, block, false);
-//                else 
-                if (symbol->getType () == &stdType.String) {
+                if (symbol->getType ()->isSet ()) {
+#ifdef CREATE_9900              
+                    expr = createRuntimeCall ("__copy_set_const", symbol->getType (), {expr}, block, false);
+#endif
+                } else if (symbol->getType () == &stdType.String) {
 #ifndef CREATE_9900                
                     expr = createRuntimeCall ( "__str_make", symbol->getType (), {expr, TExpressionBase::createVariableAccess (TConfig::globalRuntimeDataPtr, block)}, block, false);
 #endif
@@ -1052,6 +1053,9 @@ TExpressionBase *TFactor::parseSetExpression (TBlock &block) {
     constPart->setType (resultType);
     
     TExpressionBase *setConstructor = compiler.createMemoryPoolObject<TConstantValue> (constPart);
+#ifdef CREATE_9900  
+    setConstructor =  createRuntimeCall ("__copy_set_const", resultType, {setConstructor}, block, false);
+#endif    
     for (TExpressionBase *val: values) 
         if (val->isConstant ())
             constPart->addSetValue (static_cast<TConstantValue *> (val)->getConstant ()->getInteger ());
