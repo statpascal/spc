@@ -28,10 +28,10 @@ procedure vrbw (val: uint8; length: integer);		// video repeated byte write
 procedure writeV (addr: integer; val: uint8);
 function readV (addr: integer): uint8;
 
-function min (a, b: integer): integer;
-function max (a, b: integer): integer;
-function sqr (a: integer): integer;
-function abs (n: integer): integer; external;
+function min (a, b: integer): integer; intrinsic name '__min';
+function max (a, b: integer): integer; intrinsic name '__max';
+function sqr (a: integer): integer; intrinsic name '__sqr';
+function abs (n: integer): integer; intrinsic name '__abs';
 
 procedure __write_lf (var f: text);
 procedure __write_int (var f: text; n, length, precision: integer);
@@ -428,38 +428,6 @@ procedure __write_boolean (var f: text; b: boolean; length, precision: integer);
             __write_string (f, 'false', length, -1) 
     end;
 
-function min (a, b: integer): integer; assembler;
-        mov *r10, r12   // pointer to result
-        c @a, @b
-        jlt min_1
-        mov @b, *r12
-        jmp min_2
-    min_1:
-        mov @a, *r12
-    min_2:
-end;
-(*
-    begin
-        if a < b then
-            min := a
-        else
-            min := b
-    end;
-*)    
-
-function max (a, b: integer): integer;
-    begin
-        if a < b then
-            max := b
-        else
-            max := a
-    end;
-
-function sqr (a: integer): integer;
-    begin
-        sqr := a * a
-    end;
-    
 function __short_str_char (ch: char): string1;
     begin
         result [0] := #1;

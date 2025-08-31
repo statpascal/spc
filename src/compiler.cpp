@@ -869,7 +869,7 @@ void TBlock::parseSubroutine (bool isFunction) {
     TRoutineType *routineType = static_cast<TRoutineType *> (parseRoutineType (isFunction, symbols->getLevel () == 1));
     compiler.checkAndSynchronize (TToken::Semicolon, "';' expected at end of subroutine header");
     
-    bool isForward = false, isExport = false, isExternal = false, isAssembler = false;
+    bool isForward = false, isExport = false, isExternal = false, isAssembler = false, isIntrinsic = false;
     if (lexer.checkToken (TToken::CDecl))
         compiler.checkToken (TToken::Semicolon, "';' expected after 'cdecl' declaration");
     if (lexer.checkToken (TToken::Overload))
@@ -881,9 +881,14 @@ void TBlock::parseSubroutine (bool isFunction) {
     else if (lexer.checkToken (TToken::External)) {
         isExternal = true;
         parseExternalDeclaration (libName, symbolName);
+    } else if (lexer.checkToken (TToken::Intrinsic)) {
+        isIntrinsic = true;
+        parseExternalDeclaration (libName, symbolName);
+        if (!libName.empty ())
+            compiler.errorMessage (TCompilerImpl::IncompatibleTypes, "Cannot use library name with intrinsic declaration");
     } else if (lexer.checkToken (TToken::Assembler))
         isAssembler = true;
-    if (isForward || isExport || isExternal || isAssembler)
+    if (isForward || isExport || isExternal || isAssembler || isIntrinsic)
         compiler.checkToken (TToken::Semicolon, "';' expected at end of subroutine header");
     
     TSymbolList::TAddSymbolResult result = symbols->addRoutine (identifier, routineType);
@@ -924,9 +929,11 @@ void TBlock::parseSubroutine (bool isFunction) {
         symbol->setBlock (block);
     }
     
-    if (isExternal) {
+    if (isExternal || isIntrinsic) {
         symbol->removeSymbolFlags (TSymbol::Forward);
         symbol->setExternal (libName, symbolName);
+        if (isIntrinsic)
+            symbol->addSymbolFlags (TSymbol::Intrinsic);
     } else if (isUnitInterface) {
         symbol->addSymbolFlags (TSymbol::Forward);
         if (isForward) 

@@ -30,7 +30,8 @@ public:
         Label = 512,
         NamedType = 1024,
         Routine = 2048,
-        AllSymbols = 4096 - 1
+        Intrinsic = 4096,
+        AllSymbols = 8192 - 1
     };
     
     TSymbol (const std::string &name, TType *type, std::size_t level, TFlags flags, TSymbol *alias);

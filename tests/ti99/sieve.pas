@@ -14,7 +14,7 @@ begin
         for i := 0 to n do
             prim [i] := true;
         i := 2;
-        while i * i <= n do
+        while sqr (i) <= n do
             begin
                 if prim [i] then
                     begin

@@ -101,6 +101,7 @@ TLexer::TLexerImpl::TLexerImpl ():
     {"cdecl",           TToken::CDecl},
     {"overload",	TToken::Overload},
     {"assembler",       TToken::Assembler},
+    {"intrinsic",       TToken::Intrinsic},
     {"export",		TToken::Export},
     {"file",		TToken::File},
 #ifdef CREATE_9900

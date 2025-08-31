@@ -16,7 +16,7 @@ enum class TToken {
     Begin, End, If, Then, Else, For, To, Downto, Do, Const, 				
     Type, Var, Absolute, While, Repeat, Until, Record, Array, Set, File, ShortString,
     Vector, Matrix, 		
-    Of, Procedure, Function, Case, With, Nil, Forward, External, Export, CDecl, Overload, Assembler,
+    Of, Procedure, Function, Case, With, Nil, Forward, External, Export, CDecl, Overload, Assembler, Intrinsic,
     Unit, Interface, Implementation, Initialization, Finalization, Uses, Label, Goto, Program,
 
     // operators

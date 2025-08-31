@@ -1059,20 +1059,38 @@ void T9900Generator::codeInlinedFunction (TFunctionCall &functionCall) {
     const std::vector<TExpressionBase *> &args = functionCall.getArguments ();
     const std::string s = static_cast<TRoutineValue *> (function)->getSymbol ()->getExtSymbolName ();
     
-    if (s == "abs") {
+    if (s == "__abs") {
         visit (args [0]);
         const T9900Reg reg = fetchReg (intScratchReg1);
         outputCode (T9900Op::abs, reg);
+        saveReg (reg);
+    }
+    if (s == "__min" || s == "__max") {
+        visit (args [0]);
+        visit (args [1]);
+        const T9900Reg right = fetchReg (intScratchReg2),
+                       left = fetchReg (intScratchReg3);
+        outputCode (T9900Op::c, left, right);
+        const std::string ll = getNextLocalLabel ();
+        outputCode (s == "__min" ? T9900Op::jlt : T9900Op::jgt, ll);
+        outputCode (T9900Op::mov, right, left);
+        saveReg (left);
+        outputLabel (ll);
+    }
+    if (s == "__sqr") {
+        visit (args [0]);
+        const T9900Reg reg = fetchReg (intScratchReg2);
+        outputCode (T9900Op::mpy, reg, reg);
+        outputCode (T9900Op::mov, static_cast<T9900Reg> (static_cast<unsigned> (reg) + 1), reg);
         saveReg (reg);
     }
 }
 
 bool T9900Generator::isFunctionCallInlined (TFunctionCall &functionCall) {
     TExpressionBase *function = functionCall.getFunction ();
-    if (function->isRoutine ()) {
-        const std::string s = static_cast<TRoutineValue *> (function)->getSymbol ()->getExtSymbolName ();
-        return s == "abs";
-    } else
+    if (function->isRoutine ())
+        return static_cast<TRoutineValue *> (function)->getSymbol ()->checkSymbolFlag (TSymbol::Intrinsic);
+    else
         return false;        
 }
 
