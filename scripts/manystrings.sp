@@ -11,7 +11,7 @@ begin
             writeln ('procedure p', i, ';');
             writeln ('begin');
             for j := 1 to 50 do
-                writeln ('    writeln (''This is line '', ', 50 * pred (i) + j, ');');
+                writeln ('    writeln (''This is line ', 50 * pred (i) + j, ''');');
 	    writeln ('end;');
 	    writeln
        end;
