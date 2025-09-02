@@ -52,7 +52,7 @@ function __short_str_greater_equal (s, t: PChar): boolean;
 function __short_str_less (s, t: PChar): boolean; 
 function __short_str_greater (s, t: PChar): boolean; 
 
-function __copy_str_const (var s: string): string;
+function __copy_str_const (var s: string): string; external;
 
 function keypressed: boolean;
 procedure waitkey;
@@ -91,6 +91,9 @@ type
 function __set_add_val (val: integer; var s: __set_array): __generic_set_type; 
 function __set_add_range (minval, maxval: integer; var s: __set_array): __generic_set_type; 
 
+var
+    __str_const_buf: string;
+    
 function __copy_set_const (var s: __generic_set_type): __generic_set_type; external;
 
 function __in_set (v: integer; var s: __set_array): boolean; intrinsic;
@@ -523,11 +526,6 @@ function copy (s: PChar; start, len: integer): string;
             result [0] := #0
     end;
     
-function __copy_str_const (var s: string): string;
-    begin
-        __copy_str_const := s 
-    end;
-
 const 
     hex: string [16] = '0123456789ABCDEF';
     

@@ -33,7 +33,7 @@ public:
     static bool performTypeConversion (TType *required, TExpressionBase *&expr, TBlock &);
     static TType *convertBaseType (TExpressionBase *&expression, TBlock &);
     
-    static TExpressionBase *createVariableAccess (const std::string &name, TBlock &);
+    static TExpressionBase *createVariableAccess (const std::string &name, TBlock &, bool lValue = false);
     static TFunctionCall *createRuntimeCall (const std::string &name, TType *result, std::vector<TExpressionBase *> &&args, TBlock &, bool checkParameter);
     static TExpressionBase *createInt64Constant (std::int64_t val, TBlock &block);
     template<typename T> static TExpressionBase *createConstant (T val, TType *type, TBlock &);
@@ -237,7 +237,7 @@ public:
     
     TExpressionBase *getReturnStorage () const;		// L-value
     TExpressionBase *getReturnStorageDeref () const;	// L-value dereference
-    void setReturnStorage (TExpressionBase *returnStorage, TBlock &);	// L-value
+    void setReturnStorage (TExpressionBase *returnStorage, TBlock &, bool replacesTemp = false);	// L-value
     
 private:
     TExpressionBase *function;

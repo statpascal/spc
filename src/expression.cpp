@@ -142,9 +142,12 @@ bool TExpressionBase::evaluateConstant (TExpressionBase *&expr, TType *type, TTo
     return expr != exprIn;
 }
 
-TExpressionBase *TExpressionBase::createVariableAccess (const std::string &name, TBlock &block) {
-    return block.getCompiler ().createMemoryPoolObject<TLValueDereference> (
-               block.getCompiler ().createMemoryPoolObject<TVariable> (block.getSymbols ().searchSymbol (name), block));
+TExpressionBase *TExpressionBase::createVariableAccess (const std::string &name, TBlock &block, bool lValue) {
+    TExpressionBase *expr = block.getCompiler ().createMemoryPoolObject<TVariable> (block.getSymbols ().searchSymbol (name), block);
+    if (lValue)
+        return expr;
+    else
+        return block.getCompiler ().createMemoryPoolObject<TLValueDereference> (expr);
 }
 
 TType *TExpressionBase::convertBaseType (TExpressionBase *&expression, TBlock &block) {
@@ -173,8 +176,18 @@ bool TExpressionBase::checkTypeConversion (TType *required, TExpressionBase *&ex
     if (required->isShortString () && expr->getType ()->isShortString ())
         return true;
         
-    if (required->isPointer () && expr->getType ()->isShortString ())
+    if (required->isPointer () && expr->getType ()->isShortString ()) {
+#ifdef CREATE_9900        
+        if (expr->isConstant ()) {
+            const std::string s = static_cast<TConstantValue *> (expr)->getConstant ()->getString ();
+            TType *stringType = compiler.createMemoryPoolObject<TShortStringType> (
+                compiler.createMemoryPoolObject<TSubrangeType> (std::string (), &stdType.Int64, 0, s.length ()));
+            expr = createRuntimeCall ("__copy_str_const", stringType, {expr}, block, false);
+            static_cast<TFunctionCall *> (expr)->setReturnStorage (createVariableAccess ("__str_const_buf", block, true), block, true);
+        }
+#endif
         return true;
+    }
         
     if (expr->getType () == &stdType.UnresOverload && expr->isRoutine () && required->isRoutine ())
         return static_cast<TRoutineValue *> (expr)->resolveConversion (static_cast<TRoutineType *> (required));
@@ -791,12 +804,13 @@ TExpressionBase *TFactor::parse (TBlock &block) {
         expr = parseIdentifier (block);
     else if (token == TToken::IntegerConst || token == TToken::RealConst || token == TToken::CharConst || token == TToken::StringConst || token == TToken::SizeOf) {
         expr = compiler.createMemoryPoolObject<TConstantValue> (block.parseConstantLiteral ());
-        if (token == TToken::StringConst)
+        if (token == TToken::StringConst) {
 #ifdef CREATE_9900        
-            expr = createRuntimeCall ("__copy_str_const", &stdType.ShortString, {expr}, block, false);
+//            expr = createRuntimeCall ("__copy_str_const", &stdType.ShortString, {expr}, block, false);
 #else            
             expr = createRuntimeCall ("__str_make", nullptr, {expr, TExpressionBase::createVariableAccess (TConfig::globalRuntimeDataPtr, block)}, block, false);
 #endif            
+        }
     } else if (lexer.checkToken (TToken::BracketOpen)) {
         expr = TExpression::parse (block);
         compiler.checkToken (TToken::BracketClose, "Bracketed expression missing ')'");
@@ -831,7 +845,7 @@ TExpressionBase *TFactor::parseIdentifier (TBlock &block) {
 #endif
                 } else if (symbol->getType ()->isShortString ()) {
 #ifdef CREATE_9900
-                    expr = createRuntimeCall ("__copy_str_const", symbol->getType (), {expr}, block, false);
+//                    expr = createRuntimeCall ("__copy_str_const", symbol->getType (), {expr}, block, false);
 #endif                
                 }
             } else if (symbol->checkSymbolFlag (TSymbol::Routine))
@@ -1153,14 +1167,13 @@ void TFunctionCall::acceptCodeGenerator (TCodeGenerator &codeGenerator) {
     codeGenerator.generateCode (*this);
 }
 
-void TFunctionCall::setReturnStorage (TExpressionBase *expr, TBlock &block) {
+void TFunctionCall::setReturnStorage (TExpressionBase *expr, TBlock &block, bool replacesTemp) {
     returnStorage = expr;
     returnStorageDeref = block.getCompiler ().createMemoryPoolObject<TLValueDereference> (returnStorage);
     block.getSymbols ().removeSymbol (returnSymbol);
-    ignoreReturn = true;
+    ignoreReturn = !replacesTemp;
     returnSymbol = nullptr;
 }
-
 
 TVariable::TVariable (TSymbol *symbol, TBlock &block):
   symbol (symbol) {

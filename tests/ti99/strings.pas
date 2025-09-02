@@ -34,7 +34,7 @@ begin
     for i := 1 to 10 do
         a [i] := chr (ord ('a') + pred (i));
     writeln (a);
-
+    
     writeln;
     writeln ('Comparison:');
     writeln ('s=', s);

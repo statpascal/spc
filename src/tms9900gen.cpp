@@ -64,7 +64,8 @@ const std::uint16_t workspace = 0x8300;
 const std::string farCall = "__far_call_2",
                   farCallCode = "__far_call_1",
                   farRet = "__far_ret",
-                  copySet = "__copy_set_const";
+                  copySet = "__copy_set_const",
+                  copyStr = "__copy_str_const";
 
 const std::vector<T9900Reg>
     intStackReg = {T9900Reg::r1, T9900Reg::r2, T9900Reg::r3, T9900Reg::r4, T9900Reg::r5, T9900Reg::r6, T9900Reg::r7}; 
@@ -580,8 +581,8 @@ void T9900Generator::calcLength (TCodeBlock &proc) {
 }
 
 void T9900Generator::assignBank (TCodeBlock &proc, std::size_t &bank, std::size_t &org) {
-//    if (org + proc.size >= 0x7ff0) {
-    if (org + proc.size >= 0x6d00) {
+    if (org + proc.size >= 0x7ff0) {
+//    if (org + proc.size >= 0x6d00) {	// force earlier switch for tests
         ++bank;
         org = 0x6000 + sharedCode.size;
     }
@@ -682,6 +683,13 @@ void T9900Generator::outputLocalDefinitions () {
                 outputCode (T9900Op::data, T9900Operand (s.empty () ? it.defaultLabel : s));
         }
         jumpTableDefinitions.clear ();
+    }
+    if (!stringDefinitions.empty ()) {
+        outputComment (std::string ());
+        for (const TStringDefinition &s: stringDefinitions)
+            outputCode (T9900Op::stri, T9900Operand (s.label), T9900Operand (s.val));
+        stringDefinitions.clear ();
+        outputCode (T9900Op::even);
     }
     if (!setDefinitions.empty ()) {
         outputComment (std::string ());
@@ -1792,6 +1800,20 @@ void T9900Generator::generateCode (TProgram &program) {
     outputCode (T9900Op::b, T9900Operand (T9900Reg::r11, T9900Operand::TAddressingMode::RegInd));
     
     outputComment (std::string ());
+    outputLabel (copyStr);
+    outputCode (T9900Op::mov, T9900Operand (T9900Reg::r10, T9900Operand::TAddressingMode::RegInd), intScratchReg2);
+    outputCode (T9900Op::mov, T9900Operand (T9900Reg::r10, 2), intScratchReg3);
+    outputCode (T9900Op::movb, T9900Operand (intScratchReg3, T9900Operand::TAddressingMode::RegInd), intScratchReg4);
+    outputCode (T9900Op::sra, intScratchReg4, 8);
+    ll = getNextLocalLabel ();
+    outputLabel (ll);
+    outputCode (T9900Op::movb, T9900Operand (intScratchReg3, T9900Operand::TAddressingMode::RegIndInc), T9900Operand (intScratchReg2, T9900Operand::TAddressingMode::RegIndInc));
+    outputCode (T9900Op::dec, intScratchReg4);
+    outputCode (T9900Op::joc, ll);
+    outputCode (T9900Op::ai, T9900Reg::r10, 4);
+    outputCode (T9900Op::b, T9900Operand (T9900Reg::r11, T9900Operand::TAddressingMode::RegInd));
+    
+    outputComment (std::string ());
     outputLabel (progstart);
     outputCode (T9900Op::lwpi, workspace);
     outputCode (T9900Op::limi, 0);
@@ -1805,14 +1827,6 @@ void T9900Generator::generateCode (TProgram &program) {
     setOutput (&mainProgram.codeSequence);
     outputStaticConstants ();
     
-    setOutput (&sharedCode.codeSequence);
-    if (!stringDefinitions.empty ()) {
-        outputComment (std::string ());
-        for (const TStringDefinition &s: stringDefinitions)
-            outputCode (T9900Op::stri, T9900Operand (s.label), T9900Operand (s.val));
-        stringDefinitions.clear ();
-        outputCode (T9900Op::even);
-    }
 }
 
 void T9900Generator::initStaticRoutinePtr (std::size_t addr, const TRoutineValue *routineValue) {
