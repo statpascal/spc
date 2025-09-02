@@ -617,9 +617,16 @@ TExpressionBase *TExpression::parse (TBlock &block) {
         TExpressionBase *right = TSimpleExpression::parse (block);
         if (left && right)
             if (TType *type = checkOperatorTypes (left, right, operation, block)) {
-                if (operation == TToken::In) 
+                if (operation == TToken::In) {
+#ifdef CREATE_9900
+                    if (right->isFunctionCall () && static_cast<TFunctionCall *> (right)->getFunction ()->isRoutine ()) {
+                        TRoutineValue *routine = static_cast<TRoutineValue *> (static_cast<TFunctionCall *> (right)->getFunction ());
+                        if (routine->getSymbol ()->getName () == "__copy_set_const") 
+                            right = static_cast<TFunctionCall *> (right)->getArguments () [0];
+                    }
+#endif                
                     left = createRuntimeCall ("__in_set", type, {compiler.createMemoryPoolObject<TTypeCast> (&stdType.Int64, left), right}, block, false);
-                else if (left->getType ()->isSet ()) {
+                } else if (left->getType ()->isSet ()) {
                     left = createRuntimeCall (setRuntimeFunc.at (operation), type, {left, right}, block, false);
                 } else if (left->getType () == &stdType.String)
                     left = createRuntimeCall (strRuntimeFunc.at (operation), type, {left, right}, block, true);
@@ -784,8 +791,10 @@ TExpressionBase *TFactor::parse (TBlock &block) {
         expr = parseIdentifier (block);
     else if (token == TToken::IntegerConst || token == TToken::RealConst || token == TToken::CharConst || token == TToken::StringConst || token == TToken::SizeOf) {
         expr = compiler.createMemoryPoolObject<TConstantValue> (block.parseConstantLiteral ());
-#ifndef CREATE_9900        
         if (token == TToken::StringConst)
+#ifdef CREATE_9900        
+            expr = createRuntimeCall ("__copy_str_const", &stdType.ShortString, {expr}, block, false);
+#else            
             expr = createRuntimeCall ("__str_make", nullptr, {expr, TExpressionBase::createVariableAccess (TConfig::globalRuntimeDataPtr, block)}, block, false);
 #endif            
     } else if (lexer.checkToken (TToken::BracketOpen)) {
@@ -820,6 +829,10 @@ TExpressionBase *TFactor::parseIdentifier (TBlock &block) {
 #ifndef CREATE_9900                
                     expr = createRuntimeCall ( "__str_make", symbol->getType (), {expr, TExpressionBase::createVariableAccess (TConfig::globalRuntimeDataPtr, block)}, block, false);
 #endif
+                } else if (symbol->getType ()->isShortString ()) {
+#ifdef CREATE_9900
+                    expr = createRuntimeCall ("__copy_str_const", symbol->getType (), {expr}, block, false);
+#endif                
                 }
             } else if (symbol->checkSymbolFlag (TSymbol::Routine))
                 expr = compiler.createMemoryPoolObject<TRoutineValue> (identifier, block);

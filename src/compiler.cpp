@@ -880,6 +880,7 @@ void TBlock::parseSubroutine (bool isFunction) {
         isExport = true;
     else if (lexer.checkToken (TToken::External)) {
         isExternal = true;
+        routineType->setFarCall (false);
         parseExternalDeclaration (libName, symbolName);
     } else if (lexer.checkToken (TToken::Intrinsic)) {
         isIntrinsic = true;

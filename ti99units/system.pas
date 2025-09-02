@@ -52,6 +52,8 @@ function __short_str_greater_equal (s, t: PChar): boolean;
 function __short_str_less (s, t: PChar): boolean; 
 function __short_str_greater (s, t: PChar): boolean; 
 
+function __copy_str_const (var s: string): string;
+
 function keypressed: boolean;
 procedure waitkey;
 
@@ -89,7 +91,7 @@ type
 function __set_add_val (val: integer; var s: __set_array): __generic_set_type; 
 function __set_add_range (minval, maxval: integer; var s: __set_array): __generic_set_type; 
 
-function __copy_set_const (var s: __generic_set_type): __generic_set_type;
+function __copy_set_const (var s: __generic_set_type): __generic_set_type; external;
 
 function __in_set (v: integer; var s: __set_array): boolean; intrinsic;
 function __set_union (var s, t: __set_array): __generic_set_type; 
@@ -106,13 +108,6 @@ function __set_super_not_equal (var s, t: __set_array): boolean;
     
 implementation
 
-function __copy_set_const (var s: __generic_set_type): __generic_set_type;
-    begin
-        result := s
-    end;
-var 
-    vdpWriteAddress: integer;
-    
 // simple UCSD-like heap managment in lower memory
 
 const
@@ -150,6 +145,9 @@ procedure release (p: pointer);
 
 // 
 
+var
+    vdpWriteAddress: integer;
+    
 procedure setCRUBit (addr: integer; val: boolean); assembler;
     mov  *r10, r12
     mov  @2(r10), r13
@@ -524,7 +522,11 @@ function copy (s: PChar; start, len: integer): string;
         else
             result [0] := #0
     end;
-
+    
+function __copy_str_const (var s: string): string;
+    begin
+        __copy_str_const := s 
+    end;
 
 const 
     hex: string [16] = '0123456789ABCDEF';

@@ -63,7 +63,8 @@ const std::uint16_t workspace = 0x8300;
                     
 const std::string farCall = "__far_call_2",
                   farCallCode = "__far_call_1",
-                  farRet = "__far_ret";
+                  farRet = "__far_ret",
+                  copySet = "__copy_set_const";
 
 const std::vector<T9900Reg>
     intStackReg = {T9900Reg::r1, T9900Reg::r2, T9900Reg::r3, T9900Reg::r4, T9900Reg::r5, T9900Reg::r6, T9900Reg::r7}; 
@@ -143,13 +144,13 @@ void T9900Generator::removeUnusedLocalLabels (TCodeSequence &code) {
 }
 
 bool rangeOk (std::int64_t a, std::int64_t b) {
-    return std::abs (a - b) < 240;
+    return std::abs (a - b) < 220;
 }
 
 void T9900Generator::adjustJumpLabels (std::size_t offset, std::size_t val) {
     for (std::map<std::string, std::int64_t>::iterator it = jmpLabels.begin (); it != jmpLabels.end (); ++it)
-        if (static_cast<std::size_t> (it->second) >= offset)
-            it->second += val;
+        if (static_cast<std::size_t> (it->second) > offset)
+            it->second -= val;
 }
 
 void T9900Generator::removeJmpLines (TCodeSequence &code, TCodeSequence::iterator it, std::size_t count, std::size_t beginOffset) {
@@ -158,7 +159,7 @@ void T9900Generator::removeJmpLines (TCodeSequence &code, TCodeSequence::iterato
         val += it->getSize (0);
         it = code.erase (it);
     }
-    adjustJumpLabels (beginOffset, -val);
+    adjustJumpLabels (beginOffset, val);
 }
 
 void T9900Generator::optimizeJumps (TCodeSequence &code) {
@@ -177,6 +178,7 @@ void T9900Generator::optimizeJumps (TCodeSequence &code) {
     TCodeSequence::iterator line = code.begin ();
     int skip = 0;
     while (line->operation != T9900Op::end) {
+        std::int64_t oldOffset = offset;
         offset += line->getSize (offset);
         if (skip)
             --skip;
@@ -196,16 +198,16 @@ void T9900Generator::optimizeJumps (TCodeSequence &code) {
             if ((op [0] == jeq || op [0] == jne) && op [1] == b && op [2] == def_label && label [0] == label [2] && rangeOk (offset, jmpLabels [label [1]])) {
                 line->operation = op [0] == jeq ? jne : jeq;
                 line->operand1 = label [1];
-                removeJmpLines (code, std::next (line), 2, offset);
+                removeJmpLines (code, std::next (line), 2, oldOffset);
             } else if (op [0] == jlt && op [1] == jeq && op [2] == b && op [3] == def_label &&
                 label [0] == label [3] && label [1] == label [3] && rangeOk (offset, jmpLabels [label [2]])) {
                 line->operation = jgt;
                 line->operand1 = label [2];
-                removeJmpLines (code, std::next (line), 3, offset);
+                removeJmpLines (code, std::next (line), 3, oldOffset);
             } else if (op [0] == b && rangeOk (offset, jmpLabels [label [0]]) && label [0] != farRet) {
                 line->operation = jmp;
                 line->operand1 = label [0];
-                adjustJumpLabels (offset, -2);
+                adjustJumpLabels (oldOffset, 2);
             }
 //            } else
 //                skip = 2;
@@ -578,7 +580,8 @@ void T9900Generator::calcLength (TCodeBlock &proc) {
 }
 
 void T9900Generator::assignBank (TCodeBlock &proc, std::size_t &bank, std::size_t &org) {
-    if (org + proc.size >= 0x7ff0) {
+//    if (org + proc.size >= 0x7ff0) {
+    if (org + proc.size >= 0x6d00) {
         ++bank;
         org = 0x6000 + sharedCode.size;
     }
@@ -1084,11 +1087,6 @@ void T9900Generator::codeInlinedFunction (TFunctionCall &functionCall) {
         outputCode (T9900Op::mov, static_cast<T9900Reg> (static_cast<unsigned> (reg) + 1), reg);
         saveReg (reg);
     }
-    if (s == "__copy_set_const") {
-        visit (args [0]);
-        visit (args [1]);
-        codeMove (functionCall.getType ());
-    }
     if (s == "__in_set") {
         visit (args [0]);
         T9900Reg val = fetchReg (intScratchReg3);
@@ -1121,10 +1119,11 @@ void T9900Generator::codeInlinedFunction (TFunctionCall &functionCall) {
 
 bool T9900Generator::isFunctionCallInlined (TFunctionCall &functionCall) {
     TExpressionBase *function = functionCall.getFunction ();
-    if (function->isRoutine ())
-        return static_cast<TRoutineValue *> (function)->getSymbol ()->checkSymbolFlag (TSymbol::Intrinsic);
-    else
-        return false;        
+    if (function->isRoutine ()) {
+        TSymbol *s = static_cast<TRoutineValue *> (function)->getSymbol ();
+        return s->checkSymbolFlag (TSymbol::Intrinsic);
+    } else
+        return false;
 }
 
 bool T9900Generator::isReferenceCallerCopy (const TType *type) {
@@ -1779,6 +1778,20 @@ void T9900Generator::generateCode (TProgram &program) {
     outputCode (T9900Op::clr, T9900Operand (intScratchReg2, T9900Operand::TAddressingMode::RegInd), T9900Operand (), "switch bank");
     outputCode (T9900Op::b, T9900Operand (T9900Reg::r11, T9900Operand::TAddressingMode::RegInd));
     
+    outputComment (std::string ());
+    outputLabel (copySet);
+    outputCode (T9900Op::mov, T9900Operand (T9900Reg::r10, T9900Operand::TAddressingMode::RegInd), intScratchReg2);
+    outputCode (T9900Op::mov, T9900Operand (T9900Reg::r10, 2), intScratchReg3);
+    outputCode (T9900Op::li, intScratchReg4, 16);
+    std::string ll = getNextLocalLabel ();
+    outputLabel (ll);
+    outputCode (T9900Op::mov, T9900Operand (intScratchReg3, T9900Operand::TAddressingMode::RegIndInc), T9900Operand (intScratchReg2, T9900Operand::TAddressingMode::RegIndInc));
+    outputCode (T9900Op::dec, intScratchReg4);
+    outputCode (T9900Op::jne, ll);
+    outputCode (T9900Op::ai, T9900Reg::r10, 4);
+    outputCode (T9900Op::b, T9900Operand (T9900Reg::r11, T9900Operand::TAddressingMode::RegInd));
+    
+    outputComment (std::string ());
     outputLabel (progstart);
     outputCode (T9900Op::lwpi, workspace);
     outputCode (T9900Op::limi, 0);

@@ -281,7 +281,9 @@ public:
     const TSymbolList &getParameter () const;
     TType *getReturnType () const;
     bool parameterEmpty () const;
+    
     bool isFarCall () const { return farCall; }		// TMS9900 only;
+    void setFarCall (bool f) { farCall = f; }
     
     bool matchesForward (const TRoutineType *other) const;
     bool matchesOverload (const TRoutineType *other) const;
