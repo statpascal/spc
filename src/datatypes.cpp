@@ -331,7 +331,7 @@ TFileType::TFileType (TType *baseType, TSymbolList *components):
   inherited (components),
   baseType (baseType) {
 #ifdef CREATE_9900
-    addComponent ("idx", &stdType.Int16);
+    addComponent ("dataptr", &stdType.GenericPointer);
 #else  
     addComponent ("idx", &stdType.Int64);
     addComponent ("fn", &stdType.String);

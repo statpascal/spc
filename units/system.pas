@@ -226,7 +226,7 @@ procedure __write_vstring (var f: text; s: stringvector; length, precision: int6
 procedure __write_vboolean (var f: text; b: boolvector; length, precision: int64; runtimeData: pointer); external name 'rt_write_vbool';
 procedure __write_vdbl (var f: text; a: realvector; length, precision: int64; runtimeData: pointer); external name 'rt_write_vdbl';
 
-procedure __str_int64 (n, length, precision: int64; var s: string); external name 'rt_str_int';
+procedure __str_int (n, length, precision: int64; var s: string); external name 'rt_str_int';
 procedure __str_dbl (a: real; length, precision: int64; var s: string); external name 'rt_str_dbl';
 
 type

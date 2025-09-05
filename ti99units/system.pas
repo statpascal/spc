@@ -21,6 +21,8 @@ procedure clrscr;
 
 procedure move (var src, dest; length: integer);
 function compareWord (var src, dest; length: integer): boolean;
+procedure fillChar (var dest; count: integer; value: char);
+procedure fillChar (var dest; count: integer; value: uint8);
 
 procedure vmbw (var src; dest, length: integer);	// video multiple byte write
 procedure vmbr (var dest; src, length: integer);	// video multiple byte read
@@ -42,6 +44,8 @@ procedure __write_boolean (var f: text; b: boolean; length, precision: integer);
 function length (s: PChar): integer;
 function pos (ch: char; s: PChar): integer;
 function copy (s: PChar; start, len: integer): string;
+
+procedure __str_int (n, length, precision: integer; s: PChar);
 
 function __short_str_char (ch: char): string1;
 function __short_str_concat (a, b: PChar): string;
@@ -108,8 +112,10 @@ function __set_super (var s, t: __set_array): boolean;
 function __set_sub_not_equal (var s, t: __set_array): boolean;
 function __set_super_not_equal (var s, t: __set_array): boolean;
 
-    
+
 implementation
+
+uses files;
 
 // simple UCSD-like heap managment in lower memory
 
@@ -245,13 +251,33 @@ function compareWord (var src, dest; length: integer): boolean; assembler;
     comparebyte_2:
         li r12, >0100
         movb r12, *r15
-        b *r11
+        jmp comparebyte_4		// TODO: add rt with near/far return
         
-    comparebyte_3
+    comparebyte_3:
         clr r12
         movb r12, *r15
-        b *r11
+        
+    comparebyte_4:
 end;
+
+procedure fillChar (var dest; count: integer; value: char); assembler;
+        mov @count, r12
+        jeq fillchar_2
+        
+        mov @dest, r13
+        movb @value, r14
+    fillchar_1:
+        movb r14, *r13+
+        dec r12
+        jne fillchar_1
+        
+    fillchar_2:
+end;
+
+procedure fillChar (var dest; count: integer; value: uint8);
+    begin
+        fillChar (dest, count, chr (value))
+    end;
     
 procedure vrbw (val: uint8; length: integer); assembler;
         mov @length, r12
@@ -276,19 +302,6 @@ function readV (addr: integer): uint8;
         vdpwa := chr (addr shr 8);
         readV := ord (vdprd)
     end;
-
-procedure __write_data (p: pointer; length: integer); assembler;
-        mov @length, r12
-        jeq __write_data_2
-        mov @p, r13
-        li r14, vdpwd
-        inc r13
-    __write_data_1:
-        movb *r13+, *r14
-        dec r12
-        jne __write_data_1
-    __write_data_2
-end;
 
 procedure vmbw (var src; dest, length: integer); assembler;
         mov @length, r14
@@ -353,52 +366,23 @@ procedure scroll;
     
 procedure __write_lf (var f: text);
     begin
-        vdpWriteAddress := (vdpWriteAddress + 32) and not 31;
-        if vdpWriteAddress = 24 * 32 then
-            scroll;
-        setVdpAddress (vdpWriteAddress or WriteAddr);
+        if f.dataptr = nil then
+            begin
+                vdpWriteAddress := (vdpWriteAddress + 32) and not 31;
+                if vdpWriteAddress = 24 * 32 then
+                    scroll;
+                setVdpAddress (vdpWriteAddress or WriteAddr);
+            end
+        else
+            __end_line (f)
     end;
     
 procedure __write_int (var f: text; n, length, precision: integer);
-
-    function outint (n: integer; neg: boolean; p: pointer): pointer; assembler;
-            mov @p, r0
-            mov @n, r14
-            li r12, 10
-        
-        outint1:
-            clr r13
-            div r12, r13
-            ai r14, 48
-            swpb r14
-            movb r14, *r0
-            dec r0
-            mov r13, r14
-            jne outint1
-            
-            mov @neg, r13
-            jeq outint2
-            li r13, >2d00
-            movb r13, *r0
-            dec r0
-            
-        outint2:
-            mov *r10, r12
-            mov r0, *r12
-    end;
-        
     var
-        buf: string [6];
-        p: PChar;
+        buf: string;
     begin
-        if n = -32768 then
-            __write_string (f, '-32768', length, precision)
-        else
-            begin
-                p := outint (abs (n), n < 0, addr (buf [6]));
-                p^ := chr (integer (addr (buf [6])) - integer (p));
-                __write_string (f, p, length, -1)
-            end
+        __str_int (n, length, -1, buf);
+        __write_string (f, buf, length, -1);
     end;
     
 procedure __write_char (var f: text; ch: char; length, precision: integer);
@@ -411,20 +395,52 @@ procedure __write_char (var f: text; ch: char; length, precision: integer);
     end;
     
 procedure __write_string (var f: text; p: PChar; length, precision: integer);
+
+    procedure __write_data (p: pointer; length: integer); assembler;
+            mov @length, r12
+            jeq __write_data_2
+            mov @p, r13
+            li r14, vdpwd
+            inc r13
+        __write_data_1:
+            movb *r13+, *r14
+            dec r12
+            jne __write_data_1
+        __write_data_2
+    end;
+
     var
-        len, outlen: integer;
+        i, len, outlen: integer;
     begin
         len := ord (p^);
         outlen := len;
         if length > len then
             outlen := length;
-        while vdpWriteAddress + outlen > 24 * 32 do
-            scroll;
-        setVdpAddress (vdpWriteAddress or WriteAddr);
-        inc (vdpWriteAddress, outlen);
-        if outlen > len then
-            vrbw (32, outlen - len);
-        __write_data (p, len)
+        
+        if f.dataptr = nil then 
+            begin
+                while vdpWriteAddress + outlen > 24 * 32 do
+                    scroll;
+                setVdpAddress (vdpWriteAddress or WriteAddr);
+                inc (vdpWriteAddress, outlen);
+                if outlen > len then
+                    vrbw (32, outlen - len);
+                __write_data (p, len)
+            end
+        else
+            with __text_file_data (f.dataptr^) do
+                begin
+                    for i := succ (len) to outlen do
+                        if bufindex < 254 then begin
+                            buf [bufindex] := ' ';
+                            inc (bufindex)
+                        end;
+                    for i := 1 to len do
+                        if bufindex < 254 then begin
+                            buf [bufindex] := p [i];
+                            inc (bufindex)
+                        end;
+                end
     end;
     
 procedure __write_boolean (var f: text; b: boolean; length, precision: integer);
@@ -440,8 +456,6 @@ function __short_str_char (ch: char): string1;
         result [0] := #1;
         result [1] := ch
     end;
-
-// TODO: pass max. length of result string - this will crash if too short
 
 function __short_str_concat (a, b: PChar): string;
     begin
@@ -511,8 +525,6 @@ function pos (ch: char; s: PChar): integer;
         pos := 0
     end;
     
-// TODO: pass max. length of result string - this will crash if too short
-
 function copy (s: PChar; start, len: integer): string;
     begin
         if start <= ord (s^) then
@@ -543,6 +555,59 @@ function hexstr2 (n: uint8): string2;
         result [0] := #2;
         result [1] := hex [succ (n shr 4)];
         result [2] := hex [succ (n and $0f)]
+    end;
+    
+procedure __str_int (n, length, precision: integer; s: PChar);
+
+    function outint (n: integer; neg: boolean; p: pointer): pointer; assembler;
+            mov @p, r0
+            mov @n, r14
+            li r12, 10
+        
+        outint1:
+            clr r13
+            div r12, r13
+            ai r14, 48
+            swpb r14
+            movb r14, *r0
+            dec r0
+            mov r13, r14
+            jne outint1
+            
+            mov @neg, r13
+            jeq outint2
+            li r13, >2d00
+            movb r13, *r0
+            dec r0
+            
+        outint2:
+            mov *r10, r12
+            mov r0, *r12
+    end;
+    
+    var 
+        res: string [6];
+        p: PChar;
+    
+    begin
+        if n = -32768 then
+            begin
+                res := '-32768';
+                p := addr (res [0])
+            end
+        else
+            begin
+                p := outint (abs (n), n < 0, addr (res [6]));
+                p^ := chr (integer (addr (res [6])) - integer (p))
+            end;
+        if length > ord (p^) then
+            begin
+                s [0] := chr (length);
+                fillChar (s [1], length - ord (p^), ' ');
+                move (p [1], s [succ (ord (s [0]) - ord (p^))], ord (p^))
+            end
+        else
+            move (p^, s^, succ (ord (p^)))
     end;
     
 function keypressed: boolean; assembler;
@@ -622,14 +687,6 @@ function __set_add_range (minval, maxval: integer; var s: __set_array): __generi
             __set_array (result) [i shr 4] := __set_array (result) [i shr 4] or (1 shl (i and 15))
     end;
 
-(*
-function __in_set (v: integer; var s:__set_array): boolean; intrinsic;
-
-    begin
-        __in_set := s [v shr 4] and (1 shl (v and 15)) <> 0
-    end;
-*)    
-    
 function __set_union (var s, t: __set_array): __generic_set_type; 
     var
         i: integer;
@@ -693,6 +750,7 @@ function __set_super_not_equal (var s, t: __set_array): boolean;
     end;
 
 begin
+    output.dataptr := nil;
     loadCharset;
     gotoxy (0, 0);
 end.

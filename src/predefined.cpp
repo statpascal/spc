@@ -158,7 +158,9 @@ void TResetRewriteRoutine::checkArguments (TBlock &block, bool isReset, std::vec
             compiler.errorMessage (TCompilerImpl::InvalidType, "Record size can only be used with untyped files");
     } else if (!isTextType) 
         arguments.push_back (createInt64Constant (baseType ? baseType->getSize () : 128, block));
+#ifndef CREATE_9900        
     arguments.push_back (TExpressionBase::createVariableAccess (TConfig::globalRuntimeDataPtr, block));
+#endif    
     const char *runtimeName [2][2] = {{"__rewrite_bin", "__rewrite_text"}, {"__reset_bin", "__reset_text"}};
     appendTransformedNode (createRuntimeCall (runtimeName [isReset][isTextType], nullptr, std::move (arguments), block, true));
 }
@@ -182,7 +184,7 @@ void TStrRoutine::checkArguments (TBlock &block, std::vector<TRuntimeRoutine::TF
     TRuntimeRoutine::TFormatArguments &valArgument = arguments.front ();
     const TType *type = convertBaseType (valArgument.expression, block);
     checkFormatArguments (valArgument, type, block);
-    const std::string runtimeRoutine = (type == &stdType.Int64) ? "__str_int64" : "__str_dbl";
+    const std::string runtimeRoutine = (type == &stdType.Int64) ? "__str_int" : "__str_dbl";
 
     std::vector<TExpressionBase *> callArguments {
         valArgument.expression, valArgument.length, valArgument.precision, arguments [1].expression};
@@ -468,7 +470,11 @@ const std::map<TParameter, TType *> typeMap = {
     {Int_16, &stdType.Uint16},
     {Int_64, &stdType.Int64},
     {Dbl, &stdType.Real},
+#ifdef CREATE_9900    
+    {String, &stdType.ShortString},
+#else
     {String, &stdType.String},
+#endif    
     {Char, &stdType.Char},
     {Bool, &stdType.Boolean},
     {Pointer, &stdType.GenericPointer},
@@ -619,8 +625,10 @@ TExpressionBase *TPredefinedRoutine::parse (const std::string &identifier, TBloc
                 if (routineDescription.flags & RoutineDescription::KeepType)
                     returnType = args [0]->getType ();
                 
+#ifndef CREATE_9900
                 if (routineDescription.flags & RoutineDescription::AppendGlobalRuntimeDataPtr)
                     args.push_back ({TExpressionBase::createVariableAccess (TConfig::globalRuntimeDataPtr, block)});
+#endif                   
                     
                 if ((routineDescription.name == RoutineDescription::Pred || routineDescription.name == RoutineDescription::Succ) && returnType->isEnumerated () && args [0]->isConstant ()) 
                     return createConstant<std::int64_t> (static_cast<TConstantValue *> (args [0])->getConstant ()->getInteger () + (routineDescription.name == RoutineDescription::Succ ? 1 : - 1), returnType, block);
