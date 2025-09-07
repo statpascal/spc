@@ -487,9 +487,14 @@ TType *TBlock::parseFileType () {
         baseType = parseType ();
     if (baseType && !baseType->isSerializable ())
         compiler.errorMessage (TCompilerImpl::InvalidType, "Invalid type used for file");
-    if (baseType)
-        return compiler.createMemoryPoolObject<TFileType> (baseType, compiler.createMemoryPoolObject<TSymbolList> (nullptr, compiler.getMemoryPoolFactory ()));
-    else
+    if (baseType) {
+        TFileType *t = compiler.createMemoryPoolObject<TFileType> (baseType->isVoid () ? nullptr : baseType, compiler.createMemoryPoolObject<TSymbolList> (nullptr, compiler.getMemoryPoolFactory ()));
+        if (TSymbol *symbol = symbols->searchSymbol ("__file_data", TSymbol::NamedType)) 
+            if (TRecordType *rec = dynamic_cast<TRecordType *> (symbol->getType ()))
+                for (TSymbol *s: *rec->getRecordFields ().components)
+                    t->addComponent (s->getName (), s->getType ());
+        return t;
+    } else
         return symbols->searchSymbol (TConfig::binFileType, TSymbol::NamedType)->getType ();
 }
 
@@ -1371,10 +1376,10 @@ TMemoryPoolFactory &TCompilerImpl::getMemoryPoolFactory () {
 }
 
 void TCompilerImpl::createPredefinedSymbols () {
-    for (TType *t: std::vector<TType *> {&stdType.Boolean, &stdType.Char, &stdType.Uint8, &stdType.Int8, &stdType.Uint16, &stdType.Int16, &stdType.Uint32, &stdType.Int32, &stdType.Int64, &stdType.Real, &stdType.Single, &stdType.String})
+    for (TType *t: std::vector<TType *> {&stdType.Void, &stdType.Boolean, &stdType.Char, &stdType.Uint8, &stdType.Int8, &stdType.Uint16, &stdType.Int16, &stdType.Uint32, &stdType.Int32, &stdType.Int64, &stdType.Real, &stdType.Single, &stdType.String})
         predefinedSymbols->addNamedType (t->getName (), t);
-    predefinedSymbols->addNamedType (TConfig::binFileType, memoryPoolFactory.create<TFileType> (nullptr, memoryPoolFactory.create<TSymbolList> (nullptr, memoryPoolFactory)));
-    predefinedSymbols->addNamedType ("text", memoryPoolFactory.create<TFileType> (nullptr, memoryPoolFactory.create<TSymbolList> (nullptr, memoryPoolFactory)));
+//    predefinedSymbols->addNamedType (TConfig::binFileType, memoryPoolFactory.create<TFileType> (nullptr, memoryPoolFactory.create<TSymbolList> (nullptr, memoryPoolFactory)));
+//    predefinedSymbols->addNamedType ("text", memoryPoolFactory.create<TFileType> (nullptr, memoryPoolFactory.create<TSymbolList> (nullptr, memoryPoolFactory)));
     predefinedSymbols->addNamedType ("pointer", &stdType.GenericPointer);
     predefinedSymbols->addNamedType ("__generic_vector", &stdType.GenericVector);
     

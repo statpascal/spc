@@ -331,12 +331,12 @@ TFileType::TFileType (TType *baseType, TSymbolList *components):
   inherited (components),
   baseType (baseType) {
 #ifdef CREATE_9900
-    addComponent ("dataptr", &stdType.GenericPointer);
+//    addComponent ("dataptr", &stdType.GenericPointer);
 #else  
-    addComponent ("idx", &stdType.Int64);
-    addComponent ("fn", &stdType.String);
-    addComponent ("blksize", &stdType.Int64);
-    addComponent ("binary", &stdType.Boolean);
+//    addComponent ("idx", &stdType.Int64);
+//    addComponent ("fn", &stdType.String);
+//    addComponent ("blksize", &stdType.Int64);
+//    addComponent ("binary", &stdType.Boolean);
 #endif    
 }
 

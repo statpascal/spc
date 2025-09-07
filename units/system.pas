@@ -25,6 +25,16 @@ type
     double = real;
     PChar = ^char;
     
+    __file_data = record
+        idx: int64;
+        fn: string;
+        blksize: int64;
+        binary: boolean
+    end;
+    
+    __bin_file_type = file of void;
+    text = file of void;
+    
 var
     input, output: text;
 

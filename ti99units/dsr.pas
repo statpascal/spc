@@ -17,15 +17,6 @@ type
         isrList: pointer
     end;
 
-    TPab = record
-        opcode, err_type: uint8;
-        vdpaddr: integer;
-        reclen, numchar: uint8;
-        recnr: integer;
-        status: uint8;
-        name: string [25]	// TODO:  maximum file name length?
-    end;
-
 function dsrLink (var pab: TPab; pabVdpAddr: integer): boolean;
 
 const

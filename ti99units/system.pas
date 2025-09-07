@@ -2,14 +2,38 @@ unit system;
 
 interface
 
+const
+    MaxInt = $7fff;
+
 type
+    shortint = int8;
+    byte = uint8;
     integer = int16;
+    
     PChar = ^char;
     string1 = string [1];
     string2 = string [2];
     string4 = string [4];
     
     TVdpRegList = array [0..7] of uint8;
+    
+    TPab = record
+        opcode, err_type: uint8;
+        vdpaddr: integer;
+        reclen, numchar: uint8;
+        recnr: integer;
+        status: uint8;
+        name: string [25]	// TODO:  maximum file name length?
+    end;
+
+    __file_data = record
+        fileidx: integer;
+        bufpos: integer;
+        pab: TPab
+    end;
+    
+    __bin_file_type = file of void;
+    text = file of void;
     
 var
     input, output: text;
@@ -366,7 +390,7 @@ procedure scroll;
     
 procedure __write_lf (var f: text);
     begin
-        if f.dataptr = nil then
+        if f.fileidx = 0 then
             begin
                 vdpWriteAddress := (vdpWriteAddress + 32) and not 31;
                 if vdpWriteAddress = 24 * 32 then
@@ -417,7 +441,7 @@ procedure __write_string (var f: text; p: PChar; length, precision: integer);
         if length > len then
             outlen := length;
         
-        if f.dataptr = nil then 
+        if f.fileidx = 0 then 
             begin
                 while vdpWriteAddress + outlen > 24 * 32 do
                     scroll;
@@ -428,19 +452,18 @@ procedure __write_string (var f: text; p: PChar; length, precision: integer);
                 __write_data (p, len)
             end
         else
-            with __text_file_data (f.dataptr^) do
-                begin
-                    for i := succ (len) to outlen do
-                        if bufindex < 254 then begin
-                            buf [bufindex] := ' ';
-                            inc (bufindex)
-                        end;
-                    for i := 1 to len do
-                        if bufindex < 254 then begin
-                            buf [bufindex] := p [i];
-                            inc (bufindex)
-                        end;
-                end
+            begin
+                for i := succ (len) to outlen do
+                    if f.bufpos < f.pab.reclen then begin
+                        writeV (f.pab.vdpaddr + f.bufpos, ord (' '));
+                        inc (f.bufpos)
+                    end;
+                for i := 1 to len do
+                    if f.bufpos < f.pab.reclen then begin
+                        writeV (f.pab.vdpaddr + f.bufpos, ord (p [i]));
+                        inc (f.bufpos)
+                    end;
+            end
     end;
     
 procedure __write_boolean (var f: text; b: boolean; length, precision: integer);
@@ -750,7 +773,8 @@ function __set_super_not_equal (var s, t: __set_array): boolean;
     end;
 
 begin
-    output.dataptr := nil;
+    output.fileidx := 0;
+    input.fileidx := 0;
     loadCharset;
     gotoxy (0, 0);
 end.
