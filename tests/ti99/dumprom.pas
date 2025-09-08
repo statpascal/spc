@@ -1,9 +1,7 @@
 program dumprom;
 
-uses files;
-
 const
-    fn = 'DSK0.ROM.DAT';
+    fn = 'DSK1.ROM.DAT';
 
 var
     f: file;
@@ -14,6 +12,7 @@ begin
     rewrite (f, 128);
     blockwrite (f, rom, 8192 div 128);
     close (f);
+    
     writeln ('Console ROM dumped to file ', fn);
     waitkey
 end.

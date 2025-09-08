@@ -65,6 +65,44 @@ procedure __write_char (var f: text; ch: char; length, precision: integer);
 procedure __write_string (var f: text; p: PChar; length, precision: integer);
 procedure __write_boolean (var f: text; b: boolean; length, precision: integer);
 
+// file handling
+
+procedure __assign (var f; filename: string);
+
+procedure __rewrite_text (var f: text);
+procedure __reset_text (var f: text);
+
+procedure __rewrite_bin (var f; blocksize: integer);
+procedure __reset_bin (var f; blocksize: integer);
+
+procedure __write_bin_typed (var f, data);
+procedure __write_bin_ign (var f; var data; blocks: integer);
+
+procedure __read_bin_typed (var f, data);
+procedure __read_bin_ign (var f; var data; blocks: integer);
+
+procedure __close (var f);
+function __eof (var f): boolean;
+function __eof_input: boolean;
+
+procedure __end_line (var f: text);
+
+function __read_string (var f: text): string;
+procedure __read_lf (var f: text);
+
+const
+    TooManyOpenFiles = 1;
+    FileOpenFailed = 2;
+    InvalidFileName = 3;
+    FileNotOpen = 4;
+
+var
+   InOutRes: integer;
+   
+function IOResult: integer;
+
+// string handling
+
 function length (s: PChar): integer;
 function pos (ch: char; s: PChar): integer;
 function copy (s: PChar; start, len: integer): string;
@@ -139,7 +177,7 @@ function __set_super_not_equal (var s, t: __set_array): boolean;
 
 implementation
 
-uses files;
+uses dsr;
 
 // simple UCSD-like heap managment in lower memory
 
@@ -473,6 +511,215 @@ procedure __write_boolean (var f: text; b: boolean; length, precision: integer);
         else
             __write_string (f, 'false', length, -1) 
     end;
+    
+// file handling
+
+const
+    nFiles = 3;
+    fileBufSize = 245;
+    
+type
+    TFileDescriptor = record
+        isOpen: boolean;
+        pabAddr, bufAddr: integer
+    end;
+    
+var
+    vdpFree: integer absolute $8370;
+    openFiles: array [1..nFiles] of TFileDescriptor;
+    
+function IOResult: integer;
+    begin
+        IOResult := InOutRes;
+        InOutRes := 0
+    end;
+    
+procedure reserveVdpBufs;
+    var 
+        i: integer;
+    begin
+        for i := 1 to nFiles do
+            with openFiles [i] do
+                begin
+                    dec (vdpFree, fileBufSize);
+                    isOpen := false;
+                    bufAddr := succ (vdpFree);
+                    dec (vdpFree, sizeof (TPab));
+                    pabAddr := succ (vdpFree)
+                end
+    end;
+        
+procedure __assign (var f; filename: string);
+    begin
+        
+        __file_data (f).pab.name := filename
+    end;
+    
+function getFileDescriptor (var f: __file_data; isTextFile: boolean): boolean;
+    var
+        i: integer;
+    begin
+        f.fileidx := -1;
+        f.bufpos := 0;
+        fillChar (f.pab, 8, 0);
+        
+        if f.pab.name = '' then
+            if isTextFile then
+                f.fileidx := 0
+            else
+                InOutRes := InvalidFileName
+        else
+            begin
+                i := 1;
+                repeat
+                    with openFiles [i] do
+                        if not isOpen then
+                            begin
+                                isOpen := true;
+                                f.fileidx := i;
+                                f.pab.vdpaddr := openFiles [f.fileidx].bufAddr
+                            end;
+                    inc (i)
+                until (i > nFiles) or (f.fileidx <> -1)
+            end;
+        InOutRes := TooManyOpenFiles * ord (f.fileidx = -1);
+        getFileDescriptor := InOutRes = 0
+    end;
+        
+function execDsr (var f: __file_data): boolean;
+    begin
+        execDsr := dsrLink (f.pab, openFiles [f.fileidx].pabAddr)
+    end;        
+
+procedure openFile (var f: __file_data; opcode, ftype, reclen: uint8; isTextFile: boolean);
+    begin
+        if getFileDescriptor (f, isTextFile) and (f.fileidx <> 0) then
+            begin
+                f.pab.opcode := opcode;
+                f.pab.err_type := ftype;
+                f.pab.reclen := reclen;
+                InOutRes := FileOpenFailed * ord (not execDsr (f))
+            end
+    end;
+
+procedure __rewrite_bin (var f; blocksize: integer);
+    begin
+        openFile (__file_data (f), PabOpen, PabOutput or PabInternal or PabFixed or PabRelative, blocksize, false)
+    end;                
+    
+procedure __reset_bin (var f; blocksize: integer);
+    begin
+        openFile (__file_data (f), PabOpen, PabUpdate or PabInternal or PabFixed or PabRelative, blocksize, false)
+    end;                
+    
+procedure __rewrite_text (var f: text);
+    begin
+        openFile (__file_data (f), PabOpen, PabOutput or PabDisplay or PabVariable, 254, true)
+    end;
+    
+procedure __reset_text (var f: text);
+    begin
+        openFile (__file_data (f), PabOpen, PabInput or PabDisplay or PabVariable, 254, true)
+    end;
+    
+procedure __write_bin_ign (var f; var data; blocks: integer);
+    type
+        arrtype = array [0..MaxInt] of uint8;
+    var 
+        I: integer;
+    begin
+        __file_data (f).pab.opcode := PabWrite;
+        for i := 0 to pred (blocks) do
+            begin
+                vmbw (arrtype (data) [i * __file_data (f).pab.reclen], __file_data (f).pab.vdpaddr, __file_data (f).pab.reclen);
+                execDsr (__file_data (f))
+            end
+    end;        
+    
+procedure __write_bin_typed (var f, data);
+    begin
+        __write_bin_ign (f, data, 1)
+    end;
+    
+procedure __read_bin_ign (var f; var data; blocks: integer);
+    type
+        arrtype = array [0..MaxInt] of uint8;
+    var 
+        I: integer;
+    begin
+        __file_data (f).pab.opcode := PabRead;
+        for i := 0 to pred (blocks) do
+            begin
+                execDsr (__file_data (f));
+                vmbr (arrtype (data) [i * __file_data (f).pab.reclen], __file_data (f).pab.vdpaddr, __file_data (f).pab.reclen)
+            end
+    end;        
+    
+procedure __read_bin_typed (var f, data);
+    begin
+        __read_bin_ign (f, data, 1)
+    end;
+
+procedure __read_lf (var f: text);
+    begin
+    end;
+    
+function __read_string (var f: text): string;
+    begin
+        __file_data (f).pab.opcode := PabRead;
+        execDsr (__file_data (f));
+        vmbr (result [1], __file_data (f).pab.vdpaddr, __file_data (f).pab.numchar);
+        result [0] := chr (__file_data (f).pab.numchar)
+    end;    
+    
+procedure __close (var f);
+    begin
+        InOutRes := 0;
+        with __file_data (f) do
+            begin
+                if fileidx > 0 then
+                    begin
+                        pab.opcode := PabClose;
+                        execDsr (__file_data (f));
+                        openFiles [fileidx].isOpen := false;
+                        fileidx := -1
+                    end
+                else
+                    if fileidx < 0 then
+                        InOutRes := 1
+            end
+    end;
+    
+function __eof (var f): boolean;
+    begin
+        if __file_data (f).fileidx > 0 then
+            begin
+                __file_data (f).pab.opcode := PabStatus;
+                execDsr (__file_data (f));
+                __eof := __file_data (f).pab.status and $01 <> 0;
+            end
+        else
+            InOutRes := FileNotOpen
+    end;
+    
+function __eof_input: boolean;
+    begin
+        __eof_input := eof (input)
+    end;
+
+procedure __end_line (var f: text);
+    begin
+        if f.fileidx > 0 then    
+            begin
+                f.pab.opcode := PabWrite;
+                f.pab.numchar := f.bufpos;
+                execDsr (__file_data (f));
+                f.bufpos := 0
+            end
+    end;
+
+    
+// string handling
 
 function __short_str_char (ch: char): string1;
     begin
@@ -722,7 +969,7 @@ function __set_intersection (var s, t: __set_array): __generic_set_type;
     var
         i: integer;
     begin
-        for i := 0 to __set_words - 1do
+        for i := 0 to __set_words - 1 do
             __set_array (result) [i] := s [i] and t [i]
     end;
     
@@ -777,4 +1024,5 @@ begin
     input.fileidx := 0;
     loadCharset;
     gotoxy (0, 0);
+    reserveVdpBufs
 end.

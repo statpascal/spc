@@ -279,7 +279,8 @@ void TReadRoutine::checkArguments (TBlock &block, std::vector<TExpressionBase *>
         {&stdType.Int64, "__read_int64"},
         {&stdType.Char, "__read_char"},
         {&stdType.Real, "__read_dbl"},
-        {&stdType.String, "__read_string"}
+        {&stdType.String, "__read_string"},
+        {&stdType.ShortString, "__read_string"}
     };
     TExpressionBase *textfile = nullptr;
     if (args.empty () || !args.front ()->getType ()->isFile ())
@@ -298,7 +299,12 @@ void TReadRoutine::checkArguments (TBlock &block, std::vector<TExpressionBase *>
                 basetype = type->getBaseType ();
             std::map<TType *, std::string>::const_iterator it = inputFunctionName.find (basetype);
             if (it != inputFunctionName.end ()) {
+#ifdef CREATE_9900            
+            // TODO: max. length of string
+                TExpressionBase *inputFunctionCall = createRuntimeCall (it->second, nullptr, {textfile}, block, true);
+#else
                 TExpressionBase *inputFunctionCall = createRuntimeCall (it->second, nullptr, {textfile, TExpressionBase::createVariableAccess (TConfig::globalRuntimeDataPtr, block)}, block, true);
+#endif                
                 appendTransformedNode (compiler.createMemoryPoolObject<TAssignment> (static_cast<TLValueDereference *> (arg)->getLValue (), inputFunctionCall));
             } else {
                 compiler.errorMessage (TCompilerImpl::InvalidType, "Cannod read value of type '" + type->getName () + "'");
@@ -306,7 +312,11 @@ void TReadRoutine::checkArguments (TBlock &block, std::vector<TExpressionBase *>
             }
        }
     if (linefeed)
+#ifdef CREATE_9900            
+        appendTransformedNode (createRuntimeCall ("__read_lf", nullptr, {textfile}, block, true));
+#else        
         appendTransformedNode (createRuntimeCall ("__read_lf", nullptr, {textfile, createVariableAccess (TConfig::globalRuntimeDataPtr, block)}, block, true));
+#endif        
 }
 
 

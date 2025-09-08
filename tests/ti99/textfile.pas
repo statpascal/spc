@@ -1,11 +1,6 @@
 program textfile;
 
-// File output will be merged with system.pas when it is stable 
-uses files;
-
-
 procedure writeData (var f: text);
-
     var
         i: integer;
         ch: char;
@@ -28,7 +23,7 @@ var
     f: text;
     
 begin
-    assign (f, 'DSK0.TEST.TXT');
+    assign (f, 'DSK1.TEST.TXT');
     rewrite (f);
     writeData (f);
     close (f);
