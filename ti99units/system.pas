@@ -40,13 +40,18 @@ var
     memb: array [0..65535] of uint8 absolute $0000;
     memw: array [0..32767] of integer absolute $0000;
     
-procedure gotoxy (x, y: integer);
-procedure clrscr;
+// Screen and keyboard access
+    
+const
+    InvalidKey = #$ff;
+    
+function getKey: char;
 
-procedure move (var src, dest; length: integer);
-function compareWord (var src, dest; length: integer): boolean;
-procedure fillChar (var dest; count: integer; value: char);
-procedure fillChar (var dest; count: integer; value: uint8);
+procedure gotoxy (x, y: integer);
+function whereX: integer;
+function whereY: integer;
+
+procedure clrscr;
 
 procedure vmbw (var src; dest, length: integer);	// video multiple byte write
 procedure vmbr (var dest; src, length: integer);	// video multiple byte read
@@ -54,18 +59,25 @@ procedure vrbw (val: uint8; length: integer);		// video repeated byte write
 procedure writeV (addr: integer; val: uint8);
 function readV (addr: integer): uint8;
 
+// Utilites
+
+procedure move (var src, dest; length: integer);
+function compareWord (var src, dest; length: integer): boolean;
+procedure fillChar (var dest; count: integer; value: char);
+procedure fillChar (var dest; count: integer; value: uint8);
+
 function min (a, b: integer): integer; intrinsic name '__min';
 function max (a, b: integer): integer; intrinsic name '__max';
 function sqr (a: integer): integer; intrinsic name '__sqr';
 function abs (n: integer): integer; intrinsic name '__abs';
+
+// file handling
 
 procedure __write_lf (var f: text);
 procedure __write_int (var f: text; n, length, precision: integer);
 procedure __write_char (var f: text; ch: char; length, precision: integer);
 procedure __write_string (var f: text; p: PChar; length, precision: integer);
 procedure __write_boolean (var f: text; b: boolean; length, precision: integer);
-
-// file handling
 
 procedure __assign (var f; filename: string);
 
@@ -103,6 +115,9 @@ function IOResult: integer;
 
 // string handling
 
+var
+    __str_const_buf: string;
+    
 function length (s: PChar): integer;
 function pos (ch: char; s: PChar): integer;
 function copy (s: PChar; start, len: integer): string;
@@ -147,6 +162,8 @@ procedure setVdpAddress (n: integer);
 function hexstr (n: integer): string4;
 function hexstr2 (n: uint8): string2;
 
+// Set routines
+
 const
     __set_words = 16;
 
@@ -157,9 +174,6 @@ type
 function __set_add_val (val: integer; var s: __set_array): __generic_set_type; 
 function __set_add_range (minval, maxval: integer; var s: __set_array): __generic_set_type; 
 
-var
-    __str_const_buf: string;
-    
 function __copy_set_const (var s: __generic_set_type): __generic_set_type; external;
 
 function __in_set (v: integer; var s: __set_array): boolean; intrinsic;
@@ -407,10 +421,92 @@ procedure vmbr (var dest; src, length: integer); assembler;
     vmbr_2:
 end;
 
+function getKey: char;
+    var
+        keyboardMode: byte absolute $8374;
+        keyPressed: byte absolute $8375;
+        gplStatus: byte absolute $837c;
+        
+    procedure scanKey; assembler;
+           lwpi >83e0
+           bl @>000e
+           lwpi >8300
+    end;
+
+    begin
+        keyboardMode := 4;
+        scanKey;
+        if gplStatus and $20 <> 0 then
+            getKey := chr (keyPressed)
+        else
+            getKey := InvalidKey
+    end;
+    
+function __read_line_console: string;
+    const
+        FctnS = #136;
+        Enter = #13;
+    var
+        row, col, pos, count: integer;
+        ch: char;
+    begin
+        col := whereX;
+        row := whereY;
+        result [0] := #0;
+        pos := 1;
+        count := 0;
+        repeat
+            ch := getKey;
+            case ch of
+                FctnS:
+                    if pos > 1 then
+                        begin
+                            dec (pos);
+                            dec (result [0]);
+                            gotoxy (col, row);
+                            write (result, ' ');
+                            if col + pos < 31 then write (' ');
+                            count := 0
+                        end;
+                #32..#127:
+                    begin
+                        result [pos] := ch;
+                        if col + pos < 31 then
+                            begin
+                                inc (pos);
+                                inc (result [0])
+                            end;
+                        gotoxy (col, row);
+                        write (result);
+                        count := 0
+                    end
+            end;
+            inc (count);
+            if count and $ff = 1 then
+                begin
+                    gotoxy (col + pos - 1, row);
+                    if odd (count shr 8) then write (' ') else write (#$1f)
+                end;
+        until ch = Enter;
+        writeln;
+    end;
+
+
+    
 procedure gotoxy (x, y: integer);
     begin
         vdpWriteAddress := y shl 5 + x;
         setVdpAddress (vdpWriteAddress or WriteAddr)
+    end;
+    
+function whereX: integer;
+    begin
+        whereX := vdpWriteAddress and $1f
+    end;
+    
+function whereY: integer;
+    begin
+        whereY := vdpWriteAddress shr 5
     end;
     
 procedure clrscr;
@@ -527,7 +623,7 @@ type
 var
     vdpFree: integer absolute $8370;
     openFiles: array [1..nFiles] of TFileDescriptor;
-    
+
 function IOResult: integer;
     begin
         IOResult := InOutRes;
@@ -666,10 +762,15 @@ procedure __read_lf (var f: text);
     
 function __read_string (var f: text): string;
     begin
-        __file_data (f).pab.opcode := PabRead;
-        execDsr (__file_data (f));
-        vmbr (result [1], __file_data (f).pab.vdpaddr, __file_data (f).pab.numchar);
-        result [0] := chr (__file_data (f).pab.numchar)
+        if f.fileidx = 0 then
+            __read_string := __read_line_Console
+        else
+            begin
+                f.pab.opcode := PabRead;
+                execDsr (__file_data (f));
+                vmbr (result [1], f.pab.vdpaddr, f.pab.numchar);
+                result [0] := chr (f.pab.numchar)
+            end
     end;    
     
 procedure __close (var f);
@@ -914,7 +1015,10 @@ procedure loadCharset;
     begin
         gromwa := #$06; // >06b4: standard char set
         gromwa := #$b4;
-        setVdpAddress ($0800 + 8 * 32 or WriteAddr);
+        setVdpAddress ($0800 + 8 * 31 or WriteAddr);
+        for i := 1 to 7 do
+            vdpwd := #$3f;
+        vdpwd := #0;
         for i := 32 to 127 do
             begin
                 for j := 1 to 7 do

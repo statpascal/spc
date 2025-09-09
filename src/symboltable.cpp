@@ -63,9 +63,10 @@ TSymbolList::TAddSymbolResult TSymbolList::addAlias (const std::string &name, TT
 
 TSymbolList::TAddSymbolResult TSymbolList::addAbsolute (const std::string &name, TType *type, std::int64_t addr) {
     TAddSymbolResult result = addSymbol (name, type, TSymbol::Absolute, nullptr);
-    if (!result.alreadyPresent)
+    if (!result.alreadyPresent) {
         result.symbol->setOffset (addr);
-    return result;
+        result.symbol->setLevel (1);
+    } return result;
 }
 
 TSymbolList::TAddSymbolResult TSymbolList::addLabel (const std::string &name) {

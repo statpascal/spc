@@ -629,8 +629,8 @@ void TBlock::parseVarParameterDeclaration (TSymbolList &symbolList, bool createR
                 if (absoluteAddress) {
                     if (absoluteAddress->getType () != &stdType.Int64)
                         compiler.errorMessage (TCompilerImpl::InvalidUseOfSymbol, "'absolute' required variable or integer constant");
-                    else if (symbolList.getLevel () != 1)
-                        compiler.errorMessage (TCompilerImpl::InvalidUseOfSymbol, "'absolute' address can only be used with global variable");
+//                    else if (symbolList.getLevel () != 1)
+//                        compiler.errorMessage (TCompilerImpl::InvalidUseOfSymbol, "'absolute' address can only be used with global variable");
                 }
             }                
         }
