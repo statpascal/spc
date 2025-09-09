@@ -99,6 +99,8 @@ function __eof_input: boolean;
 
 procedure __end_line (var f: text);
 
+function __read_int (var f: text): integer;
+function __read_char (var f: text): char;
 function __read_string (var f: text): string;
 procedure __read_lf (var f: text);
 
@@ -479,7 +481,9 @@ function __read_line_console: string;
                         gotoxy (col, row);
                         write (result);
                         count := 0
-                    end
+                    end;
+                Enter:
+                    count := $100;	// turn off cursor
             end;
             inc (count);
             if count and $ff = 1 then
@@ -758,6 +762,36 @@ procedure __read_bin_typed (var f, data);
 
 procedure __read_lf (var f: text);
     begin
+    end;
+    
+function __read_int (var f: text): integer;
+    var
+        s: string;
+        i: integer;
+        neg: boolean;
+    begin
+        s := __read_string (f);
+        result := 0;
+        neg := (length (s) <> 0) and (s [1] = '-');
+        i := succ (ord (neg));
+        while (i <= length (s)) and (s [i] in ['0'..'9']) do
+            begin
+                result := result * 10 + ord (s [i]) - ord ('0');
+                inc (i)
+            end;
+        if neg then
+            result := -result
+    end;
+    
+function  __read_char (var f: text): char;
+    var 
+        s: string;
+    begin
+        s := __read_string (f);
+        if length (s) <> 0 then
+            __read_char := s [1]
+        else
+            __read_char := #0
     end;
     
 function __read_string (var f: text): string;

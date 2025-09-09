@@ -276,7 +276,7 @@ TReadRoutine::TReadRoutine (TBlock &block, std::vector<TExpressionBase *> &&args
 void TReadRoutine::checkArguments (TBlock &block, std::vector<TExpressionBase *> &&args, bool linefeed) {
     TCompilerImpl &compiler = block.getCompiler ();
     static const std::map<TType *, std::string> inputFunctionName = {
-        {&stdType.Int64, "__read_int64"},
+        {&stdType.Int64, "__read_int"},
         {&stdType.Char, "__read_char"},
         {&stdType.Real, "__read_dbl"},
         {&stdType.String, "__read_string"},
