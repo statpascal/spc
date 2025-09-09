@@ -322,6 +322,27 @@ void T9900Generator::optimizePeepHole (TCodeSequence &code) {
         // remove
         else if (op1 == T9900Op::ai && !op_1_2.isLabel () && !op_1_2.val)
             removeLines (code, line, 1);
+            
+        // ai reg, imm
+        // mov *reg, op
+        // ->
+        // mov @imm(reg),op
+        
+        else if (op1 == T9900Op::ai && !op_1_2.isLabel () && op2 == T9900Op::mov && isSameCalcStackReg (op_1_1, op_2_1) && op_2_1.t == T9900Operand::TAddressingMode::RegInd) {
+            op_2_1 = T9900Operand (op_1_1.reg, op_1_2.val);
+            removeLines (code, line, 1);
+        }
+        
+        // ai reg, imm
+        // mov op, *reg
+        // ->
+        // mov op, @imm(reg)
+        
+        else if (op1 == T9900Op::ai && !op_1_2.isLabel () && op2 == T9900Op::mov && isSameCalcStackReg (op_1_1, op_2_2) && op_2_2.t == T9900Operand::TAddressingMode::RegInd) {
+            op_2_2 = T9900Operand (op_1_1.reg, op_1_2.val);
+            removeLines (code, line, 1);
+        }
+        
         
         // li reg, imm
         // mov|movb *reg, reg
