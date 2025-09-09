@@ -225,7 +225,7 @@ procedure __write_string (var f: text; s: string; length, precision: int64; runt
 procedure __write_boolean (var f: text; b: boolean; length, precision: int64; runtimeData: pointer); external name 'rt_write_bool';
 procedure __write_dbl (var f: text; a: real; length, precision: int64; runtimeData: pointer); external name 'rt_write_dbl';
 
-function __read_int64 (var f: text; runtimeData: pointer): int64; external name 'rt_read_int';
+function __read_int (var f: text; runtimeData: pointer): int64; external name 'rt_read_int';
 function __read_char (var f: text; runtimeData: pointer): char; external name 'rt_read_char';
 function __read_string (var f: text; runtimeData: pointer): string; external name 'rt_read_string';
 function __read_dbl (var f: text; runtimeData: pointer): real; external name 'rt_read_dbl';
