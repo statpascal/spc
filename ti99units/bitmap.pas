@@ -12,7 +12,7 @@ procedure setStandardMode;
 procedure setColor (color: TColor);
 procedure setBkColor (color: TColor);
 
-// procedure plot (x, y: integer);
+procedure plot (x, y: integer);
 procedure line (x0, y0, x1, y1: integer);
 
 implementation
@@ -61,11 +61,11 @@ const
     invalid = -1;
     cachedChar: integer = invalid;
 var
-    cacheChar, cacheColor: array [0..7] of uint8;
+    cachePattern, cacheColor: array [0..7] of uint8;
     
 procedure flushCache;
     begin
-        vmbw (cacheChar, cachedChar, 8);
+        vmbw (cachePattern, cachedChar, 8);
         vmbw (cacheColor, colorTable + cachedChar, 8)
     end;
 
@@ -79,14 +79,16 @@ procedure plot (x, y: integer);
                 if cachedChar <> invalid then
                     flushCache;
                 cachedChar := offset;
-                vmbr (cacheChar, offset, 8);
+                vmbr (cachePattern, offset, 8);
                 vmbr (cacheColor, colorTable + offset, 8);
             end;
         if activeColor = 0 then
-            cacheChar [y and $07] := cacheChar [y and $07] and not ($80 shr (x and 7))
+            cachePattern [y and $07] := cachePattern [y and $07] and not ($80 shr (x and 7))
         else
-            cacheChar [y and $07] := cacheChar [y and $07] or $80 shr (x and 7);
-        cacheColor [y and $07] := activeColor;
+            begin
+                cachePattern [y and $07] := cachePattern [y and $07] or $80 shr (x and 7);
+                cacheColor [y and $07] := activeColor
+            end
     end;
 
 // Bresenham's line algorithm
@@ -95,23 +97,18 @@ procedure line (x0, y0, x1, y1: integer);
 
     function sign (x: integer): integer;
         begin
-            if x < 0 then 
-                sign := -1
-            else if x > 0 then 
-                sign := 1
-            else 
-                sign := 0
+            sign := ord (x > 0) - ord (x < 0)
         end;
 
     procedure swap (var a, b: integer);
         var 
-            h : integer;
+            h: integer;
         begin
             h := a; a := b; b := h
         end;
 
     var 
-        dx, dy, sy, d, x : integer;
+        dx, dy, sy, d, x: integer;
         x_y : boolean;
         
     begin
@@ -131,8 +128,8 @@ procedure line (x0, y0, x1, y1: integer);
         sy := sign (y1 - y0); 
         d := dy - dx;
         inc (dx, dx);
-        
-        for x := x0 to x1 do 
+
+        for x := x0 to x1 do        
             begin
                 if x_y then 
                     plot (y0, x) 
