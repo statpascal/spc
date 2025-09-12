@@ -307,12 +307,12 @@ public:
     virtual void acceptCodeGenerator (TCodeGenerator &) override;
 
     void resolveCall (std::vector<TExpressionBase *> args, TBlock &);
-    bool resolveConversion (const TRoutineType *required);
+    bool resolveConversion (const TRoutineType *required, TBlock &block);
 
     TSymbol *getSymbol () const;
     
 private:
-    void resolveOverload (TSymbol *);
+    void resolveOverload (TSymbol *, TBlock &);
 
     TSymbol *symbol;	// resolved overload
     std::vector<TSymbol *> symbolOverloads;

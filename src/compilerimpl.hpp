@@ -4,7 +4,8 @@
 #pragma once
 
 #include <vector>
-#include <stack>
+#include <set>
+// #include <stack>
 #include <unordered_map>
 
 #include "compiler.hpp"
@@ -38,6 +39,9 @@ public:
     bool isDisplayNeeded () const;
     
     TSymbolList &getSymbols () const;
+    
+    void addUsedSymbol (TSymbol *s);
+    void markUsedSymbols ();	// traverse syntax tree to find symbols actually used
     
     /** search for field in active with statements; returns nullptr if not found */
     TExpressionBase *searchActiveRecords (const std::string &identifier);
@@ -103,6 +107,7 @@ private:
     TLexer &lexer;
     TSymbolList *symbols;
     TSymbol *ownSymbol;
+    std::set<TSymbol *> usedSymbols;
     TBlock *parentBlock;
     
     TStatement *statements;
@@ -136,7 +141,7 @@ public:
     TUnit (TCompilerImpl &compiler, TSymbolList *predefinedSymbols);
     
     void parseHeader ();
-    void parseImplementation ();
+    void parseImplementation (TBlock &programBlock);
     
     TStatement *getInitializationStatement () const;
     TStatement *getFinalizationStatement () const;
@@ -149,7 +154,7 @@ public:
     virtual void acceptCodeGenerator (TCodeGenerator &) override;
     
 private:
-    TStatement *parseInitFinal (const std::string funcName, TBlock &declarations);
+    TStatement *parseInitFinal (const std::string funcName, TBlock &declarations, TBlock &programBlock);
 
     TCompilerImpl &compiler;
     TSymbolList *predefinedSymbols, *importedSymbols, *publicSymbols, *allSymbols;
@@ -225,7 +230,6 @@ private:
     void createPredefinedSymbols ();
     
     void parseProgram ();
-    TUnit *parseUnit ();
 
     TMemoryPoolFactory memoryPoolFactory;
     TLexer programLexer;
@@ -275,6 +279,10 @@ inline TStatement *TBlock::getStatements () const {
 
 inline TBlock *TBlock::getParentBlock () const {
     return parentBlock;
+}
+
+inline void TBlock::addUsedSymbol (TSymbol *s) {
+    usedSymbols.insert (s);
 }
 
 

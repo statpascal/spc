@@ -10,7 +10,7 @@ namespace statpascal {
 const ssize_t TSymbol::LabelDefined, TSymbol::UndefinedLabelUsed, TSymbol::InvalidRegister;
 
 TSymbol::TSymbol (const std::string &name, TType *type, std::size_t level, TFlags flags, TSymbol *alias):
-  name (name), level (level), flags (flags), alias (alias), block (nullptr), offset (0), parameterPosition (0), assignedRegister (InvalidRegister), aliased (false), constantValue (nullptr) {
+  name (name), level (level), flags (flags), alias (alias), block (nullptr), offset (0), parameterPosition (0), assignedRegister (InvalidRegister), aliased (false), used (false), constantValue (nullptr) {
     setType (type);
 }
 
@@ -141,7 +141,13 @@ std::vector<TSymbol *> TSymbolList::searchSymbols (const std::string &name, TSym
 
 void TSymbolList::removeSymbol (const TSymbol *symbol) {
     symbols.erase (std::remove (symbols.begin (), symbols.end (), symbol), symbols.end ());
-    
+}
+
+void TSymbolList::removeUnusedSymbols () {
+    TBaseContainer::iterator start = std::stable_partition (symbols.begin (), symbols.end (), [] (TSymbol *s) { return s->isUsed (); });
+//    for (TBaseContainer::iterator it = start; it != symbols.end (); ++it)
+//        std::cout << "Unused: " << (*it)->getName () <<  std::endl;
+    symbols.erase (start, symbols.end ());    
 }
 
 void TSymbolList::moveSymbols (TSymbol::TFlags flags, TSymbolList &dest) {

@@ -143,7 +143,9 @@ bool TExpressionBase::evaluateConstant (TExpressionBase *&expr, TType *type, TTo
 }
 
 TExpressionBase *TExpressionBase::createVariableAccess (const std::string &name, TBlock &block, bool lValue) {
-    TExpressionBase *expr = block.getCompiler ().createMemoryPoolObject<TVariable> (block.getSymbols ().searchSymbol (name), block);
+    TSymbol *s = block.getSymbols ().searchSymbol (name);
+    block.addUsedSymbol (s);
+    TExpressionBase *expr = block.getCompiler ().createMemoryPoolObject<TVariable> (s, block);
     if (lValue)
         return expr;
     else
@@ -190,7 +192,7 @@ bool TExpressionBase::checkTypeConversion (TType *required, TExpressionBase *&ex
     }
         
     if (expr->getType () == &stdType.UnresOverload && expr->isRoutine () && required->isRoutine ())
-        return static_cast<TRoutineValue *> (expr)->resolveConversion (static_cast<TRoutineType *> (required));
+        return static_cast<TRoutineValue *> (expr)->resolveConversion (static_cast<TRoutineType *> (required), block);
 
 
     if (required->isRoutine () && expr->getType ()->isRoutine () &&
@@ -1316,7 +1318,7 @@ TRoutineValue::TRoutineValue (const std::string &identifier, TBlock &block):
         compiler.errorMessage (TCompilerImpl::IdentifierNotFound, "Identifier '" + identifier + "' not found in subroutine call");
         setType (&stdType.Void);
     } else {
-        resolveOverload (symbolOverloads.front ());
+        resolveOverload (symbolOverloads.front (), block);
         if (symbolOverloads.size () > 1) {
 //            std::cout << "Overloaded: " << identifier << " with count: " << symbolOverloads.size () << std::endl;
             setType (&stdType.UnresOverload);
@@ -1326,9 +1328,10 @@ TRoutineValue::TRoutineValue (const std::string &identifier, TBlock &block):
     }
 }
 
-void TRoutineValue::resolveOverload (TSymbol *s) {
+void TRoutineValue::resolveOverload (TSymbol *s, TBlock &block) {
     symbol = s;
     setType (s->getType ());
+    block.addUsedSymbol (symbol);
 }
 
 void TRoutineValue::resolveCall (std::vector<TExpressionBase *> args, TBlock &block) {
@@ -1352,17 +1355,17 @@ void TRoutineValue::resolveCall (std::vector<TExpressionBase *> args, TBlock &bl
             }
         }
         if (success) {
-            resolveOverload (s);
+            resolveOverload (s, block);
             return;
         }
     }        
 }
 
-bool TRoutineValue::resolveConversion (const TRoutineType *required) {
+bool TRoutineValue::resolveConversion (const TRoutineType *required, TBlock &block) {
     for (TSymbol *s: symbolOverloads) {
         TRoutineType *routineType = static_cast<TRoutineType *> (s->getType ());
         if (routineType->matchesOverload (required)) {
-            resolveOverload (s);
+            resolveOverload (s, block);
             return true;
         }
     }

@@ -251,6 +251,15 @@ bool TBlock::isDisplayNeeded () const {
     return displayNeeded;
 }
 
+void TBlock::markUsedSymbols () {
+    for (TSymbol *s: usedSymbols) 
+        if (!s->isUsed ()) {
+            s->setUsed ();
+            if (TBlock *block = s->getBlock ())
+                block->markUsedSymbols ();
+        }
+}
+
 TExpressionBase *TBlock::searchActiveRecords (const std::string &identifier) {
     for (std::vector<TExpressionBase *>::reverse_iterator it = activeRecords.rbegin (); it != activeRecords.rend (); ++it) {
         const TRecordType *type = static_cast<TRecordType *> ((*it)->getType ());
@@ -704,7 +713,7 @@ const TSimpleConstant *TBlock::parseSimpleConstant (TType *type) {
         c = compiler.createMemoryPoolObject<TSimpleConstant> (std::string (1, c->getChar ()), &stdType.String);
     else if (basetype->isRoutine () && c->getType ()->isRoutine () && static_cast<const TRoutineType *> (basetype)->matchesOverload (static_cast<TRoutineType *> (c->getType ()))) {
         TRoutineValue *rval = compiler.createMemoryPoolObject <TRoutineValue> (c->getString (), *this);
-        if (rval->resolveConversion (static_cast<const TRoutineType *> (basetype)))
+        if (rval->resolveConversion (static_cast<const TRoutineType *> (basetype), *this))
             return compiler.createMemoryPoolObject<TSimpleConstant> (rval); // rval.getSymbol ()->getOverloadName (), basetype);
         else 
             compiler.errorMessage (TCompilerImpl::InvalidType, "Cannot convert routine '" + c->getString () + "' to type " + basetype->getName ());
@@ -1042,18 +1051,19 @@ void TUnit::parseHeader () {
     allSymbols->copySymbols (TSymbol::AllSymbols, *publicSymbols);
 }
 
-TStatement *TUnit::parseInitFinal (const std::string funcName, TBlock &declarations) {
+TStatement *TUnit::parseInitFinal (const std::string funcName, TBlock &declarations, TBlock &programBlock) {
     TSymbolList parameters (nullptr, compiler.getMemoryPoolFactory ());
     TRoutineType *t = compiler.createMemoryPoolObject<TRoutineType> (std::move (parameters), &stdType.Void, true);
     TSymbol *initSymbol = allSymbols->addRoutine (funcName, t).symbol;
     initSymbol->setBlock (compiler.createMemoryPoolObject<TBlock> (compiler, compiler.createMemoryPoolObject<TSymbolList> (allSymbols, compiler.getMemoryPoolFactory ()), initSymbol, &declarations));
     initSymbol->getBlock ()->parse ();
+    programBlock.addUsedSymbol (initSymbol);
     compiler.getLexer ().checkToken (TToken::Semicolon);
     return compiler.createMemoryPoolObject<TRoutineCall> (
         TExpressionBase::createRuntimeCall (funcName, &stdType.Void, {}, declarations, false));
 }
 
-void TUnit::parseImplementation () {    
+void TUnit::parseImplementation (TBlock &programBlock) {    
     TLexer &lexer = compiler.getLexer ();
     compiler.checkToken (TToken::Implementation, "'implementation' expected");
     
@@ -1068,10 +1078,10 @@ void TUnit::parseImplementation () {
     if (!initializationTokenPresent)
         oldInitCodePresent = lexer.getToken () == TToken::Begin;
     if (initializationTokenPresent || oldInitCodePresent)
-        initializationStatement = parseInitFinal ("$" + unitname + "_init", declarations);
+        initializationStatement = parseInitFinal ("$" + unitname + "_init", declarations, programBlock);
     if (!oldInitCodePresent) {
         if (lexer.checkToken (TToken::Finalization))
-            finalizationStatement = parseInitFinal ("$" + unitname + "_final", declarations);
+            finalizationStatement = parseInitFinal ("$" + unitname + "_final", declarations, programBlock);
         compiler.checkToken (TToken::End, "'end' expected");
     }
 
@@ -1260,13 +1270,8 @@ TCompiler::TCompileResult TCompilerImpl::compile () {
     TUnit *unit = loadUnit ("system");
     systemUnit = unit;
     
-    if (getLexer ().getToken () == TToken::Unit) {
-        parseUnit ();
-        return errorFlag ? TCompiler::Error : TCompiler::UnitCompiled;
-    } else {
-        parseProgram ();
-        return errorFlag ? TCompiler::Error : TCompiler::ProgramCompiled;
-    }
+    parseProgram ();
+    return errorFlag ? TCompiler::Error : TCompiler::ProgramCompiled;
 }
 
 void TCompilerImpl::errorMessage (TCompilerImpl::TErrorType errorType, const std::string &description) {
@@ -1350,7 +1355,7 @@ void TCompilerImpl::parseProgram () {
             if (!it.second.complete) {
                 lexerStack.push (&it.second.lexer);
                 if (it.second.unit)
-                    it.second.unit->parseImplementation ();
+                    it.second.unit->parseImplementation (*program.getBlock ());
                 it.second.complete = true;
                 lexerStack.pop ();
                 allUnitsDone = false;
@@ -1360,15 +1365,10 @@ void TCompilerImpl::parseProgram () {
     if (!errorFlag) {
         for (std::vector<TUnit *>::reverse_iterator it = allUnits.rbegin (); it != allUnits.rend (); ++it)
             program.appendUnit (*it);
+        program.getBlock ()->markUsedSymbols ();
+        program.getBlock ()->getSymbols ().removeUnusedSymbols ();
         program.acceptCodeGenerator (codeGenerator);
     }
-}
-
-TUnit *TCompilerImpl::parseUnit () {
-    TUnit *unit =  memoryPoolFactory.create<TUnit> (*this, predefinedSymbols);
-    unit->parseHeader ();
-    unit->parseImplementation ();
-    return unit;
 }
 
 TMemoryPoolFactory &TCompilerImpl::getMemoryPoolFactory () {

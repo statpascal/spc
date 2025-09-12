@@ -59,6 +59,9 @@ public:
     /** set if an alias to the symbol exists: address operator, absolute declaration or type cast. */
     void setAliased ();
     bool isAliased () const;
+    
+    void setUsed (bool f = true);
+    bool isUsed () const;
 
     // Block syntax tree node for subroutine symbols    
     void setBlock (TBlock *);
@@ -87,7 +90,7 @@ private:
     TSymbol *alias;
     TBlock *block;
     ssize_t offset, parameterPosition, assignedRegister;
-    bool aliased;
+    bool aliased, used;
     TType *type;
     const TConstant *constantValue;
 };
@@ -116,6 +119,8 @@ public:
     TSymbol *searchSymbol (const std::string &name, TSymbol::TFlags = TSymbol::AllSymbols) const;
     std::vector<TSymbol *> searchSymbols (const std::string &name, TSymbol::TFlags = TSymbol::AllSymbols) const;
     void removeSymbol (const TSymbol *);
+    
+    void removeUnusedSymbols ();
     
     TSymbol *makeLocalLabel (char c);	// -> yields --c - makeUniqueLabelNames in TBaseGenerator provides distinct names. 
                                         // Labels with c = 'l' are removed by optimzier if not referenced in block (case jump tables are outside)
@@ -277,6 +282,15 @@ inline void TSymbol::setConstant (const TConstant *constant) {
 
 inline const TConstant *TSymbol::getConstant () const {
     return constantValue;
+}
+
+inline void TSymbol::setUsed (bool f) {
+    used = f;
+}
+
+inline bool TSymbol::isUsed () const {
+    bool val = used || !(flags & Routine) || (flags & External);
+    return val;
 }
 
 }
