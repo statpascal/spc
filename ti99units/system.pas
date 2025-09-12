@@ -89,11 +89,14 @@ procedure __reset_bin (var f; blocksize: integer);
 
 procedure __write_bin_typed (var f, data);
 procedure __write_bin_ign (var f; var data; blocks: integer);
+procedure __seek_bin (var f; pos: integer);
 
 procedure __read_bin_typed (var f, data);
 procedure __read_bin_ign (var f; var data; blocks: integer);
 
 procedure __close (var f);
+procedure __erase (var f);
+
 function __eof (var f): boolean;
 function __eof_input: boolean;
 
@@ -198,20 +201,20 @@ uses dsr;
 // simple UCSD-like heap managment in lower memory
 
 const
-    heapPtr: integer = $4000;
-    heapMin = $2000;
+    heapPtr: integer = $2000;
+    heapMax = $4000;
     
 procedure __new (var p: pointer; count, size: integer);
     var
         n: integer;
     begin
         n := (count * size + 1) and not 1;
-        if heapPtr - n < heapMin then
+        if heapPtr + n > heapMax then
             p := nil
         else 
             begin
-                dec (heapPtr, n);
-                p := pointer (heapPtr)
+                p := pointer (heapPtr);
+                inc (heapPtr, n);
             end
     end;
     
@@ -259,7 +262,7 @@ procedure _rt_scroll_up; assembler;
         swpb r0
         movb r0, *r13
         li r8, 8
-        li r12, >8322
+        li r12, >8320
         
     _rt_scroll_up_2:
         movb *r14, *r12+
@@ -276,7 +279,7 @@ procedure _rt_scroll_up; assembler;
         movb r0, *r13
 
         li r8, 8
-        li r12, >8322
+        li r12, >8320
         
     _rt_scroll_up_3:
         movb *r12+, *r15
@@ -741,6 +744,12 @@ procedure __write_bin_typed (var f, data);
         __write_bin_ign (f, data, 1)
     end;
     
+procedure __seek_bin (var f; pos: integer);
+    begin
+        if __file_data (f).fileidx > 0 then
+        __file_data (f).pab.recnr := pos
+    end;
+
 procedure __read_bin_ign (var f; var data; blocks: integer);
     type
         arrtype = array [0..MaxInt] of uint8;
@@ -798,13 +807,15 @@ function __read_string (var f: text): string;
     begin
         if f.fileidx = 0 then
             __read_string := __read_line_Console
-        else
+        else if f.fileidx > 0 then
             begin
                 f.pab.opcode := PabRead;
                 execDsr (__file_data (f));
                 vmbr (result [1], f.pab.vdpaddr, f.pab.numchar);
                 result [0] := chr (f.pab.numchar)
             end
+        else
+            InOutRes := FileNotOpen
     end;    
     
 procedure __close (var f);
@@ -823,6 +834,17 @@ procedure __close (var f);
                     if fileidx < 0 then
                         InOutRes := 1
             end
+    end;
+    
+procedure __erase (var f);
+    begin
+        if __file_data (f).fileidx > 0 then
+            begin
+                __file_data (f).pab.opcode := PabDelete;
+                execDsr (__file_data (f))
+            end
+        else
+            InOutRes := FileNotOpen
     end;
     
 function __eof (var f): boolean;
