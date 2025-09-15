@@ -220,7 +220,7 @@ void T9900Generator::optimizeJumps (TCodeSequence &code) {
 }
 
 void T9900Generator::optimizeSingleLine (TCodeSequence &code) {
-    for (T9900Operation &line: code) 
+    for (T9900Operation &line: code) {
         if (line.operation == T9900Op::li && !line.operand2.isLabel ()) {
             if (!line.operand2.val) {
                 line.operation = T9900Op::clr;
@@ -234,6 +234,11 @@ void T9900Generator::optimizeSingleLine (TCodeSequence &code) {
             line.operation = ops [static_cast<std::int16_t> (line.operand2.val) + 2];
             line.operand2 = T9900Operand ();
         }
+        if (line.operand1.isValid () && line.operand1.isIndexed () && !line.operand1.isLabel () && !line.operand1.val)
+            line.operand1.t = T9900Operand::TAddressingMode::RegInd;
+        if (line.operand2.isValid () && line.operand2.isIndexed () && !line.operand2.isLabel () && !line.operand2.val)
+            line.operand2.t = T9900Operand::TAddressingMode::RegInd;
+    }
 }
 
 void T9900Generator::optimizePeepHole (TCodeSequence &code) {
@@ -567,6 +572,24 @@ void T9900Generator::optimizePeepHole (TCodeSequence &code) {
                 removeLines (code, line, 2);
             } else
                 ++line;
+        }
+        
+        // mov reg, op1
+        // op  op1, op2
+        // ->
+        // mov reg, op1
+        // op  reg, op2
+        else if (op1 == T9900Op::mov && op_1_1.isReg () && !op_1_2.isReg () && op_1_2 == op_2_1 && op_2_2.isValid ()) {
+            op_2_1 = op_1_1;
+            ++line;
+        }
+        
+        // mov op, op
+        // not cond jump
+        // ->
+        // not cond jump
+        else if (op1 == T9900Op::mov && op_1_1 == op_1_2 && (op2 <= T9900Op::jmp || op2 >= T9900Op::sbo)) {
+            removeLines (code, line, 1);
         }
 
 /*        
@@ -947,9 +970,11 @@ void T9900Generator::outputIntegerCmpOperation (TToken operation, TExpressionBas
     bool secondFirst = left->isSymbol () || left->isConstant () || left->isLValueDereference ();
     T9900Reg r1, r2, r3;
     
-    if (right->isConstant () && !static_cast<TConstantValue *> (right)->getConstant ()->getInteger () && operation == TToken::LessThan) {
+    if (right->isConstant () && !static_cast<TConstantValue *> (right)->getConstant ()->getInteger () && (operation == TToken::LessThan || operation == TToken::GreaterThan)) {
         visit (left);
         T9900Reg reg = fetchReg (intScratchReg2);
+        if (operation == TToken::GreaterThan)
+            outputCode (T9900Op::neg, reg);
         outputCode (T9900Op::srl, reg, 15);
         saveReg (reg);
         return;
@@ -1102,6 +1127,7 @@ void T9900Generator::codeInlinedFunction (TFunctionCall &functionCall) {
         visit (args [1]);
         const T9900Reg right = fetchReg (intScratchReg2),
                        left = fetchReg (intScratchReg3);
+        outputComment ("no.opt");
         outputCode (T9900Op::c, left, right);
         const std::string ll = getNextLocalLabel ();
         outputCode (s == "__min" ? T9900Op::jlt : T9900Op::jgt, ll);
@@ -1226,10 +1252,7 @@ void T9900Generator::generateCode (TFunctionCall &functionCall) {
             const T9900Reg reg = fetchReg (intScratchReg1);
             if (parameterDescriptions [i].type->getSize () == 1)
                 outputCode (T9900Op::swpb, reg);            
-            if (parameterDescriptions [i].offset)
-                outputCode (T9900Op::mov, reg, T9900Operand (T9900Reg::r10, parameterDescriptions [i].offset));
-            else
-                outputCode (T9900Op::mov, reg, T9900Operand (T9900Reg::r10, T9900Operand::TAddressingMode::RegInd));
+            outputCode (T9900Op::mov, reg, T9900Operand (T9900Reg::r10, parameterDescriptions [i].offset));
         } else {
             T9900Reg reg = getSaveReg (intScratchReg1);
             outputCode (T9900Op::mov, T9900Reg::r10, reg);
@@ -1883,7 +1906,8 @@ void T9900Generator::externalRoutine (TSymbol *s) {
         TSymbolList &symbols = block.getSymbols ();
         assignParameterOffsets (block);
         outputComment (std::string ());
-//        TRoutineType *type = static_cast<TRoutineType *> (s->getType ());
+        TRoutineType *type = static_cast<TRoutineType *> (s->getType ());
+        bool isFar = type->isFarCall ();
 //        std::cout << s->getName () << ": " <<  type->getName () << (type->isFarCall () ? ": FAR" : ": NEAR") << std::endl;
         for (const std::string &s: createSymbolList (s->getName (), symbols.getLevel (), symbols, {}, -4))
             outputComment (s);
@@ -1900,10 +1924,10 @@ void T9900Generator::externalRoutine (TSymbol *s) {
             if (std::size_t size = s->getBlock ()->getSymbols ().getParameterSize ())
                 outputCode (T9900Op::ai, T9900Reg::r10, size);
             // TODO: check far flag for level 1 routines
-            if (s->getLevel () > 1)
-                outputCode (T9900Op::b, T9900Operand (T9900Reg::r11, T9900Operand::TAddressingMode::RegInd));
-            else
+            if (isFar)
                 outputCode (T9900Op::b, makeLabelMemory (farRet));
+            else
+                outputCode (T9900Op::b, T9900Operand (T9900Reg::r11, T9900Operand::TAddressingMode::RegInd));
         } else {
             std::string binData;
             binData.reserve (std::filesystem::file_size (s->getExtLibName ()));	
@@ -1945,7 +1969,7 @@ void T9900Generator::beginRoutineBody (const std::string &routineName, std::size
         outputCode (T9900Op::li, T9900Reg::r10, 65536 - symbolList.getLocalSize (), "init stack ptr");
 }
 
-void T9900Generator::endRoutineBody (std::size_t level, TSymbolList &symbolList, const std::set<T9900Reg> &saveRegs, bool hasStackFrame) {
+void T9900Generator::endRoutineBody (std::size_t level, TSymbolList &symbolList, const std::set<T9900Reg> &saveRegs, bool hasStackFrame, bool isFar) {
     if (level > 1) {
         for (std::set<T9900Reg>::reverse_iterator it = saveRegs.rbegin (); it != saveRegs.rend (); ++it)
             if (std::next (it) != saveRegs.rend ())
@@ -1961,7 +1985,7 @@ void T9900Generator::endRoutineBody (std::size_t level, TSymbolList &symbolList,
         if (symbolList.getParameterSize ())
             outputCode (T9900Op::ai, T9900Reg::r10, symbolList.getParameterSize ());
         
-        if (level == 2)
+        if (isFar)
             outputCode (T9900Op::b, makeLabelMemory (farRet));
         else
             outputCode (T9900Op::b, T9900Operand (T9900Reg::r11, T9900Operand::TAddressingMode::RegInd));
@@ -2039,7 +2063,7 @@ void T9900Generator::assignGlobalVariables (TSymbolList &blockSymbols) {
     }
 }
 
-void T9900Generator::codeBlock (TBlock &block, bool hasStackFrame, TCodeSequence &output) {
+void T9900Generator::codeBlock (TBlock &block, bool hasStackFrame, bool isFar, TCodeSequence &output) {
     TCodeSequence blockPrologue, blockEpilogue, blockCode, globalInits;
 
     TCodeSequence blockStatements;
@@ -2106,7 +2130,7 @@ void T9900Generator::codeBlock (TBlock &block, bool hasStackFrame, TCodeSequence
     beginRoutineBody (block.getSymbol ()->getName (), blockSymbols.getLevel (), blockSymbols, saveRegs, hasStackFrame);
     
     setOutput (&blockEpilogue);
-    endRoutineBody (blockSymbols.getLevel (), blockSymbols, saveRegs, hasStackFrame);
+    endRoutineBody (blockSymbols.getLevel (), blockSymbols, saveRegs, hasStackFrame, isFar);
     outputLocalDefinitions ();
     
     if (!globalInits.empty ()) 
@@ -2131,13 +2155,16 @@ void T9900Generator::generateBlock (TBlock &block) {
     makeUniqueLabelNames (blockSymbols);
     
     currentLevel = blockSymbols.getLevel ();
-
+    
+    TRoutineType *routine = static_cast<TRoutineType *> (block.getSymbol ()->getType ());
+    bool isFar = routine->isFarCall ();
+    
 //    std::cout << "Entering: " << block.getSymbol ()->getName () << ", level: " << blockSymbols.getLevel () << std::endl;
 
     assignStackOffsets (block);
     clearRegsUsed ();
     
-    codeBlock (block, true, currentLevel == 1 ? mainProgram.codeSequence : subPrograms.back ().codeSequence);
+    codeBlock (block, true, isFar, currentLevel == 1 ? mainProgram.codeSequence : subPrograms.back ().codeSequence);
 
 /*    
     if (blockSymbols.getLevel () > 1) {

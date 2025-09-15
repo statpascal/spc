@@ -578,10 +578,7 @@ procedure __write_string (var f: text; p: PChar; length, precision: integer);
         i, len, outlen: integer;
     begin
         len := ord (p^);
-        outlen := len;
-        if length > len then
-            outlen := length;
-        
+        outlen := max (len, length);
         if f.fileidx = 0 then 
             begin
                 while vdpWriteAddress + outlen > 24 * 32 do

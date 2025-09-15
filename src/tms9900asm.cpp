@@ -98,7 +98,7 @@ const std::vector<T9900OpDescription> opDescription = {
 };
 
 T9900Operand::T9900Operand ():
-  t (TAddressingMode::Invalid) {
+  T9900Operand (T9900Reg::r0, TAddressingMode::Invalid) {
 }
 
 T9900Operand::T9900Operand (T9900Reg reg, TAddressingMode t):
@@ -163,6 +163,10 @@ std::string T9900Operand::makeString (bool hex) const {
             return getValue (hex);
     }
     return std::string ();
+}
+
+bool operator == (T9900Operand op1, T9900Operand op2) {
+    return op1.val == op2.val && op1.t == op2.t && op1.reg == op2.reg && op1.label == op2.label;
 }
 
 T9900Operation::T9900Operation (T9900Op op, T9900Operand op1, T9900Operand op2, const std::string &comment):

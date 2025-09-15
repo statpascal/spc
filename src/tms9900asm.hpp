@@ -69,6 +69,8 @@ public:
     std::uint16_t val;
 };
 
+bool operator == (T9900Operand op1, T9900Operand op2);
+
 class T9900Operation {
 public:
     T9900Operation (T9900Op, T9900Operand = T9900Operand (), T9900Operand = T9900Operand (), const std::string &comment = std::string ());
@@ -80,7 +82,6 @@ public:
     T9900Operand operand1, operand2;
     std::string comment;
 };
-
 
 bool lookupInstruction (const std::string &s, T9900OpDescription &desc);
 
