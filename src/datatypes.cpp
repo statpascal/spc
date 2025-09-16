@@ -496,6 +496,7 @@ TType *TReferenceType::getBaseType () const {
 
 TRoutineType::TRoutineType (TSymbolList &&parameters, TType *returnType, bool farCall):
   parameters (std::move (parameters)), returnType (returnType), farCall (farCall) {
+//    this->farCall = false;
 }
 
 std::string TRoutineType::getName () const {

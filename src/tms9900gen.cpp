@@ -199,7 +199,7 @@ void T9900Generator::optimizeJumps (TCodeSequence &code) {
             if ((op [0] == jeq || op [0] == jne) && op [1] == b && op [2] == def_label && label [0] == label [2] && rangeOk (offset, jmpLabels [label [1]])) {
                 line->operation = op [0] == jeq ? jne : jeq;
                 line->operand1 = label [1];
-                removeJmpLines (code, std::next (line), 2, oldOffset);
+                removeJmpLines (code, std::next (line), 1, oldOffset);
             } else if (op [0] == jlt && op [1] == jeq && op [2] == b && op [3] == def_label &&
                 label [0] == label [3] && label [1] == label [3] && rangeOk (offset, jmpLabels [label [2]])) {
                 line->operation = jgt;
@@ -862,7 +862,7 @@ void T9900Generator::generateCode (TExpression &comparison) {
     outputBinaryOperation (comparison.getOperation (), comparison.getLeftExpression (), comparison.getRightExpression ());
 }
 
-void T9900Generator::outputBooleanCheck (TExpressionBase *expr, const std::string &label, bool branchOnFalse) {
+void T9900Generator::outputBooleanCheck (TExpressionBase *expr, std::string labelTrue, std::string labelFalse) {
     static const std::map<TToken, std::vector<T9900Op>> intTrueJmp = {
         {TToken::Equal, {T9900Op::jne}}, 
         {TToken::GreaterThan, {T9900Op::jlt, T9900Op::jeq}},
@@ -871,19 +871,36 @@ void T9900Generator::outputBooleanCheck (TExpressionBase *expr, const std::strin
         {TToken::LessEqual, {T9900Op::jgt}},
         {TToken::NotEqual, {T9900Op::jeq}}
     };
-    static const std::map<TToken, std::vector<T9900Op>> intFalseJmp = {
-        {TToken::Equal, {T9900Op::jeq}}, 
-        {TToken::GreaterThan, {T9900Op::jgt}},
-        {TToken::LessThan, {T9900Op::jlt}}, 
-        {TToken::GreaterEqual, {T9900Op::jgt, T9900Op::jeq}}, 
-        {TToken::LessEqual, {T9900Op::jlt, T9900Op::jeq}},
-        {TToken::NotEqual, {T9900Op::jne}}
-    };
+    
     if (TPrefixedExpression *prefExpr = dynamic_cast<TPrefixedExpression *> (expr))
         if (prefExpr->getOperation () == TToken::Not) {
-            branchOnFalse = !branchOnFalse;
+            std::swap (labelTrue, labelFalse);
             expr = prefExpr->getExpression ();
         }
+    
+    if (TSimpleExpression *simple = dynamic_cast<TSimpleExpression *> (expr)) {
+        if (simple->getLeftExpression ()->getType () == &stdType.Boolean &&
+            simple->getRightExpression ()->getType () == &stdType.Boolean &&
+            simple->getOperation () == TToken::Or) {
+                std::string ll = getNextLocalLabel ();
+                outputBooleanCheck (simple->getLeftExpression (), labelTrue, ll);
+                outputLabel (ll);
+                outputBooleanCheck (simple->getRightExpression (), labelTrue, labelFalse);
+                return;
+            }
+    }
+    
+    if (TTerm *term = dynamic_cast<TTerm *> (expr)) {
+        if (term->getLeftExpression ()->getType () == &stdType.Boolean &&
+            term->getRightExpression ()->getType () == &stdType.Boolean &&
+            term->getOperation () == TToken::And) {
+                std::string ll = getNextLocalLabel ();
+                outputBooleanCheck (term->getLeftExpression (), ll, labelFalse);
+                outputLabel (ll);
+                outputBooleanCheck (term->getRightExpression (), labelTrue, labelFalse);
+                return;
+        }
+    }
     
     TExpression *condition = dynamic_cast<TExpression *> (expr);
     
@@ -899,20 +916,19 @@ void T9900Generator::outputBooleanCheck (TExpressionBase *expr, const std::strin
             const T9900Reg r1 = fetchReg (intScratchReg2);
             outputCode (T9900Operation (T9900Op::c, r1, r2));
         }
-        for (T9900Op op: (branchOnFalse ? intFalseJmp : intTrueJmp).at (condition->getOperation ()))
+        for (T9900Op op: intTrueJmp.at (condition->getOperation ()))
             outputCode (op, ll);
-        outputCode (T9900Op::b, makeLabelMemory (label));
-        outputLabel (ll);
     } else if (condition && condition->getLeftExpression ()->getType ()->isReal ()) {
         //
     } else {
         visit (expr);
         const T9900Reg reg = fetchReg (intScratchReg1);
         outputCode (T9900Op::ci, reg, 0);
-        outputCode (branchOnFalse ? T9900Op::jne : T9900Op::jeq, ll);
-        outputCode (T9900Op::b, makeLabelMemory (label));
-        outputLabel (ll);
+        outputCode (T9900Op::jeq, ll);
     }
+    outputCode (T9900Op::b, makeLabelMemory (labelTrue));
+    outputLabel (ll);
+    outputCode (T9900Op::b, makeLabelMemory (labelFalse));
 }
 
 void T9900Generator::outputBooleanShortcut (TToken operation, TExpressionBase *left, TExpressionBase *right) {
@@ -1673,6 +1689,7 @@ void T9900Generator::generateCode (TRoutineCall &routineCall) {
 }
 
 void T9900Generator::generateCode (TIfStatement &ifStatement) {
+/*
     const std::string l1 = getNextLocalLabel ();
     outputBooleanCheck (ifStatement.getCondition (), l1);
     visit (ifStatement.getStatement1 ());
@@ -1684,6 +1701,21 @@ void T9900Generator::generateCode (TIfStatement &ifStatement) {
         outputLabel (l2);
     } else
         outputLabel (l1);
+*/        
+    const std::string 
+        l1 = getNextLocalLabel (),
+        l2 = getNextLocalLabel (),
+        l3 = getNextLocalLabel ();
+    outputBooleanCheck (ifStatement.getCondition (), l1, l2);
+    outputLabel (l1);
+    TStatement *stmt1 = ifStatement.getStatement1 ();
+    visit (stmt1);
+    if (!dynamic_cast<TGotoStatement *> (stmt1))
+        outputCode (T9900Op::b, makeLabelMemory (l3));
+    outputLabel (l2);
+    if (TStatement *statement2 = ifStatement.getStatement2 ())
+        visit (statement2);
+    outputLabel (l3);
 }
 
 void T9900Generator::generateCode (TCaseStatement &caseStatement) {
@@ -1775,9 +1807,11 @@ void T9900Generator::generateCode (TLabeledStatement &labeledStatement) {
 }
 
 void T9900Generator::generateCode (TGotoStatement &gotoStatement) {
-    if (TExpressionBase *condition = gotoStatement.getCondition ())
-        outputBooleanCheck (condition, gotoStatement.getLabel ()->getName (), false);
-    else
+    if (TExpressionBase *condition = gotoStatement.getCondition ()) {
+        const std::string ll = getNextLocalLabel ();
+        outputBooleanCheck (condition, gotoStatement.getLabel ()->getName (), ll);
+        outputLabel (ll);
+    } else
         outputCode (T9900Op::b, makeLabelMemory (gotoStatement.getLabel ()->getName ()));
 }
     

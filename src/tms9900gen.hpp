@@ -102,7 +102,7 @@ private:
     void beginRoutineBody (const std::string &routineName, std::size_t level, TSymbolList &, const std::set<T9900Reg> &saveRegs, bool hasStackFrame);
     void endRoutineBody (std::size_t level, TSymbolList &, const std::set<T9900Reg> &saveRegs, bool hasStackFrame, bool isFar);
 
-    void outputBooleanCheck (TExpressionBase *, const std::string &label, bool branchOnFalse = true);
+    void outputBooleanCheck (TExpressionBase *, std::string labelTrue, std::string labelFalse);
     void outputBooleanShortcut (TToken operation, TExpressionBase *left, TExpressionBase *right);
     void outputPointerOperation (TToken operation, TExpressionBase *left, TExpressionBase *right);
     void outputFloatOperation (TToken operation, TExpressionBase *left, TExpressionBase *right);
