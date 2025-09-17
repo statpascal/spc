@@ -107,9 +107,6 @@ procedure line (x0, y0, x1, y1: integer);
             h := a; a := b; b := h
         end;
 
-    label
-        l1, l2;
-
     var 
         dx, dy, sy, d, x: integer;
         x_y : boolean;
@@ -138,18 +135,11 @@ procedure line (x0, y0, x1, y1: integer);
                     plot (y0, x) 
                 else 
                     plot (x, y0);
-//                if (d > 0) or (d = 0) and (sy > 0) then 
-                
-                if d > 0 then goto l1;
-                if d <> 0 then goto l2;
-                if sy > 0 then goto l1 else goto l2;
-                
-l1:                
+                if (d > 0) or (d = 0) and (sy > 0) then 
                     begin
                         inc (y0, sy);
                         dec (d, dx)
                     end;
-l2:                    
                 inc (d, dy)
             end;
         flushCache

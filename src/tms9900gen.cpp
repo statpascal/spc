@@ -154,13 +154,33 @@ void T9900Generator::adjustJumpLabels (std::size_t offset, std::size_t val) {
             it->second -= val;
 }
 
-void T9900Generator::removeJmpLines (TCodeSequence &code, TCodeSequence::iterator it, std::size_t count, std::size_t beginOffset) {
+T9900Generator::TCodeSequence::iterator T9900Generator::removeJmpLines (TCodeSequence &code, TCodeSequence::iterator it, std::size_t count, std::size_t beginOffset) {
     std::size_t val = 0;
     while (count-- > 0) {
         val += it->getSize (0);
         it = code.erase (it);
     }
     adjustJumpLabels (beginOffset, val);
+    
+    for (TCodeSequence::iterator it1 = code.begin (); it1 != code.end () && std::next (it1) != code.end (); ++it1) {
+        TCodeSequence::iterator it2 = std::next (it1);
+        if (it1->operation == T9900Op::def_label && it2->operation == T9900Op::def_label) {
+            const std::string s1 = it1->operand1.label,
+                              s2 = it2->operand1.label;
+            for (T9900Operation &op: code) {
+                if (op.operand1.isLabel () && op.operand1.label == s2)
+                    op.operand1.label = s1;
+                if (op.operand2.isLabel () && op.operand2.label == s2)
+                    op.operand2.label = s1;
+            }
+            if (it == it2)
+                it = code.erase (it2);
+            else
+                code.erase (it2);
+        }
+    }
+    
+    return it;
 }
 
 void T9900Generator::optimizeJumps (TCodeSequence &code) {
@@ -195,8 +215,21 @@ void T9900Generator::optimizeJumps (TCodeSequence &code) {
                     op [i] = T9900Op::end;	// do not touch
                 ++it;
             }
+            
             using enum statpascal::T9900Op;
-            if ((op [0] == jeq || op [0] == jne) && op [1] == b && op [2] == def_label && label [0] == label [2] && rangeOk (offset, jmpLabels [label [1]])) {
+            
+            if (!label [0].empty ()) 
+                for (TCodeSequence::iterator it1 = code.begin (); it1 != code.end (); ++it1)
+                    if (it1->operation == def_label && it1->operand1.label == label [0]) {
+                        it1 = std::next (it1);
+                        if ((it1->operation == b || it1->operation == jmp) && (op [0] == b || rangeOk (offset, jmpLabels [it1->operand1.label])))
+                            line->operand1.label = it1->operand1.label;
+                        break;
+                    }
+            
+            if (op [0] == jmp && op [1] == def_label && label [0] == label [1])
+                line = removeJmpLines (code, line, 1, oldOffset);
+            else if ((op [0] == jeq || op [0] == jne) && (op [1] == b || op [1] == jmp) && op [2] == def_label && label [0] == label [2] && rangeOk (offset, jmpLabels [label [1]])) {
                 line->operation = op [0] == jeq ? jne : jeq;
                 line->operand1 = label [1];
                 removeJmpLines (code, std::next (line), 1, oldOffset);
@@ -2178,6 +2211,7 @@ void T9900Generator::codeBlock (TBlock &block, bool hasStackFrame, bool isFar, T
     optimizePeepHole (blockStatements);
     optimizeSingleLine (blockStatements);
     optimizeJumps (blockStatements);
+    removeUnusedLocalLabels (blockStatements);
     
     std::move (blockStatements.begin (), blockStatements.end (), std::back_inserter (output));
     setOutput (&output);

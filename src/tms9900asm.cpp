@@ -179,7 +179,7 @@ T9900Operation::T9900Operation (T9900Op op, T9900Operand op1, T9900Operand op2, 
 std::string T9900Operation::makeString () const {
     switch (operation) {
         case T9900Op::def_label:
-            return operand1.makeString () + ": even";	// required for xas99/labels on consecutive lines
+            return operand1.makeString () + ":";
         case T9900Op::comment:
             return comment.empty () ? comment : "; " + comment;
         case T9900Op::stri: {
