@@ -221,8 +221,9 @@ private:
     
     std::map<std::string, std::int64_t> jmpLabels;
     void optimizeJumps (TCodeSequence &);
-    TCodeSequence::iterator removeJmpLines (TCodeSequence &, TCodeSequence::iterator it, std::size_t count, std::size_t beginOffset);
-    void adjustJumpLabels (std::size_t offset, std::size_t val);
+    
+    void removeJmpLines (TCodeSequence &, TCodeSequence::iterator it, std::size_t count);
+    void mergeLabel (TCodeSequence &code, TCodeSequence::iterator line);
 
     void removeUnusedLocalLabels (TCodeSequence &code);
     void removeLines (TCodeSequence &code, TCodeSequence::iterator &line, std::size_t count);    
