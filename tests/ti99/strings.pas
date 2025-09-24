@@ -35,9 +35,6 @@ begin
         a [i] := chr (ord ('a') + pred (i));
     writeln (a);
 
-// TODO: Comparison of string constants does not work - both value are copied
-// to the same buffer before calling the compare routine.
-    
     writeln;
     writeln ('Comparison:');
     writeln ('s=', s);

@@ -10,7 +10,7 @@ namespace statpascal {
 const ssize_t TSymbol::LabelDefined, TSymbol::UndefinedLabelUsed, TSymbol::InvalidRegister;
 
 TSymbol::TSymbol (const std::string &name, TType *type, std::size_t level, TFlags flags, TSymbol *alias):
-  name (name), level (level), flags (flags), alias (alias), block (nullptr), offset (0), parameterPosition (0), assignedRegister (InvalidRegister), aliased (false), used (false), constantValue (nullptr) {
+  name (name), level (level), tempBlock (0), flags (flags), alias (alias), block (nullptr), offset (0), parameterPosition (0), assignedRegister (InvalidRegister), aliased (false), used (false), constantValue (nullptr) {
     setType (type);
 }
 
@@ -34,7 +34,9 @@ TSymbolList::TSymbolList (TSymbolList *previousLevel, TMemoryPoolFactory &memory
 TSymbolList::TSymbolList (TSymbolList *symbols, TMemoryPoolFactory &memoryPoolFactory, std::size_t level):
   previousLevel (symbols),
   memoryPoolFactory (memoryPoolFactory),
-  level (level) {
+  level (level),
+  tempBlock (1),
+  tempPresent (false) {
 }
 
 TSymbolList::TAddSymbolResult TSymbolList::addRoutine (const std::string &name, TRoutineType *type) {
@@ -43,6 +45,13 @@ TSymbolList::TAddSymbolResult TSymbolList::addRoutine (const std::string &name, 
 
 TSymbolList::TAddSymbolResult TSymbolList::addVariable (const std::string &name, TType *type) {
     return addSymbol (name, type, TSymbol::Variable, nullptr);
+}
+
+TSymbolList::TAddSymbolResult TSymbolList::addTempVariable (const std::string &name, TType *type) {
+    TAddSymbolResult result = addSymbol (name, type, TSymbol::Variable, nullptr);
+    result.symbol->setTempBlock (tempBlock);
+    tempPresent = true;
+    return result;
 }
 
 TSymbolList::TAddSymbolResult TSymbolList::addStaticVariable (const std::string &name, const TConstant *c) {
@@ -141,6 +150,13 @@ std::vector<TSymbol *> TSymbolList::searchSymbols (const std::string &name, TSym
 
 void TSymbolList::removeSymbol (const TSymbol *symbol) {
     symbols.erase (std::remove (symbols.begin (), symbols.end (), symbol), symbols.end ());
+}
+
+void TSymbolList::beginNewTempBlock () {
+    if (tempPresent) {
+        ++tempBlock;
+        tempPresent = false;
+    }
 }
 
 void TSymbolList::removeUnusedSymbols () {

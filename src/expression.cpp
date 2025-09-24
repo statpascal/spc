@@ -185,7 +185,7 @@ bool TExpressionBase::checkTypeConversion (TType *required, TExpressionBase *&ex
             TType *stringType = compiler.createMemoryPoolObject<TShortStringType> (
                 compiler.createMemoryPoolObject<TSubrangeType> (std::string (), &stdType.Int64, 0, s.length ()));
             expr = createRuntimeCall ("__copy_str_const", stringType, {expr}, block, false);
-            static_cast<TFunctionCall *> (expr)->setReturnStorage (createVariableAccess ("__str_const_buf", block, true), block, true);
+//            static_cast<TFunctionCall *> (expr)->setReturnStorage (createVariableAccess ("__str_const_buf", block, true), block, true);
         }
 #endif
         return true;
@@ -1154,7 +1154,7 @@ TFunctionCall::TFunctionCall (TExpressionBase *function, std::vector<TExpression
 
     if (returnType != &stdType.Void && compiler.getCodeGenerator ().classifyReturnType (returnType) == TCodeGenerator::TReturnLocation::Reference) {
         static std::size_t callCount = 0;
-        TSymbolList::TAddSymbolResult result = block.getSymbols ().addVariable ("$rettmp_" +  std::to_string (callCount++), routineType->getReturnType ());
+        TSymbolList::TAddSymbolResult result = block.getSymbols ().addTempVariable ("__rettmp_" +  std::to_string (callCount++), routineType->getReturnType ());
         returnSymbol = result.symbol;
         returnStorage = compiler.createMemoryPoolObject<TVariable> (returnSymbol, block);
         returnStorageDeref = compiler.createMemoryPoolObject<TLValueDereference> (returnStorage);

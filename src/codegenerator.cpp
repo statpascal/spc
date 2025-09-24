@@ -153,14 +153,38 @@ void TBaseGenerator::alignType (TType *type) {
 void TBaseGenerator::assignStackOffsets (ssize_t &pos, TSymbolList &symbolList, bool handleParameters) {
     // move static variables to end of list
     std::stable_partition (symbolList.begin (), symbolList.end (), [] (TSymbol *s) { return !s->checkSymbolFlag (TSymbol::StaticVariable); });
+    // move temps to end of list
+    std::stable_partition (symbolList.begin (), symbolList.end (), [] (TSymbol *s) { return !s->getTempBlock (); });
+    
+    ssize_t maxPos = 0, tempBeginPos = 0;
+    std::size_t lastTempBlock = 0;
+    bool tempFound = false;
     for (TSymbol *s: symbolList)
         if (s->getRegister () == TSymbol::InvalidRegister)
         if ((handleParameters && s->checkSymbolFlag (TSymbol::Parameter)) ||
             (!handleParameters && s->checkSymbolFlag (TSymbol::Variable) && !s->checkSymbolFlag (TSymbol::Alias))) {
             TType *type = s->getType ();
             alignType (type);
+            
+            if (!tempFound && s->getTempBlock ()) {
+                tempFound = true;
+                tempBeginPos = pos;
+            }
+            
+            if (tempFound && lastTempBlock != s->getTempBlock ()) {
+                lastTempBlock = s->getTempBlock ();
+#ifdef CREATE_9900
+                pos = tempBeginPos;
+                // TODO: destructions for temps on x64/ARM64
+#endif                
+            }
+            
             assignAlignedOffset (*s, pos, type->getAlignment ());
+            if (pos > maxPos)
+                maxPos = pos;
         }
+    if (!symbolList.empty ())
+        pos = maxPos;
 }
 
 TBaseGenerator::TTypeAnyManager TBaseGenerator::lookupAnyManager (const TType *type) {

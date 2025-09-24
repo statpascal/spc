@@ -12,6 +12,8 @@ TStatement *TStatement::parse (TBlock &declarations) {
     TCompilerImpl &compiler = declarations.getCompiler ();
     TLexer &lexer = compiler.getLexer ();
     
+    declarations.getSymbols ().beginNewTempBlock ();
+    
     if (lexer.checkToken (TToken::Begin))
         return compiler.createMemoryPoolObject<TStatementSequence> (declarations);
     if (lexer.checkToken (TToken::If))

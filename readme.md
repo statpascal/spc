@@ -101,8 +101,8 @@ The compiler can produce a bank switched ROM cartridge for the TI99/4A. The uppe
 KB) as heap for dynamic allocations.
 
 There are no floating point yet and the runtime library is rather limited. 
-Dynamic memory management currently uses a *mark/release* style.  File
-operations are supported using PABs.
+Dynamic memory management currently uses a *mark/release* style. Input is
+limited to a single variable in a *readln* call.
 
 To enable the TI99 mode, execute the makefile with the option *ti99=1*:
 
@@ -131,7 +131,6 @@ The following steps are planned:
 
 - a standard runtime library
 - floating point operations (probably IEEE-754 binary32)
-- standard Pascal file operations
 
 ## License
 

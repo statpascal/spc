@@ -56,6 +56,9 @@ public:
     void setRegister (ssize_t);
     ssize_t getRegister () const;
     
+    void setTempBlock (std::size_t);
+    std::size_t getTempBlock () const;
+    
     /** set if an alias to the symbol exists: address operator, absolute declaration or type cast. */
     void setAliased ();
     bool isAliased () const;
@@ -85,7 +88,7 @@ public:
     static const ssize_t LabelDefined = -1, UndefinedLabelUsed = -2, InvalidRegister = -1;
 private:
     std::string name, libName, extSymbolName;
-    std::size_t level;
+    std::size_t level, tempBlock;
     TFlags flags;
     TSymbol *alias;
     TBlock *block;
@@ -108,6 +111,7 @@ public:
 
     TAddSymbolResult addRoutine (const std::string &name, TRoutineType *type);
     TAddSymbolResult addVariable (const std::string &name, TType *type);
+    TAddSymbolResult addTempVariable (const std::string &name, TType *type);
     TAddSymbolResult addStaticVariable (const std::string &name, const TConstant *);
     TAddSymbolResult addParameter (const std::string &name, TType *type);
     TAddSymbolResult addConstant (const std::string &name, const TSimpleConstant *);
@@ -120,6 +124,7 @@ public:
     std::vector<TSymbol *> searchSymbols (const std::string &name, TSymbol::TFlags = TSymbol::AllSymbols) const;
     void removeSymbol (const TSymbol *);
     
+    void beginNewTempBlock ();
     void removeUnusedSymbols ();
     
     TSymbol *makeLocalLabel (char c);	// -> yields --c - makeUniqueLabelNames in TBaseGenerator provides distinct names. 
@@ -149,7 +154,8 @@ private:
     TSymbolList *previousLevel;    
     TMemoryPoolFactory &memoryPoolFactory;
     TBaseContainer symbols;    
-    std::size_t parameterSize, localSize, level;
+    std::size_t parameterSize, localSize, level, tempBlock;
+    bool tempPresent;
 };
 
 // ---
@@ -235,6 +241,14 @@ inline ssize_t TSymbol::getRegister () const {
     return assignedRegister;
 }
 
+inline void TSymbol::setTempBlock (std::size_t n) {
+    tempBlock = n;
+}
+
+inline std::size_t TSymbol::getTempBlock () const {
+    return tempBlock;
+}
+    
 inline void TSymbol::setAliased () {
     aliased = true;
 }

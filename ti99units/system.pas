@@ -120,9 +120,6 @@ function IOResult: integer;
 
 // string handling
 
-var
-    __str_const_buf: string;
-    
 function length (s: PChar): integer;
 function pos (ch: char; s: PChar): integer;
 function copy (s: PChar; start, len: integer): string;
