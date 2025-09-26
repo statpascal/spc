@@ -12,8 +12,6 @@ TStatement *TStatement::parse (TBlock &declarations) {
     TCompilerImpl &compiler = declarations.getCompiler ();
     TLexer &lexer = compiler.getLexer ();
     
-    declarations.getSymbols ().beginNewTempBlock ();
-    
     if (lexer.checkToken (TToken::Begin))
         return compiler.createMemoryPoolObject<TStatementSequence> (declarations);
     if (lexer.checkToken (TToken::If))
@@ -119,6 +117,7 @@ TStatement *TSimpleStatement::parse (TBlock &declarations) {
     TCompilerImpl &compiler = declarations.getCompiler ();
     TLexer &lexer = compiler.getLexer ();
     
+    declarations.getSymbols ().beginNewTempBlock ();
     const std::string identifier = lexer.getIdentifier ();
     TExpressionBase *left = TExpression::parse (declarations),
                     *right = nullptr;
@@ -183,6 +182,7 @@ void TIfStatement::parse (TBlock &declarations) {
     TCompilerImpl &compiler = declarations.getCompiler ();
     TLexer &lexer = compiler.getLexer ();
     
+    declarations.getSymbols ().beginNewTempBlock ();
     condition = TExpression::parse (declarations);
     if (condition && !TExpressionBase::checkTypeConversion (&stdType.Boolean, condition, declarations))
         compiler.errorMessage (TCompilerImpl::IncompatibleTypes, "Boolean required in condition of 'if'-statement");
@@ -227,6 +227,8 @@ TStatement *TRepeatStatement::parse (TBlock &declarations) {
     TCompilerImpl &compiler = declarations.getCompiler ();
     TSymbol *label = createLocalLabel (declarations);
     std::vector<TStatement *> statements = parseStatementSequence (declarations, TToken::Until);
+    
+    declarations.getSymbols ().beginNewTempBlock ();
     TExpressionBase *condition;
     if (declarations.getCompiler ().getLexer ().checkToken (TToken::Until) && (condition = TExpression::parse (declarations))) {
         TExpressionBase::performTypeConversion (&stdType.Boolean, condition, declarations);
@@ -244,6 +246,8 @@ TStatement *TWhileStatement::parse (TBlock &declarations) {
     TSymbol *l1 = createLocalLabel (declarations),
             *l2 = createLocalLabel (declarations);
     std::vector<TStatement *> statements;
+    
+    declarations.getSymbols ().beginNewTempBlock ();
     TExpressionBase *condition = TExpression::parse (declarations);
     if (condition) {
         TExpressionBase::performTypeConversion (&stdType.Boolean, condition, declarations);
@@ -274,6 +278,7 @@ void TCaseStatement::parse (TBlock &declarations) {
     TCompilerImpl &compiler = declarations.getCompiler ();
     TLexer &lexer = compiler.getLexer ();
     
+    declarations.getSymbols ().beginNewTempBlock ();
     expression = TExpression::parse (declarations);
     const TType *type = expression ? TExpressionBase::convertBaseType (expression, declarations) : nullptr;
     if (type && !type->isEnumerated ())
@@ -330,6 +335,8 @@ TStatement *TForStatement::parse (TBlock &declarations) {
         lexer.getNextToken ();
     // TODO: Check if control variable is local
     compiler.checkToken (TToken::Define, "':=' required in 'for'-statement");
+    
+    declarations.getSymbols ().beginNewTempBlock ();
     TExpressionBase *begin = TExpression::parse (declarations);
     if (lexer.checkToken (TToken::To))
         isIncrement = true;
@@ -442,7 +449,8 @@ void TWithStatement::parse (TBlock &declarations) {
     TLexer &lexer = compiler.getLexer ();
         
     std::size_t count = 0;
-    do 
+    do {
+        declarations.getSymbols ().beginNewTempBlock ();
         if (TExpressionBase *expr = TExpression::parse (declarations)) {
             if (expr->getType ()->isRecord ()) {
                 ++count;
@@ -450,7 +458,7 @@ void TWithStatement::parse (TBlock &declarations) {
             } else
                 compiler.errorMessage (TCompilerImpl::InvalidType, "Record type required in 'with'-statement");
         }
-    while (lexer.checkToken (TToken::Comma));
+    } while (lexer.checkToken (TToken::Comma));
     compiler.checkToken (TToken::Do, "'do' expected in 'with'-statement");
     statement = TStatement::parse (declarations);
     while (count--)

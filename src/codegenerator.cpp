@@ -51,7 +51,7 @@ TType *TBaseGenerator::getMemoryOperationType (TType *const type) {
                 return &stdType.Int64;
         }
     }
-    if (type->isPointer () || type->isRoutine ())
+    if (type->isPointer () || type->isRoutine ()) {
 #ifdef CREATE_9900
         if (type->isRoutine ())
             return &stdType.UnresOverload;
@@ -62,6 +62,7 @@ TType *TBaseGenerator::getMemoryOperationType (TType *const type) {
 #endif
 //    if (type->isVector ())
 //        return &stdType.GenericVector;
+    }
         
     return &stdType.UnresOverload;
 }
@@ -153,10 +154,11 @@ void TBaseGenerator::alignType (TType *type) {
 void TBaseGenerator::assignStackOffsets (ssize_t &pos, TSymbolList &symbolList, bool handleParameters) {
     // move static variables to end of list
     std::stable_partition (symbolList.begin (), symbolList.end (), [] (TSymbol *s) { return !s->checkSymbolFlag (TSymbol::StaticVariable); });
-    // move temps to end of list
-    std::stable_partition (symbolList.begin (), symbolList.end (), [] (TSymbol *s) { return !s->getTempBlock (); });
+    // move temps to begin of list
+    std::stable_partition (symbolList.begin (), symbolList.end (), [] (TSymbol *s) { return s->getTempBlock (); });
     
-    ssize_t maxPos = 0, tempBeginPos = 0;
+    const ssize_t tempBeginPos = pos;
+    ssize_t maxTempPos = pos;
     std::size_t lastTempBlock = 0;
     bool tempFound = false;
     for (TSymbol *s: symbolList)
@@ -168,23 +170,30 @@ void TBaseGenerator::assignStackOffsets (ssize_t &pos, TSymbolList &symbolList, 
             
             if (!tempFound && s->getTempBlock ()) {
                 tempFound = true;
-                tempBeginPos = pos;
+                lastTempBlock = s->getTempBlock ();
             }
             
-            if (tempFound && lastTempBlock != s->getTempBlock ()) {
+            if (tempFound && !s->getTempBlock ()) {
+                tempFound = false;
+                pos = maxTempPos;
+            }
+            
+            if (s->getTempBlock () && lastTempBlock != s->getTempBlock ()) {
                 lastTempBlock = s->getTempBlock ();
 #ifdef CREATE_9900
                 pos = tempBeginPos;
                 // TODO: destructions for temps on x64/ARM64
 #endif                
             }
-            
             assignAlignedOffset (*s, pos, type->getAlignment ());
-            if (pos > maxPos)
-                maxPos = pos;
+            
+            if (s->getTempBlock () && pos > maxTempPos)
+                maxTempPos = pos;
         }
-    if (!symbolList.empty ())
-        pos = maxPos;
+#ifdef CREATE_9900        
+    if (pos < maxTempPos)
+        pos = maxTempPos;
+#endif        
 }
 
 TBaseGenerator::TTypeAnyManager TBaseGenerator::lookupAnyManager (const TType *type) {

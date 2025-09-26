@@ -67,8 +67,18 @@ bool TExpressionBase::createFunctionCall (TExpressionBase *&base, TBlock &block,
 
 TFunctionCall *TExpressionBase::createRuntimeCall (const std::string &name, TType *resultType, std::vector<TExpressionBase *> &&args, TBlock &block, bool checkParameter) {
     TCompilerImpl &compiler = block.getCompiler ();
-    TFunctionCall *expr = compiler.createMemoryPoolObject<TFunctionCall> (
-        compiler.createMemoryPoolObject<TRoutineValue> (name, block), std::move (args), block, checkParameter);
+    TRoutineValue *routine = compiler.createMemoryPoolObject<TRoutineValue> (name, block);
+    if (resultType) {
+        // For external functions we can change the actual routine type itself.
+        // This is only applied to short string constants, which yield a string
+        // type with the length of the constant.
+        if (routine->getSymbol ()->checkSymbolFlag (TSymbol::External)) {
+            TRoutineType *rt = static_cast<TRoutineType *> (routine->getType ());
+            rt->setReturnType (resultType);
+            routine->setType (rt);
+        }            
+    }
+    TFunctionCall *expr = compiler.createMemoryPoolObject<TFunctionCall> (routine, std::move (args), block, checkParameter);
     if (resultType)
         expr->setType (resultType);
     return expr;
@@ -236,7 +246,7 @@ bool TExpressionBase::checkTypeConversion (TType *required, TExpressionBase *&ex
     }
     
     if (required->isShortString () && expr->getType () == &stdType.Char) {
-        expr = createRuntimeCall ("__short_str_char", required, {expr}, block, false);
+        expr = createRuntimeCall ("__short_str_char", nullptr, {expr}, block, false);
         return true;
     }
     
@@ -731,7 +741,7 @@ TExpressionBase *TSimpleExpression::parse (TBlock &block) {
                 } else if (type->isString ()) 
                     left = createRuntimeCall ("__str_concat", type, {left, right}, block, false);
                 else if (type->isShortString ())
-                    left = createRuntimeCall ("__short_str_concat", type, {left, right}, block, false);
+                    left = createRuntimeCall ("__short_str_concat", nullptr, {left, right}, block, false);
                 else if (!mergeConstants (left, right, type, operation, block))
                     left = compiler.createMemoryPoolObject<TSimpleExpression> (left, right, operation, type);
             }

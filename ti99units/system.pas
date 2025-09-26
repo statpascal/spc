@@ -800,7 +800,7 @@ function  __read_char (var f: text): char;
 function __read_string (var f: text): string;
     begin
         if f.fileidx = 0 then
-            __read_string := __read_line_Console
+            __read_string := __read_line_console
         else if f.fileidx > 0 then
             begin
                 f.pab.opcode := PabRead;
