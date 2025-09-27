@@ -134,7 +134,12 @@ TStatement *TSimpleStatement::parse (TBlock &declarations) {
                     compiler.errorMessage (TCompilerImpl::InvalidUseOfSymbol, "Cannot assign to function result");
                 else if (!left->isVectorIndex ()) {	// handled as function call
                     TExpressionBase::performTypeConversion (left->getType (), right, declarations);
-                    if (right->isFunctionCall () && (left->getType () == right->getType () || left->getType ()->isVector () || (left->getType ()->isSet () && right->getType ()->isSet ()))
+                    if (right->isFunctionCall () && (
+                            left->getType () == right->getType () || 
+                            left->getType ()->isVector () || 
+                            (left->getType ()->isSet () && right->getType ()->isSet ()) ||
+                            (left->getType ()->isShortString () && right->getType ()->isShortString () && left->getType ()->getSize () >= right->getType ()->getSize ())
+                        )
                         && static_cast<TFunctionCall *> (right)->getReturnStorage () && !compiler.getCodeGenerator ().isFunctionCallInlined (*static_cast<TFunctionCall *> (right))) {
                         static_cast<TFunctionCall *> (right)->setReturnStorage (left, declarations);
                         return compiler.createMemoryPoolObject<TRoutineCall> (right);

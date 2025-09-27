@@ -329,6 +329,15 @@ void T9900Generator::optimizePeepHole (TCodeSequence &code) {
             removeLines (code, line, 1);
         }
         
+        // li reg, imm
+        // swpb reg
+        //->
+        // li reg, swap (imm)
+        else if (op1 == T9900Op::li && op2 == T9900Op::swpb && !op_1_2.isLabel () && isSameReg (op_1_1, op_2_1)) {
+            op_1_2.val = ((op_1_2.val & 0xff) << 8) | (op_1_2.val >> 8);
+            removeLines (code, line1, 1);
+        }
+        
         // li reg1, imm
         // add reg1, reg2
         // ->
