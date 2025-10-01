@@ -157,13 +157,28 @@ void T9900Generator::mergeLabel (TCodeSequence &code, TCodeSequence::iterator li
     const std::string 
         s1 = line->operand1.label,
         s2 = std::next (line)->operand1.label;
+    auto replace = [&] (T9900Operand &op) { if (op.isLabel () && op.label == s2) op.label = s1; };
     for (T9900Operation &op: code) {
+        replace (op.operand1);
+        replace (op.operand2);
+    }
+/*    
         if (op.operand1.isLabel () && op.operand1.label == s2)
             op.operand1.label = s1;
         if (op.operand2.isLabel () && op.operand2.label == s2)
             op.operand2.label = s1;
     }
+*/    
     code.erase (std::next (line));
+}
+
+void T9900Generator::mergeMultipleLabels (TCodeSequence &code) {
+    TCodeSequence::iterator line = code.begin ();
+    while (line->operation != T9900Op::end) 
+        if (line->operation == T9900Op::def_label && std::next (line)->operation == T9900Op::def_label)
+            mergeLabel (code, line);
+        else
+            ++line;
 }
 
 void T9900Generator::optimizeJumps (TCodeSequence &code) {
@@ -171,6 +186,7 @@ void T9900Generator::optimizeJumps (TCodeSequence &code) {
     code.push_back (T9900Op::end);
     code.push_back (T9900Op::end);
     
+    mergeMultipleLabels (code);
     bool modified;
     do {
         std::int64_t offset = 0;
@@ -187,10 +203,7 @@ void T9900Generator::optimizeJumps (TCodeSequence &code) {
         while (!modified && line->operation != T9900Op::end) {
             using enum statpascal::T9900Op;
             offset += line->getSize (offset);
-            if (line->operation == def_label && std::next (line)->operation == def_label) {
-                mergeLabel (code, line);
-                modified = true;
-            } else if ((line->operation >= T9900Op::jmp && line->operation <= T9900Op::jop) || line->operation == T9900Op::b) {
+            if ((line->operation >= T9900Op::jmp && line->operation <= T9900Op::jop) || line->operation == T9900Op::b) {
                 T9900Op op [4];
                 std::string label [4];
                 TCodeSequence::iterator it = line;
@@ -1307,9 +1320,10 @@ void T9900Generator::generateCode (TFunctionCall &functionCall) {
         visit (parameterDescriptions [i].actualParameter);
         if (parameterDescriptions [i].isInteger) {
             const T9900Reg reg = fetchReg (intScratchReg1);
-            if (parameterDescriptions [i].type->getSize () == 1)
+            bool isByte = parameterDescriptions [i].type->getSize () == 1;
+            if (isByte)
                 outputCode (T9900Op::swpb, reg);            
-            outputCode (T9900Op::mov, reg, T9900Operand (T9900Reg::r10, parameterDescriptions [i].offset));
+            outputCode (isByte ? T9900Op::movb : T9900Op::mov, reg, T9900Operand (T9900Reg::r10, parameterDescriptions [i].offset));
         } else {
             T9900Reg reg = getSaveReg (intScratchReg1);
             outputCode (T9900Op::mov, T9900Reg::r10, reg);
@@ -2178,13 +2192,10 @@ void T9900Generator::codeBlock (TBlock &block, bool hasStackFrame, bool isFar, T
     }
     
     setOutput (&blockCode);
-    
     if (!globalInits.empty ()) 
         outputCode (T9900Op::bl, makeLabelMemory ("$init_static"));
     visit (block.getStatements ());
-    
     outputLabel (endOfRoutineLabel);
-//    logOptimizer = block.getSymbol ()->getName () == "gettapeinput_$182";
     
     optimizePeepHole (blockCode);
     optimizeSingleLine (blockCode);

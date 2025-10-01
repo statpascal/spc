@@ -995,7 +995,7 @@ procedure __str_int (n, length, precision: integer; s: PChar);
             mov r13, r14
             jne outint1
             
-            mov @neg, r13
+            movb @neg, r13
             jeq outint2
             li r13, >2d00
             movb r13, *r0

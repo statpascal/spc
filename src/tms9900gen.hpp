@@ -224,6 +224,7 @@ private:
     
     void removeJmpLines (TCodeSequence &, TCodeSequence::iterator it, std::size_t count);
     void mergeLabel (TCodeSequence &code, TCodeSequence::iterator line);
+    void mergeMultipleLabels (TCodeSequence &code);
 
     void removeUnusedLocalLabels (TCodeSequence &code);
     void removeLines (TCodeSequence &code, TCodeSequence::iterator &line, std::size_t count);    
