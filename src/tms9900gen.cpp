@@ -322,7 +322,7 @@ void T9900Generator::optimizePeepHole (TCodeSequence &code) {
         T9900Operand &op_4_1 = line3->operand1,
                      &op_4_2 = line3->operand2;
         T9900Op      &op4 = line3->operation;
-//        std::string &comm_4 = line3->comment; 
+        std::string &comm_4 = line3->comment; 
         
         if (op1 == T9900Op::li && op2 == T9900Op::li && op3 == T9900Op::mov && op4 == T9900Op::mov &&
             isSameCalcStackReg (op_1_1, op_4_1) && isSameCalcStackReg (op_2_1, op_3_1)) {
@@ -639,6 +639,20 @@ void T9900Generator::optimizePeepHole (TCodeSequence &code) {
         // not cond jump
         else if (op1 == T9900Op::mov && op_1_1 == op_1_2 && (op2 <= T9900Op::jmp || op2 >= T9900Op::sbo)) {
             removeLines (code, line, 1);
+        }
+        
+        // movb op1, reg
+        // srl reg, 8
+        // swpb reg
+        // movb reg, op2
+        // ->
+        // movb op1, op2
+        else if (op1 == T9900Op::movb && op2 == T9900Op::srl && op3 == T9900Op::swpb && op4 == T9900Op::movb &&
+                 op_1_2.isReg () && isSameCalcStackReg (op_1_2,  op_2_1) && isSameCalcStackReg (op_1_2, op_3_1) &&
+                 isSameCalcStackReg (op_1_2, op_4_1)) {
+            op_4_1 = op_1_1;
+            comm_4 = comm_1 + " " + comm_4;
+            removeLines (code, line, 3);
         }
 
 /*        
