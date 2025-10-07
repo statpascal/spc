@@ -53,7 +53,7 @@ TType *TBaseGenerator::getMemoryOperationType (TType *const type) {
     }
     if (type->isPointer () || type->isRoutine ()) {
 #ifdef CREATE_9900
-        if (type->isRoutine ())
+        if (type->isRoutine () && TConfig::target == TConfig::TTarget::TI_BANKCART)
             return &stdType.UnresOverload;
         else
             return &stdType.Uint16;

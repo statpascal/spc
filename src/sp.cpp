@@ -53,6 +53,12 @@ private:
 
 
 void compile9900 (int argc, char **argv) {
+    sp::TConfig::target = sp::TConfig::TTarget::TI_BANKCART;
+    if (haveParameter ("--cart", argc, argv))
+        sp::TConfig::target = sp::TConfig::TTarget::TI_CART;
+    if (haveParameter ("--ea5", argc, argv))
+        sp::TConfig::target = sp::TConfig::TTarget::TI_EA5;
+
     sp::TRuntimeData runtimeData;
     sp::T9900Generator generator (runtimeData);
     sp::TCompiler compiler (generator);
@@ -74,6 +80,7 @@ void compile9900 (int argc, char **argv) {
 
 void compile (int argc, char **argv) {
 #ifdef CREATE_9900
+        sp::TConfig::target = sp::TConfig::TTarget::TI_EA5;
         compile9900 (argc, argv);
         return;
 #endif        
@@ -88,8 +95,10 @@ void compile (int argc, char **argv) {
         runtimeData.appendArgv (argv [i]);
         
 #ifdef CREATE_X64
+    sp::TConfig::target = sp::TConfig::TTarget::X64;
     sp::TX64Generator generator (runtimeData);
 #else
+    sp::TConfig::target = sp::TConfig::TTarget::AARCH64;
     createListing = true;	// asm source required
     sp::TA64Generator generator (runtimeData);
 #endif    

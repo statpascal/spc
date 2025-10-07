@@ -37,6 +37,6 @@ begin
             end;
     writeln; writeln;
     writeln ('Found ', count, ' primes below ', n);
-    waitkey
+//    waitkey
 end.
 

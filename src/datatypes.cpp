@@ -330,14 +330,6 @@ void TRecordType::setSize (std::size_t n) {
 TFileType::TFileType (TType *baseType, TSymbolList *components):
   inherited (components),
   baseType (baseType) {
-#ifdef CREATE_9900
-//    addComponent ("dataptr", &stdType.GenericPointer);
-#else  
-//    addComponent ("idx", &stdType.Int64);
-//    addComponent ("fn", &stdType.String);
-//    addComponent ("blksize", &stdType.Int64);
-//    addComponent ("binary", &stdType.Boolean);
-#endif    
 }
 
 std::string TFileType::getName () const {
@@ -384,11 +376,15 @@ std::string TPointerType::getName () const {
 }
 
 std::size_t TPointerType::getSize () const {
-#ifdef CREATE_9900
-    return 2;
-#else
-    return sizeof (void *);
-#endif    
+    switch (TConfig::target) {
+        case TConfig::TTarget::TI_CART:
+        case TConfig::TTarget::TI_EA5:
+        case TConfig::TTarget::TI_BANKCART:
+            return 2;
+        case TConfig::TTarget::X64:
+        case TConfig::TTarget::AARCH64: 
+            return sizeof (void *);
+    }
 }
 
 bool TPointerType::isSerializable () const {
@@ -474,11 +470,15 @@ std::string TReferenceType::getName () const {
 }
 
 std::size_t TReferenceType::getSize () const {
-#ifdef CREATE_9900
-    return 2;
-#else
-    return sizeof (void *);
-#endif    
+    switch (TConfig::target) {
+        case TConfig::TTarget::TI_CART:
+        case TConfig::TTarget::TI_EA5:
+        case TConfig::TTarget::TI_BANKCART:
+            return 2;
+        case TConfig::TTarget::X64:
+        case TConfig::TTarget::AARCH64: 
+            return sizeof (void *);
+    }
 }
 
 bool TReferenceType::isSerializable () const {
@@ -508,11 +508,16 @@ std::string TRoutineType::getName () const {
 }
 
 std::size_t TRoutineType::getSize () const {
-#ifdef CREATE_9900
-    return 4;
-#else
-    return sizeof (void (*)());
-#endif    
+    switch (TConfig::target) {
+        case TConfig::TTarget::TI_CART:
+        case TConfig::TTarget::TI_EA5:
+            return 2;
+        case TConfig::TTarget::TI_BANKCART:
+            return 4;
+        case TConfig::TTarget::X64:
+        case TConfig::TTarget::AARCH64: 
+            return sizeof (void *);
+    }
 }
 
 bool TRoutineType::isSerializable () const {

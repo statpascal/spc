@@ -96,11 +96,12 @@ The next steps will be:
 
 This is work in progress.
 
-The compiler can produce a bank switched ROM cartridge for the TI99/4A. The upper memory
-(24 KB) is used for global variables and stack frames, the lower memory (8
-KB) as heap for dynamic allocations.
+The compiler can produce an (optionally) bank switched ROM cartridge or an
+EA5 image for the TI99/4A.  The upper memory (24 KB) is used for global
+variables and stack frames (and also code starting at A000 for EA5),
+the lower memory (8 KB) as heap for dynamic allocations.
 
-There are no floating point yet and the runtime library is rather limited. 
+There is no floating point yet and the runtime library is rather limited. 
 Dynamic memory management currently uses a *mark/release* style. Input is
 limited to a single variable in a *readln* call.
 
@@ -117,15 +118,22 @@ runtime library. The *tests/ti99* directory shows what is
 already working.
 
 Compiling a program in this mode produces the assembler source *out.a99*,
-which can be assembled with xas99.
+which can be assembled with xas99, e.g.
 
 ```
 user@host:~/src/statpascal> obj/sp tests/ti99/sieve.pas 
 user@host:~/src/statpascal> ~/ti99/xdt99/xas99.py -R -b -q out.a99 -o cart.bin
 user@host:~/src/statpascal> cat cart_b*.bin >cart.bin
-user@host:~/src/statpascal> ls -l cart.bin 
--rw-r--r--. 1 user user 40960 Aug 20 19:14 cart.bin
 ```
+
+For small programs, the bank switch overhead can be avoided by either
+producing a single bank cartride (option *--cart*) or an EA5 image (option
+*--ea5*); yielding a performance increase of about 15% for typical
+programs.
+
+The scripts *runcart.sh*, *runbank.sh* and *runea5.sh* in the
+scripts directory show the invocation of the compiler, xas99 assembler and
+start the *emul99* emulator.
 
 The following steps are planned:
 

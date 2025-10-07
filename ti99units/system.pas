@@ -258,13 +258,16 @@ procedure _rt_scroll_up; assembler;
         movb r0, *r13
         swpb r0
         movb r0, *r13
-        li r8, 8
+        li r8, 32
         li r12, >8320
         
     _rt_scroll_up_2:
         movb *r14, *r12+
+        dec r8			// deley before accessing next byte
         movb *r14, *r12+
+        dec r8
         movb *r14, *r12+
+        dec r8
         movb *r14, *r12+
         dec r8
         jne _rt_scroll_up_2
@@ -275,13 +278,16 @@ procedure _rt_scroll_up; assembler;
         swpb r0
         movb r0, *r13
 
-        li r8, 8
+        li r8, 32
         li r12, >8320
         
     _rt_scroll_up_3:
         movb *r12+, *r15
+        dec r8
         movb *r12+, *r15
+        dec r8
         movb *r12+, *r15
+        dec r8
         movb *r12+, *r15
         dec r8
         jne _rt_scroll_up_3
@@ -369,31 +375,27 @@ end;
 
 procedure writeV (addr: integer; val: uint8);
     begin
-        vdpwa := chr (addr and 255);
-        vdpwa := chr (addr shr 8 or $40);
-        vdpwd := chr (val)
+        vmbw (val, addr, 1)
     end;
     
 function readV (addr: integer): uint8;
     begin
-        vdpwa := chr (addr and 255);
-        vdpwa := chr (addr shr 8);
-        readV := ord (vdprd)
+        vmbr (result, addr, 1)
     end;
 
 procedure vmbw (var src; dest, length: integer); assembler;
         mov @length, r14
         jeq vmbw_2
         
-        mov @src, r12
         mov @dest, r13
-        li r15, vdpwd
-
         ori r13, >4000
         swpb r13
         movb r13, @vdpwa
         swpb r13
         movb r13, @vdpwa
+        
+        mov @src, r12
+        li r15, vdpwd
 
     vmbw_1:
         movb *r12+, *r15
@@ -407,14 +409,14 @@ procedure vmbr (var dest; src, length: integer); assembler;
         mov @length, r14
         jeq vmbr_2
         
-        mov @dest, r12
         mov @src, r13
+        swpb r13
+        movb r13, @vdpwa
+        swpb r13
+        movb r13, @vdpwa
+        
         li r15, vdprd
-
-        swpb r13
-        movb r13, @vdpwa
-        swpb r13
-        movb r13, @vdpwa
+        mov @dest, r12
 
     vmbr_1:
         movb *r15, *r12+

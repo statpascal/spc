@@ -19,10 +19,13 @@ implementation
 
 const
     vdpRegsStandard: TVdpRegList = ($00, $c0, $00, $0e, $01, $06, $00, $07);
-    vdpRegsBitmap: TVdpRegList = ($02, $c0, $06, $ff, $03, $00, $00, $00);
+    vdpRegsBitmap: TVdpRegList = ($02, $c0, $06, $ff, $03, $78, $07, $00);
     
-    patternTable = $0000;
-    colorTable = $2000;
+    imageTable = $1800;			// VR2 = $06
+    patternTable = $0000;		// VR3 = $ff
+    colorTable = $2000;			// VR4 = §03
+    spriteAttributeTable = $3c00;	// VR5 = $78
+    spritePatternTable = $3800;		// VR6 = $07
     
 var
     activeColor: uint8;
@@ -38,7 +41,8 @@ procedure setBitmapMode;
             for j := 0 to 255 do
                 vdpwd := chr (j);
         setVdpAddress (ColorTable or WriteAddr);
-        vrbw (activeColor, $1800)
+        vrbw (activeColor, $1800);
+        writeV (spriteAttributeTable, $d0)	// sprites off
     end;
     
 procedure setStandardMode;

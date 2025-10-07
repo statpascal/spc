@@ -15,6 +15,9 @@ struct TConfig {
     static const std::size_t setLimit = setwords * 8 * sizeof (std::int64_t);
     static const std::string globalRuntimeDataPtr; //  = "__globalruntimedata";
     static const std::string binFileType; // = "__bin_file_type";
+    
+    enum class TTarget { X64, AARCH64, TI_EA5, TI_CART, TI_BANKCART };
+    static TTarget target;    
 };
 
 }

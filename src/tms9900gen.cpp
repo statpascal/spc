@@ -654,26 +654,8 @@ void T9900Generator::optimizePeepHole (TCodeSequence &code) {
             comm_4 = comm_1 + " " + comm_4;
             removeLines (code, line, 3);
         }
-
-/*        
-        // li r12, bank
-        // li r13, subprog
-        // bl @farCall
-        // ->
-        // bl @farCallCode
-        // data bank
-        // data subprog
-        else if (op1 == T9900Op::li && op2 == T9900Op::li && op3 == T9900Op::bl && op_3_1.label == farCall) {
-            op1 = op3;
-            op2 = op3 = T9900Op::data;
-            op_1_1 = makeLabelMemory (farCallCode);
-            op_2_1 = op_1_2;
-            op_3_1 = op_2_2;
-            op_1_2 = op_2_2 = T9900Operand ();
-        }
-*/        
         
-         else
+        else
             ++line;
     }
     
@@ -724,31 +706,43 @@ void T9900Generator::getAssemblerCode (std::vector<std::uint8_t> &opcodes, bool 
     listing.clear ();
 
     calcLength (sharedCode);    
+    std::size_t length = sharedCode.size;
     calcLength (mainProgram);
-    for (TCodeBlock &proc: subPrograms)
+    length += mainProgram.size;
+    for (TCodeBlock &proc: subPrograms) {
         calcLength (proc);
-    
-    std::size_t org = 0x6000;
-    std::size_t bank = 0;
-    assignBank (sharedCode, bank, org);
-    
-    assignBank (mainProgram, bank, org);
-    for (TCodeBlock &proc: subPrograms)
-        assignBank (proc, bank, org);
-        
-    // last word of each bank is filled with bank switching address (to be pushed in far calls)
-    sharedCode.codeSequence.push_back (T9900Operation (T9900Op::comment, T9900Operand (), T9900Operand (),  std::string ("")));
-    sharedCode.codeSequence.push_back (T9900Operation (T9900Op::comment, T9900Operand (), T9900Operand (),  std::string ("Bank ids at end of each page")));
-    for (std::size_t i = 0; i <= bank; ++i) {
-        sharedCode.codeSequence.push_back (T9900Operation (T9900Op::bank, i, 0x7ffe));
-        sharedCode.codeSequence.push_back (T9900Operation (T9900Op::data, 0x6000 + 2 * i));
+        length += proc.size;
     }
-    sharedCode.codeSequence.push_back (T9900Operation (T9900Op::comment, T9900Operand (), T9900Operand (),  std::string ("")));
-
-    resolveBankLabels (mainProgram);
-    for (TCodeBlock &proc: subPrograms)
-        resolveBankLabels (proc);
         
+    if (TConfig::target == TConfig::TTarget::TI_BANKCART) {
+        std::size_t org = 0x6000;
+        std::size_t bank = 0;
+        assignBank (sharedCode, bank, org);
+        
+        assignBank (mainProgram, bank, org);
+        for (TCodeBlock &proc: subPrograms)
+            assignBank (proc, bank, org);
+            
+        // last word of each bank is filled with bank switching address (to be pushed in far calls)
+        sharedCode.codeSequence.push_back (T9900Operation (T9900Op::comment, T9900Operand (), T9900Operand (),  std::string ("")));
+        sharedCode.codeSequence.push_back (T9900Operation (T9900Op::comment, T9900Operand (), T9900Operand (),  std::string ("Bank ids at end of each page")));
+        for (std::size_t i = 0; i <= bank; ++i) {
+            sharedCode.codeSequence.push_back (T9900Operation (T9900Op::bank, i, 0x7ffe));
+            sharedCode.codeSequence.push_back (T9900Operation (T9900Op::data, 0x6000 + 2 * i));
+        }
+        sharedCode.codeSequence.push_back (T9900Operation (T9900Op::comment, T9900Operand (), T9900Operand (),  std::string ("")));
+
+        resolveBankLabels (mainProgram);
+        for (TCodeBlock &proc: subPrograms)
+            resolveBankLabels (proc);
+    }
+/*    if (TConfig::target == TConfig::TTarget::TI_EA5) {
+        sharedCode.codeSequence.push_front (T9900Operation (T9900Op::data, length));
+        sharedCode.codeSequence.push_front (T9900Operation (T9900Op::data, 0xa000));
+        sharedCode.codeSequence.push_front (T9900Operation (T9900Op::data, 0x0000));
+    }
+*/    
+            
     for (T9900Operation &op: sharedCode.codeSequence) 
         listing.push_back (op.makeString ());
     
@@ -850,10 +844,13 @@ void T9900Generator::outputStaticConstants () {
                     outputCode (T9900Op::byte, val);
                     val.clear ();
                 }
-                outputCode (T9900Op::data, getBankName (it->second));
+                if (TConfig::target == TConfig::TTarget::TI_BANKCART) {
+                    outputCode (T9900Op::data, getBankName (it->second));
+                    i += 2;
+                }
                 outputCode (T9900Op::data, it->second);
                 ++it;
-                i += 4;
+                i += 2;
             } else
                 val.push_back (staticDataDefinition.values [i++]);
             if (val.size () == 16) {
@@ -1281,7 +1278,7 @@ void T9900Generator::generateCode (TFunctionCall &functionCall) {
 
 
     TExpressionBase *function = functionCall.getFunction ();
-    const bool isFarCall = static_cast<TRoutineType *> (function->getType ())->isFarCall ();
+    const bool isFarCall = TConfig::target == TConfig::TTarget::TI_BANKCART && static_cast<TRoutineType *> (function->getType ())->isFarCall ();
     const std::vector<TExpressionBase *> &args = functionCall.getArguments ();
 
     struct TParameterDescription {
@@ -1395,7 +1392,7 @@ void T9900Generator::generateCode (TConstantValue &constant) {
 }
 
 void T9900Generator::generateCode (TRoutineValue &routineValue) {
-    bool isFarCall = static_cast<TRoutineType *> (routineValue.getType ())->isFarCall ();
+    bool isFarCall = TConfig::target == TConfig::TTarget::TI_BANKCART && static_cast<TRoutineType *> (routineValue.getType ())->isFarCall ();
     TSymbol *s = routineValue.getSymbol ();
     const std::string name = s->getName ();
     if (isFarCall) {
@@ -1895,45 +1892,49 @@ void T9900Generator::generateCode (TProgram &program) {
     T9900Operand e;	// empty
 
     setOutput (&sharedCode.codeSequence);    
-    const std::string proglist = getNextLocalLabel ();
-    outputCode (T9900Op::aorg, 0x6000, e, "cartride address space");
-    outputComment (std::string ());
-    outputCode (T9900Op::data, 0xaa01, e, "standard header");
-    outputCode (T9900Op::data, 0x0100, e, "number of programs");
-    outputCode (T9900Op::data, 0x0000, e, "power up list");
-    outputCode (T9900Op::data, proglist, e, "program list");	
-    outputCode (T9900Op::data, 0x0000, e, "DSR list");
-    outputCode (T9900Op::data, 0x0000, e, "subprogram list");
-    outputCode (T9900Op::data, 0x0000, e, "ISR list");
-    
-    outputLabel (proglist);
-    outputCode (T9900Op::data, 0x0000, e, "no next program");
     const std::string progstart = getNextLocalLabel ();
-    outputCode (T9900Op::data, progstart, e, "program address");
+    if (TConfig::target == TConfig::TTarget::TI_EA5) {
+        outputCode (T9900Op::aorg, 0xa000, e, "high memory");
+        outputComment (std::string ());
+        outputCode (T9900Op::jmp, progstart);
+    } else {
+        const std::string proglist = getNextLocalLabel ();
+        outputCode (T9900Op::aorg, 0x6000, e, "cartride address space");
+        outputComment (std::string ());
+        outputCode (T9900Op::data, 0xaa01, e, "standard header");
+        outputCode (T9900Op::data, 0x0100, e, "number of programs");
+        outputCode (T9900Op::data, 0x0000, e, "power up list");
+        outputCode (T9900Op::data, proglist, e, "program list");	
+        outputCode (T9900Op::data, 0x0000, e, "DSR list");
+        outputCode (T9900Op::data, 0x0000, e, "subprogram list");
+        outputCode (T9900Op::data, 0x0000, e, "ISR list");
     
-    std::string progname = program.getBlock ()->getSymbol ()->getName ();
-    std::transform (progname.begin (), progname.end (), progname.begin (), [] (char c) {return c == '_' ? ' ' : std::toupper (c);});
-    outputCode (T9900Op::byte, progname.length ());
-    outputCode (T9900Op::text, progname);
-    outputCode (T9900Op::even);
+        outputLabel (proglist);
+        outputCode (T9900Op::data, 0x0000, e, "no next program");
+        outputCode (T9900Op::data, progstart, e, "program address");
     
-    outputComment (std::string ());
-    outputLabel (farCallCode);
-    outputCode (T9900Op::mov, T9900Operand (T9900Reg::r11, T9900Operand::TAddressingMode::RegIndInc), intScratchReg2);
-    outputCode (T9900Op::mov, T9900Operand (T9900Reg::r11, T9900Operand::TAddressingMode::RegIndInc), intScratchReg3);
+        std::string progname = program.getBlock ()->getSymbol ()->getName ();
+        std::transform (progname.begin (), progname.end (), progname.begin (), [] (char c) {return c == '_' ? ' ' : std::toupper (c);});
+        outputCode (T9900Op::byte, progname.length ());
+        outputCode (T9900Op::text, progname);
+        outputCode (T9900Op::even);
+        outputComment (std::string ());
+        outputLabel (farCallCode);
+        outputCode (T9900Op::mov, T9900Operand (T9900Reg::r11, T9900Operand::TAddressingMode::RegIndInc), intScratchReg2);
+        outputCode (T9900Op::mov, T9900Operand (T9900Reg::r11, T9900Operand::TAddressingMode::RegIndInc), intScratchReg3);
     
-    outputComment (std::string ());
-    outputLabel (farCall);
-    outputCode (T9900Op::clr, T9900Operand (intScratchReg2, T9900Operand::TAddressingMode::RegInd), T9900Operand (), "switch bank");
-    outputCode (T9900Op::b, T9900Operand (intScratchReg3, T9900Operand::TAddressingMode::RegInd));
+        outputComment (std::string ());
+        outputLabel (farCall);
+        outputCode (T9900Op::clr, T9900Operand (intScratchReg2, T9900Operand::TAddressingMode::RegInd), T9900Operand (), "switch bank");
+        outputCode (T9900Op::b, T9900Operand (intScratchReg3, T9900Operand::TAddressingMode::RegInd));
     
-    outputComment (std::string ());
-    outputLabel (farRet);
-    codePop (intScratchReg2);
-    outputCode (T9900Op::clr, T9900Operand (intScratchReg2, T9900Operand::TAddressingMode::RegInd), T9900Operand (), "switch bank");
-    outputCode (T9900Op::b, T9900Operand (T9900Reg::r11, T9900Operand::TAddressingMode::RegInd));
-    
-    outputComment (std::string ());
+        outputComment (std::string ());
+        outputLabel (farRet);
+        codePop (intScratchReg2);
+        outputCode (T9900Op::clr, T9900Operand (intScratchReg2, T9900Operand::TAddressingMode::RegInd), T9900Operand (), "switch bank");
+        outputCode (T9900Op::b, T9900Operand (T9900Reg::r11, T9900Operand::TAddressingMode::RegInd));
+        outputComment (std::string ());
+    }
     outputLabel (copySet);
     outputCode (T9900Op::mov, T9900Operand (T9900Reg::r10, T9900Operand::TAddressingMode::RegInd), intScratchReg2);
     outputCode (T9900Op::mov, T9900Operand (T9900Reg::r10, 2), intScratchReg3);
@@ -2010,7 +2011,7 @@ void T9900Generator::externalRoutine (TSymbol *s) {
         assignParameterOffsets (block);
         outputComment (std::string ());
         TRoutineType *type = static_cast<TRoutineType *> (s->getType ());
-        bool isFar = type->isFarCall ();
+        bool isFar = TConfig::target == TConfig::TTarget::TI_BANKCART && type->isFarCall ();
 //        std::cout << s->getName () << ": " <<  type->getName () << (type->isFarCall () ? ": FAR" : ": NEAR") << std::endl;
         for (const std::string &s: createSymbolList (s->getName (), symbols.getLevel (), symbols, {}, -4))
             outputComment (s);
@@ -2097,7 +2098,7 @@ void T9900Generator::endRoutineBody (std::size_t level, TSymbolList &symbolList,
 }
 
 TCodeGenerator::TParameterLocation T9900Generator::classifyType (const TType *type) {
-    if (type->isEnumerated () || type->isPointer () || type->isReference ()) 
+    if (type->isEnumerated () || type->isPointer () || type->isReference () || (type->isRoutine () && TConfig::target != TConfig::TTarget::TI_BANKCART))
         return TParameterLocation::IntReg;
     if (type == &stdType.Real || type == &stdType.Single)
         return TParameterLocation::FloatReg;
@@ -2244,7 +2245,7 @@ void T9900Generator::codeBlock (TBlock &block, bool hasStackFrame, bool isFar, T
     
 //    removeUnusedLocalLabels (blockStatements);
     optimizePeepHole (blockStatements);
-//    optimizeSingleLine (blockStatements);
+    optimizeSingleLine (blockStatements);
 //    optimizeJumps (blockStatements);
 //    removeUnusedLocalLabels (blockStatements);
     
@@ -2260,7 +2261,7 @@ void T9900Generator::generateBlock (TBlock &block) {
     currentLevel = blockSymbols.getLevel ();
     
     TRoutineType *routine = static_cast<TRoutineType *> (block.getSymbol ()->getType ());
-    bool isFar = routine->isFarCall ();
+    bool isFar = TConfig::target == TConfig::TTarget::TI_BANKCART && routine->isFarCall ();
     
 //    std::cout << "Entering: " << block.getSymbol ()->getName () << ", level: " << blockSymbols.getLevel () << std::endl;
 
@@ -2289,7 +2290,6 @@ void T9900Generator::generateBlock (TBlock &block) {
     for (TSymbol *s: blockSymbols) {
         if (s->checkSymbolFlag (TSymbol::Routine)) {
             if (blockSymbols.getLevel () == 1) {
-//                std::cout << "Creating code block: " << s->getName () << std::endl;
                 subPrograms.push_back (TCodeBlock {s});
                 setOutput (&subPrograms.back ().codeSequence);
             }
@@ -2297,6 +2297,8 @@ void T9900Generator::generateBlock (TBlock &block) {
                 externalRoutine (s);
             else 
                 visit (s->getBlock ());
+            if (subPrograms.back ().codeSequence.empty ())
+                subPrograms.pop_back ();            
         }
     }
 }

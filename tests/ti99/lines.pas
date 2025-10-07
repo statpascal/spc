@@ -54,7 +54,7 @@ begin
     count := 0;
     repeat
         inc (count);
-        setColor (TColor (2 + (count div 10)  mod 14));
+        setColor (TColor (2 + (count div 10) mod 14));
         drawline (p [0]);
         add (p [0], q [0]);
         if count > 50 then
