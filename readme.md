@@ -96,7 +96,7 @@ The next steps will be:
 
 This is work in progress.
 
-The compiler can produce an (optionally) bank switched ROM cartridge or an
+The compiler can produce an (optionally bank switched) ROM cartridge or an
 EA5 image for the TI99/4A.  The upper memory (24 KB) is used for global
 variables and stack frames (and also code starting at A000 for EA5),
 the lower memory (8 KB) as heap for dynamic allocations.
@@ -126,19 +126,20 @@ user@host:~/src/statpascal> ~/ti99/xdt99/xas99.py -R -b -q out.a99 -o cart.bin
 user@host:~/src/statpascal> cat cart_b*.bin >cart.bin
 ```
 
-For small programs, the bank switch overhead can be avoided by either
-producing a single bank cartride (option *--cart*) or an EA5 image (option
+For small programs, the bank switching overhead can be avoided by either
+producing a single bank cartridge (option *--cart*) or an EA5 image (option
 *--ea5*); yielding a performance increase of about 15% for typical
 programs.
 
 The scripts *runcart.sh*, *runbank.sh* and *runea5.sh* in the
-scripts directory show the invocation of the compiler, xas99 assembler and
+scripts directory show the invocation of the compiler, *xas99* assembler and
 start the *emul99* emulator.
 
 The following steps are planned:
 
 - a standard runtime library
 - floating point operations (probably IEEE-754 binary32)
+- internal assembler 
 
 ## License
 
