@@ -3,8 +3,10 @@
 StatPascal is a Pascal based language (similar to pre-object Turbo Pascal)
 with vector extensions commonly used in statistical computing.  It is
 designed as an embeddable system providing fast Pascal type scripting to
-host applications by generating X64 and ARM64 assembly code.  It uses the
-Linux calling conventions on these architectures so the generated code does
+host applications by generating X64 and ARM64 assembly code.  
+
+StatPascal is written in C++ and uses the
+Linux calling conventions on the above architectures so the generated code does
 *not* work under Windows oder MacOS.
 
 As a toy project, a code generator for the TI99/4A (see next section) is in
@@ -100,6 +102,9 @@ The compiler can produce an (optionally bank switched) ROM cartridge or an
 EA5 image for the TI99/4A.  The upper memory (24 KB) is used for global
 variables and stack frames (and also code starting at A000 for EA5),
 the lower memory (8 KB) as heap for dynamic allocations.
+
+Using the bank switching features of the FinalGROM 99, code sizes of up to
+1 MB are possible.
 
 There is no floating point yet and the runtime library is rather limited. 
 Dynamic memory management currently uses a *mark/release* style. Input is

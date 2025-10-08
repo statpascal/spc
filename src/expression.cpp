@@ -194,7 +194,10 @@ bool TExpressionBase::checkTypeConversion (TType *required, TExpressionBase *&ex
             const std::string s = static_cast<TConstantValue *> (expr)->getConstant ()->getString ();
             TType *stringType = compiler.createMemoryPoolObject<TShortStringType> (
                 compiler.createMemoryPoolObject<TSubrangeType> (std::string (), &stdType.Int64, 0, s.length ()));
-            expr = createRuntimeCall ("__copy_str_const", stringType, {expr}, block, false);
+            if (TConfig::target == TConfig::TTarget::TI_BANKCART)                
+                expr = createRuntimeCall ("__copy_str_const", stringType, {expr}, block, false);
+            else
+                expr->setType (stringType);
 //            static_cast<TFunctionCall *> (expr)->setReturnStorage (createVariableAccess ("__str_const_buf", block, true), block, true);
         }
 #endif
@@ -849,7 +852,8 @@ TExpressionBase *TFactor::parseIdentifier (TBlock &block) {
                 expr = compiler.createMemoryPoolObject<TConstantValue> (symbol);
                 if (symbol->getType ()->isSet ()) {
 #ifdef CREATE_9900              
-                    expr = createRuntimeCall ("__copy_set_const", symbol->getType (), {expr}, block, false);
+                    if (TConfig::target == TConfig::TTarget::TI_BANKCART)
+                        expr = createRuntimeCall ("__copy_set_const", symbol->getType (), {expr}, block, false);
 #endif
                 } else if (symbol->getType () == &stdType.String) {
 #ifndef CREATE_9900                
