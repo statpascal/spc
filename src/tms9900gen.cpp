@@ -530,13 +530,16 @@ void T9900Generator::optimizePeepHole (TCodeSequence &code) {
                 removeLines (code, line, 4);
         }
         
-        // li reg, imm
-        // a op, reg
+        // li reg, imm1
+        // a @op, reg
         // . x, *reg
         // ->
-        // mov op, reg
-        // . x, @imm(reg)
-        else if (op1 == T9900Op::li && op2 == T9900Op::a && isSameCalcStackReg (op_1_1, op_2_2) &&
+        // mov @op, reg
+        // . x, @imm1(reg)
+        
+        // TODO: imm1 could be label 
+        
+        else if (op1 == T9900Op::li && !op_1_2.isLabel () && op2 == T9900Op::a && isSameCalcStackReg (op_1_1, op_2_2) &&
             isSameCalcStackReg (op_2_2, op_3_2) && op_3_2.t == T9900Operand::TAddressingMode::RegInd) {
             op2 = T9900Op::mov;
             op_3_2 = T9900Operand (op_1_1.reg, op_1_2.val);
@@ -544,6 +547,23 @@ void T9900Generator::optimizePeepHole (TCodeSequence &code) {
             removeLines (code, line, 1);
         }
         
+        // li reg, imm1
+        // a @op, reg
+        // . *reg, x
+        // ->
+        // mov @ap, reg
+        // . @imm1(reg), x
+
+        // TODO: imm1 could be label 
+        
+        else if (op1 == T9900Op::li && !op_1_2.isLabel () && op2 == T9900Op::a && isSameCalcStackReg (op_1_1, op_2_2) &&
+            isSameCalcStackReg (op_2_2, op_3_1) && op_3_1.t == T9900Operand::TAddressingMode::RegInd) {
+            op2 = T9900Op::mov;
+            op_3_1 = T9900Operand (op_1_1.reg, op_1_2.val);
+            comm_3 = comm_3 + " -> " + comm_1 + " + " + comm_2;
+            removeLines (code, line, 1);
+        }
+
         // li reg1, imm
         // inv reg1
         // szc reg1, reg2

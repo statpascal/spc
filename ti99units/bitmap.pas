@@ -76,7 +76,9 @@ procedure flushCache;
 procedure plot (x, y: integer);
     var
         offset: integer;
+        y07: integer;
     begin
+        y07 := y and $07;
         offset := y and $f8 shl 5 + x and $f8;
         if offset <> cachedChar then
             begin
@@ -87,12 +89,21 @@ procedure plot (x, y: integer);
                 vmbr (cacheColor, colorTable + offset, 8);
             end;
         if activeColor = 0 then
+            cachePattern [y07] := cachePattern [y07] and not ($80 shr (x and 7))
+        else
+            begin
+                cachePattern [y07] := cachePattern [y07] or $80 shr (x and 7);
+                cacheColor [y07] := activeColor
+            end
+(*            
+        if activeColor = 0 then
             cachePattern [y and $07] := cachePattern [y and $07] and not ($80 shr (x and 7))
         else
             begin
                 cachePattern [y and $07] := cachePattern [y and $07] or $80 shr (x and 7);
                 cacheColor [y and $07] := activeColor
             end
+*)            
     end;
 
 // Bresenham's line algorithm

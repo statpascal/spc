@@ -1075,7 +1075,7 @@ procedure loadCharset;
             begin
                 for j := 1 to 7 do
                     vdpwd := gromrd;
-                vdpwd := chr (0)
+                vdpwd := #0
             end
     end;
 
