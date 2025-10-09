@@ -47,17 +47,31 @@ const
     
 function getKey: char;
 
+// low level VDP access (disables interrupts)
+
+var
+    vdprd:  char absolute $8800;
+    vdpsta: char absolute $8802;
+    vdpwd:  char absolute $8c00;
+    vdpwa:  char absolute $8c02;
+    gromwa: char absolute $9c02;
+    gromrd: char absolute $9800;
+    
+procedure vmbw (var src; dest, length: integer);	// video multiple byte write
+procedure vmbr (var dest; src, length: integer);	// video multiple byte read
+procedure vrbw (dest: integer; val: uint8; length: integer);		// video repeated byte write
+
+// high level routines
+
+procedure setVdpRegs (var vdpRegs: TVdpRegList);
+// procedure setVdpAddress (n: integer);	// needs interrupt level 0
+
 procedure gotoxy (x, y: integer);
 function whereX: integer;
 function whereY: integer;
-
 procedure clrscr;
-
-procedure vmbw (var src; dest, length: integer);	// video multiple byte write
-procedure vmbr (var dest; src, length: integer);	// video multiple byte read
-procedure vrbw (val: uint8; length: integer);		// video repeated byte write
-procedure writeV (addr: integer; val: uint8);
-function readV (addr: integer): uint8;
+procedure pokeV (addr: integer; val: uint8);
+function peekV (addr: integer): uint8;
 
 // Utilites
 
@@ -147,19 +161,6 @@ procedure release (p: pointer);
 
 procedure setCRUBit (addr: integer; val: boolean);
 
-const
-    WriteAddr = $4000;
-    
-var
-    vdprd:  char absolute $8800;
-    vdpsta: char absolute $8802;
-    vdpwd:  char absolute $8c00;
-    vdpwa:  char absolute $8c02;
-    gromwa: char absolute $9c02;
-    gromrd: char absolute $9800;
-    
-procedure setVdpRegs (var vdpRegs: TVdpRegList);
-procedure setVdpAddress (n: integer);
 
 function hexstr (n: integer): string4;
 function hexstr2 (n: uint8): string2;
@@ -200,6 +201,7 @@ uses dsr;
 const
     heapPtr: integer = $2000;
     heapMax = $4000;
+    WriteAddr = $4000;
     
 procedure __new (var p: pointer; count, size: integer);
     var
@@ -236,11 +238,19 @@ var
     vdpWriteAddress: integer;
     
 procedure setCRUBit (addr: integer; val: boolean); assembler;
-    mov  *r10, r12
-    mov  @2(r10), r13
-    ldcr r13, 1
+        mov  *r10, r12
+        mov  @2(r10), r13
+        ldcr r13, 1
 end;
 
+procedure limi0; assembler;
+    limi 0
+end;
+
+procedure limi2; assembler;
+    limi 2
+end;
+    
 procedure setVdpAddress (n: integer);
     begin
         vdpwa := chr (n and 255);
@@ -252,6 +262,7 @@ procedure _rt_scroll_up; assembler;
         li r13, vdpwa
         li r14, vdprd
         li r15, vdpwd
+        limi 0
         
     _rt_scroll_up_1:
         swpb r0
@@ -303,6 +314,8 @@ procedure _rt_scroll_up; assembler;
         movb r12, *r15
         dec r8
         jne _rt_scroll_up_4
+        
+        limi 2
 end;
 
 procedure move (var src, dest; length: integer); assembler;
@@ -363,30 +376,11 @@ procedure fillChar (var dest; count: integer; value: uint8);
         fillChar (dest, count, chr (value))
     end;
     
-procedure vrbw (val: uint8; length: integer); assembler;
-        mov @length, r12
-        li r13, vdpwd
-        movb @val, r14
-    vrbw_1:
-        movb r14, *r13
-        dec r12
-        jne vrbw_1
-end;
-
-procedure writeV (addr: integer; val: uint8);
-    begin
-        vmbw (val, addr, 1)
-    end;
-    
-function readV (addr: integer): uint8;
-    begin
-        vmbr (result, addr, 1)
-    end;
-
 procedure vmbw (var src; dest, length: integer); assembler;
         mov @length, r14
         jeq vmbw_2
         
+        limi 0
         mov @dest, r13
         ori r13, >4000
         swpb r13
@@ -401,6 +395,7 @@ procedure vmbw (var src; dest, length: integer); assembler;
         movb *r12+, *r15
         dec r14
         jne vmbw_1
+        limi 2
         
     vmbw_2:
 end;
@@ -409,6 +404,7 @@ procedure vmbr (var dest; src, length: integer); assembler;
         mov @length, r14
         jeq vmbr_2
         
+        limi 0
         mov @src, r13
         swpb r13
         movb r13, @vdpwa
@@ -422,8 +418,43 @@ procedure vmbr (var dest; src, length: integer); assembler;
         movb *r15, *r12+
         dec r14
         jne vmbr_1
+        limi 2
+        
     vmbr_2:
 end;
+
+procedure vrbw (dest: integer; val: uint8; length: integer); assembler;
+        mov @length, r12
+        jeq vrbw_2
+        
+        limi 0
+        mov @dest, r13
+        ori r13, >4000
+        swpb r13
+        movb r13, @vdpwa
+        swpb r13
+        movb r13, @vdpwa
+        
+        li r13, vdpwd
+        movb @val, r14
+    vrbw_1:
+        movb r14, *r13
+        dec r12
+        jne vrbw_1
+        limi 2
+        
+    vrbw_2:
+end;
+
+procedure pokeV (addr: integer; val: uint8);
+    begin
+        vmbw (val, addr, 1)
+    end;
+    
+function peekV (addr: integer): uint8;
+    begin
+        vmbr (result, addr, 1)
+    end;
 
 function getKey: char;
     var
@@ -438,12 +469,14 @@ function getKey: char;
     end;
 
     begin
+        limi0;
         keyboardMode := 4;
         scanKey;
         if gplStatus and $20 <> 0 then
             getKey := chr (keyPressed)
         else
-            getKey := InvalidKey
+            getKey := InvalidKey;
+        limi2
     end;
     
 function __read_line_console: string;
@@ -502,7 +535,7 @@ function __read_line_console: string;
 procedure gotoxy (x, y: integer);
     begin
         vdpWriteAddress := y shl 5 + x;
-        setVdpAddress (vdpWriteAddress or WriteAddr)
+//        setVdpAddress (vdpWriteAddress or WriteAddr)
     end;
     
 function whereX: integer;
@@ -517,8 +550,8 @@ function whereY: integer;
     
 procedure clrscr;
     begin
-        setVdpAddress (WriteAddr);
-        vrbw (32, 768);
+//        setVdpAddress (WriteAddr);
+        vrbw (0, 32, 768);
         gotoxy (0, 0)
     end;
     
@@ -534,8 +567,8 @@ procedure __write_lf (var f: text);
             begin
                 vdpWriteAddress := (vdpWriteAddress + 32) and not 31;
                 if vdpWriteAddress = 24 * 32 then
-                    scroll;
-                setVdpAddress (vdpWriteAddress or WriteAddr);
+                    scroll
+//                setVdpAddress (vdpWriteAddress or WriteAddr);
             end
         else
             __end_line (f)
@@ -563,6 +596,16 @@ procedure __write_string (var f: text; p: PChar; length, precision: integer);
     procedure __write_data (p: pointer; length: integer); assembler;
             mov @length, r12
             jeq __write_data_2
+            
+            limi 0
+            
+            mov @vdpWriteAddress, r13
+            ori r13, >4000
+            swpb r13
+            movb r13, @vdpwa
+            swpb r13
+            movb r13, @vdpwa
+            
             mov @p, r13
             li r14, vdpwd
             inc r13
@@ -570,7 +613,9 @@ procedure __write_string (var f: text; p: PChar; length, precision: integer);
             movb *r13+, *r14
             dec r12
             jne __write_data_1
-        __write_data_2
+            limi 2
+            
+        __write_data_2:
     end;
 
     var
@@ -582,22 +627,24 @@ procedure __write_string (var f: text; p: PChar; length, precision: integer);
             begin
                 while vdpWriteAddress + outlen > 24 * 32 do
                     scroll;
-                setVdpAddress (vdpWriteAddress or WriteAddr);
-                inc (vdpWriteAddress, outlen);
                 if outlen > len then
-                    vrbw (32, outlen - len);
-                __write_data (p, len)
+                    begin
+                        vrbw (vdpWriteAddress, 32, outlen - len);
+                        inc (vdpWriteAddress, outlen - len)
+                    end;
+                __write_data (p, len);
+                inc (vdpWriteAddress, len)
             end
         else
             begin
                 for i := succ (len) to outlen do
                     if f.bufpos < f.pab.reclen then begin
-                        writeV (f.pab.vdpaddr + f.bufpos, ord (' '));
+                        pokeV (f.pab.vdpaddr + f.bufpos, ord (' '));
                         inc (f.bufpos)
                     end;
                 for i := 1 to len do
                     if f.bufpos < f.pab.reclen then begin
-                        writeV (f.pab.vdpaddr + f.bufpos, ord (p [i]));
+                        pokeV (f.pab.vdpaddr + f.bufpos, ord (p [i]));
                         inc (f.bufpos)
                     end;
             end
@@ -1034,6 +1081,7 @@ procedure __str_int (n, length, precision: integer; s: PChar);
     end;
     
 function keypressed: boolean; assembler;
+        limi 0
         clr r14
         clr r13
         li r15, >0100   // true
@@ -1053,6 +1101,7 @@ function keypressed: boolean; assembler;
     keypressed_2:
         mov *r10, r12
         movb r15, *r12
+        limi 2
     end;
 
 procedure waitkey;
@@ -1065,6 +1114,7 @@ procedure loadCharset;
     var 
         i, j: integer;
     begin
+        limi0;
         gromwa := #$06; // >06b4: standard char set
         gromwa := #$b4;
         setVdpAddress ($0800 + 8 * 31 or WriteAddr);
@@ -1076,7 +1126,8 @@ procedure loadCharset;
                 for j := 1 to 7 do
                     vdpwd := gromrd;
                 vdpwd := #0
-            end
+            end;
+        limi2
     end;
 
 procedure setVdpRegs (var vdpRegs: TVdpRegList);
@@ -1084,12 +1135,14 @@ procedure setVdpRegs (var vdpRegs: TVdpRegList);
         i: integer;
         dummy: char;
     begin
+        limi0;
         dummy := vdpsta;
         for i := 0 to 7 do
             begin
                 vdpwa := chr (vdpRegs [i]);
                 vdpwa := chr ($80 + i)
-            end
+            end;
+        limi2;
     end;
     
     

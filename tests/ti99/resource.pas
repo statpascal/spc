@@ -9,7 +9,7 @@ procedure p;
         subroutines accessing it are put into the same bank.
 
         Calling vmbw from system.pas requires a copy to RAM since a bank
-        switch is possible.
+        switch can occur.
 
         Using the local vdpWrite, direct access to the data is possible.
     *)
@@ -17,6 +17,13 @@ procedure p;
     procedure q; external 'resource.bin';
 
     procedure vdpWrite (src, size: integer); assembler;
+        limi 0
+        
+        li r13, >0040		// set VDP write addr to 0
+        movb r13, @vdpwa
+        swpb r13
+        movb r13, @vdpwa        
+        
         mov @src, r12
 	mov @size, r13
 	li r14, vdpwd
@@ -25,6 +32,8 @@ procedure p;
 	movb *r12+, *r14
 	dec 13
 	jne vdpWrite1
+	
+	limi 2
     end;
 
     const
@@ -34,10 +43,9 @@ procedure p;
     begin
 	move (addr (q)^, buf, screenSize);
 	vmbw (buf, 0, screenSize);
+	
 	waitkey;
-
-	gotoxy (0, 0);
-        vdpwrite (integer (PChar (addr (q)) + screenSize), screenSize);
+        vdpwrite (integer (addr (q) + screenSize), screenSize);
 
 	repeat
 	until not keypressed

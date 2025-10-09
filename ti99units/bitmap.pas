@@ -32,17 +32,17 @@ var
 
 procedure setBitmapMode;
     var 
-        i, j: integer;
+        i: integer;
+        screen: array [0..255] of uint8;
     begin
+        for i := 0 to 255 do
+            screen [i] := i;
         setVdpRegs (vdpRegsBitmap);
-        setVdpAddress (WriteAddr);
-        vrbw (0, $1800);
-        for i := 1 to 3 do
-            for j := 0 to 255 do
-                vdpwd := chr (j);
-        setVdpAddress (ColorTable or WriteAddr);
-        vrbw (activeColor, $1800);
-        writeV (spriteAttributeTable, $d0)	// sprites off
+        vrbw (patternTable, 0, $1800);
+        for i := 0 to 2 do
+            vmbw (screen, imageTable + i * $100, $100);
+        vrbw (ColorTable, activeColor, $1800);
+        pokeV (spriteAttributeTable, $d0)	// sprites off
     end;
     
 procedure setStandardMode;

@@ -1987,7 +1987,7 @@ void T9900Generator::generateCode (TProgram &program) {
     outputComment (std::string ());
     outputLabel (progstart);
     outputCode (T9900Op::lwpi, workspace);
-    outputCode (T9900Op::limi, 0);
+//    outputCode (T9900Op::limi, 0);
     if (TConfig::target == TConfig::TTarget::TI_BANKCART)
         outputCode (T9900Op::clr, T9900Operand (0x6000, T9900Operand::TAddressingMode::Memory), T9900Operand (), "activate bank 0");
 //    outputCode (T9900Op::b, makeLabelMemory ("__main_start"));
