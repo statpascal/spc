@@ -32,11 +32,11 @@ begin
     for i := 2 to n do
         if prim [i] then
             begin
-                write (i:8);
+                write (i:5);
                 inc (count)
             end;
     writeln; writeln;
     writeln ('Found ', count, ' primes below ', n);
-//    waitkey
+    waitkey
 end.
 

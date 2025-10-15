@@ -1,5 +1,7 @@
 program casetest;
 
+uses vdp;
+
 var
     i: integer;
 

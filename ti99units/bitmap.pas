@@ -2,12 +2,7 @@ unit bitmap;
 
 interface
 
-type
-    TColor = (transparent, black, mediumgreen, lightgreen, darkblue, lightblue, darkred,  cyan, 
-              mediumred, lightred, darkyellow, lightyellow, darkgreen, magenta, gray, white);
-
-procedure setBitmapMode;
-procedure setStandardMode;
+uses vdp;
 
 procedure setColor (color: TColor);
 procedure setBkColor (color: TColor);
@@ -17,39 +12,8 @@ procedure line (x0, y0, x1, y1: integer);
 
 implementation
 
-const
-    vdpRegsStandard: TVdpRegList = ($00, $c0, $00, $0e, $01, $06, $00, $07);
-    vdpRegsBitmap: TVdpRegList = ($02, $c0, $06, $ff, $03, $78, $07, $00);
-    
-    imageTable = $1800;			// VR2 = $06
-    patternTable = $0000;		// VR3 = $ff
-    colorTable = $2000;			// VR4 = §03
-    spriteAttributeTable = $3c00;	// VR5 = $78
-    spritePatternTable = $3800;		// VR6 = $07
-    
 var
     activeColor: uint8;
-
-procedure setBitmapMode;
-    var 
-        i: integer;
-        screen: array [0..255] of uint8;
-    begin
-        for i := 0 to 255 do
-            screen [i] := i;
-        setVdpRegs (vdpRegsBitmap);
-        vrbw (patternTable, 0, $1800);
-        for i := 0 to 2 do
-            vmbw (screen, imageTable + i * $100, $100);
-        vrbw (ColorTable, activeColor, $1800);
-        pokeV (spriteAttributeTable, $d0)	// sprites off
-    end;
-    
-procedure setStandardMode;
-    begin
-        setVdpRegs (vdpRegsStandard);
-        clrscr;
-    end;
 
 procedure setColor (color: TColor);
     begin
@@ -69,7 +33,7 @@ var
     
 procedure flushCache;
     begin
-        vmbw (cachePattern, cachedChar, 8);
+        vmbw (cachePattern, patternTable + cachedChar, 8);
         vmbw (cacheColor, colorTable + cachedChar, 8)
     end;
 
@@ -85,7 +49,7 @@ procedure plot (x, y: integer);
                 if cachedChar <> invalid then
                     flushCache;
                 cachedChar := offset;
-                vmbr (cachePattern, offset, 8);
+                vmbr (cachePattern, patternTable + offset, 8);
                 vmbr (cacheColor, colorTable + offset, 8);
             end;
         if activeColor = 0 then
@@ -95,15 +59,6 @@ procedure plot (x, y: integer);
                 cachePattern [y07] := cachePattern [y07] or $80 shr (x and 7);
                 cacheColor [y07] := activeColor
             end
-(*            
-        if activeColor = 0 then
-            cachePattern [y and $07] := cachePattern [y and $07] and not ($80 shr (x and 7))
-        else
-            begin
-                cachePattern [y and $07] := cachePattern [y and $07] or $80 shr (x and 7);
-                cacheColor [y and $07] := activeColor
-            end
-*)            
     end;
 
 // Bresenham's line algorithm

@@ -1,5 +1,7 @@
 program keyscan;
 
+uses vdp;
+
 type
     TKeyboardData = array [0..7] of uint8;
     

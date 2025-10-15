@@ -1,5 +1,7 @@
 program resource;
 
+uses vdp;
+
 // embed resource into program
 
 procedure p;
@@ -41,6 +43,8 @@ procedure p;
     var
 	buf: array [1..screenSize] of uint8;
     begin
+        setVideoMode (StandardMode);
+    
 	move (addr (q)^, buf, screenSize);
 	vmbw (buf, 0, screenSize);
 	

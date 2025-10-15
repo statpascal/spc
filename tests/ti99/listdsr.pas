@@ -1,6 +1,6 @@
 program listdsr;
 
-uses dsr;
+uses vdp, dsr;
 
 var
     header: TStandardHeader absolute $4000;

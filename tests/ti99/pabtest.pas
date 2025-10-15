@@ -1,6 +1,6 @@
 program pabtest;
 
-uses dsr;
+uses vdp, dsr;
 
 procedure test;
     const

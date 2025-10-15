@@ -66,6 +66,8 @@ const
 
 implementation
 
+uses vdp;
+
 var 
     header: TStandardHeader absolute $4000;
         

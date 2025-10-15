@@ -1,5 +1,7 @@
 program byteop;
 
+uses vdp;
+
 type
     tinyint = 0..10;
 

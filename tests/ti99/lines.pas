@@ -49,7 +49,7 @@ begin
     
     setColor (transparent);
     setBkColor (black);
-    setBitmapMode;	// fills color table with selected color
+    setVideoMode (BitmapMode);
     
     count := 0;
     repeat

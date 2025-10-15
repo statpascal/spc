@@ -537,8 +537,6 @@ void T9900Generator::optimizePeepHole (TCodeSequence &code) {
         // mov @op, reg
         // . x, @imm1(reg)
         
-        // TODO: imm1 could be label 
-        
         else if (op1 == T9900Op::li && !op_1_2.isLabel () && op2 == T9900Op::a && isSameCalcStackReg (op_1_1, op_2_2) &&
             isSameCalcStackReg (op_2_2, op_3_2) && op_3_2.t == T9900Operand::TAddressingMode::RegInd) {
             op2 = T9900Op::mov;
@@ -554,8 +552,6 @@ void T9900Generator::optimizePeepHole (TCodeSequence &code) {
         // mov @ap, reg
         // . @imm1(reg), x
 
-        // TODO: imm1 could be label 
-        
         else if (op1 == T9900Op::li && !op_1_2.isLabel () && op2 == T9900Op::a && isSameCalcStackReg (op_1_1, op_2_2) &&
             isSameCalcStackReg (op_2_2, op_3_1) && op_3_1.t == T9900Operand::TAddressingMode::RegInd) {
             op2 = T9900Op::mov;
@@ -2051,7 +2047,6 @@ void T9900Generator::externalRoutine (TSymbol *s) {
             
             if (std::size_t size = s->getBlock ()->getSymbols ().getParameterSize ())
                 outputCode (T9900Op::ai, T9900Reg::r10, size);
-            // TODO: check far flag for level 1 routines
             if (isFar)
                 outputCode (T9900Op::b, makeLabelMemory (farRet));
             else

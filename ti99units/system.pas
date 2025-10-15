@@ -15,8 +15,6 @@ type
     string2 = string [2];
     string4 = string [4];
     
-    TVdpRegList = array [0..7] of uint8;
-    
     TPab = record
         opcode, err_type: uint8;
         vdpaddr: integer;
@@ -47,31 +45,6 @@ const
     
 function getKey: char;
 
-// low level VDP access (disables interrupts)
-
-var
-    vdprd:  char absolute $8800;
-    vdpsta: char absolute $8802;
-    vdpwd:  char absolute $8c00;
-    vdpwa:  char absolute $8c02;
-    gromwa: char absolute $9c02;
-    gromrd: char absolute $9800;
-    
-procedure vmbw (var src; dest, length: integer);	// video multiple byte write
-procedure vmbr (var dest; src, length: integer);	// video multiple byte read
-procedure vrbw (dest: integer; val: uint8; length: integer);		// video repeated byte write
-
-// high level routines
-
-procedure setVdpRegs (var vdpRegs: TVdpRegList);
-// procedure setVdpAddress (n: integer);	// needs interrupt level 0
-
-procedure gotoxy (x, y: integer);
-function whereX: integer;
-function whereY: integer;
-procedure clrscr;
-procedure pokeV (addr: integer; val: uint8);
-function peekV (addr: integer): uint8;
 
 // Utilites
 
@@ -159,7 +132,6 @@ procedure __dispose (p: pointer);
 procedure mark (var p: pointer);
 procedure release (p: pointer);
 
-procedure setCRUBit (addr: integer; val: boolean);
 
 
 function hexstr (n: integer): string4;
@@ -194,14 +166,13 @@ function __set_super_not_equal (var s, t: __set_array): boolean;
 
 implementation
 
-uses dsr;
+uses vdp, dsr;
 
 // simple UCSD-like heap managment in lower memory
 
 const
     heapPtr: integer = $2000;
     heapMax = $4000;
-    WriteAddr = $4000;
     
 procedure __new (var p: pointer; count, size: integer);
     var
@@ -233,90 +204,6 @@ procedure release (p: pointer);
     end;
 
 // 
-
-var
-    vdpWriteAddress: integer;
-    
-procedure setCRUBit (addr: integer; val: boolean); assembler;
-        mov  *r10, r12
-        mov  @2(r10), r13
-        ldcr r13, 1
-end;
-
-procedure limi0; assembler;
-    limi 0
-end;
-
-procedure limi2; assembler;
-    limi 2
-end;
-    
-procedure setVdpAddress (n: integer);
-    begin
-        vdpwa := chr (n and 255);
-        vdpwa := chr (n shr 8)
-    end;
-    
-procedure _rt_scroll_up; assembler;
-        li r0, 32
-        li r13, vdpwa
-        li r14, vdprd
-        li r15, vdpwd
-        limi 0
-        
-    _rt_scroll_up_1:
-        swpb r0
-        movb r0, *r13
-        swpb r0
-        movb r0, *r13
-        li r8, 32
-        li r12, >8320
-        
-    _rt_scroll_up_2:
-        movb *r14, *r12+
-        dec r8			// deley before accessing next byte
-        movb *r14, *r12+
-        dec r8
-        movb *r14, *r12+
-        dec r8
-        movb *r14, *r12+
-        dec r8
-        jne _rt_scroll_up_2
-
-        ai r0, >3fe0
-        swpb r0
-        movb r0, *r13
-        swpb r0
-        movb r0, *r13
-
-        li r8, 32
-        li r12, >8320
-        
-    _rt_scroll_up_3:
-        movb *r12+, *r15
-        dec r8
-        movb *r12+, *r15
-        dec r8
-        movb *r12+, *r15
-        dec r8
-        movb *r12+, *r15
-        dec r8
-        jne _rt_scroll_up_3
-
-        ai r0, >c040
-        ci r0, 768
-        jne _rt_scroll_up_1
-
-        li r8, 32
-        li r12, >2000
-        
-    _rt_scroll_up_4:
-        movb r12, *r15
-        dec r8
-        jne _rt_scroll_up_4
-        
-        limi 2
-end;
 
 procedure move (var src, dest; length: integer); assembler;
         mov @src, r12
@@ -376,86 +263,6 @@ procedure fillChar (var dest; count: integer; value: uint8);
         fillChar (dest, count, chr (value))
     end;
     
-procedure vmbw (var src; dest, length: integer); assembler;
-        mov @length, r14
-        jeq vmbw_2
-        
-        limi 0
-        mov @dest, r13
-        ori r13, >4000
-        swpb r13
-        movb r13, @vdpwa
-        swpb r13
-        movb r13, @vdpwa
-        
-        mov @src, r12
-        li r15, vdpwd
-
-    vmbw_1:
-        movb *r12+, *r15
-        dec r14
-        jne vmbw_1
-        limi 2
-        
-    vmbw_2:
-end;
-    
-procedure vmbr (var dest; src, length: integer); assembler;
-        mov @length, r14
-        jeq vmbr_2
-        
-        limi 0
-        mov @src, r13
-        swpb r13
-        movb r13, @vdpwa
-        swpb r13
-        movb r13, @vdpwa
-        
-        li r15, vdprd
-        mov @dest, r12
-
-    vmbr_1:
-        movb *r15, *r12+
-        dec r14
-        jne vmbr_1
-        limi 2
-        
-    vmbr_2:
-end;
-
-procedure vrbw (dest: integer; val: uint8; length: integer); assembler;
-        mov @length, r12
-        jeq vrbw_2
-        
-        limi 0
-        mov @dest, r13
-        ori r13, >4000
-        swpb r13
-        movb r13, @vdpwa
-        swpb r13
-        movb r13, @vdpwa
-        
-        li r13, vdpwd
-        movb @val, r14
-    vrbw_1:
-        movb r14, *r13
-        dec r12
-        jne vrbw_1
-        limi 2
-        
-    vrbw_2:
-end;
-
-procedure pokeV (addr: integer; val: uint8);
-    begin
-        vmbw (val, addr, 1)
-    end;
-    
-function peekV (addr: integer): uint8;
-    begin
-        vmbr (result, addr, 1)
-    end;
-
 function getKey: char;
     var
         keyboardMode: byte absolute $8374;
@@ -502,13 +309,13 @@ function __read_line_console: string;
                             dec (result [0]);
                             gotoxy (col, row);
                             write (result, ' ');
-                            if col + pos < 31 then write (' ');
+                            if col + pos < screenWidth then write (' ');
                             count := 0
                         end;
                 #32..#127:
                     begin
                         result [pos] := ch;
-                        if col + pos < 31 then
+                        if col + pos < screenWidth then
                             begin
                                 inc (pos);
                                 inc (result [0])
@@ -518,58 +325,22 @@ function __read_line_console: string;
                         count := 0
                     end;
                 Enter:
-                    count := $100;	// turn off cursor
+                    count := $100	// turn off cursor
             end;
             inc (count);
             if count and $ff = 1 then
                 begin
                     gotoxy (col + pos - 1, row);
                     if odd (count shr 8) then write (' ') else write (#$1f)
-                end;
+                end
         until ch = Enter;
-        writeln;
+        writeln
     end;
 
-
-    
-procedure gotoxy (x, y: integer);
-    begin
-        vdpWriteAddress := y shl 5 + x;
-//        setVdpAddress (vdpWriteAddress or WriteAddr)
-    end;
-    
-function whereX: integer;
-    begin
-        whereX := vdpWriteAddress and $1f
-    end;
-    
-function whereY: integer;
-    begin
-        whereY := vdpWriteAddress shr 5
-    end;
-    
-procedure clrscr;
-    begin
-//        setVdpAddress (WriteAddr);
-        vrbw (0, 32, 768);
-        gotoxy (0, 0)
-    end;
-    
-procedure scroll;
-    begin
-       _rt_scroll_up;
-        dec (vdpWriteAddress, 32);
-    end;
-    
 procedure __write_lf (var f: text);
     begin
         if f.fileidx = 0 then
-            begin
-                vdpWriteAddress := (vdpWriteAddress + 32) and not 31;
-                if vdpWriteAddress = 24 * 32 then
-                    scroll
-//                setVdpAddress (vdpWriteAddress or WriteAddr);
-            end
+            outputLine
         else
             __end_line (f)
     end;
@@ -592,49 +363,13 @@ procedure __write_char (var f: text; ch: char; length, precision: integer);
     end;
     
 procedure __write_string (var f: text; p: PChar; length, precision: integer);
-
-    procedure __write_data (p: pointer; length: integer); assembler;
-            mov @length, r12
-            jeq __write_data_2
-            
-            limi 0
-            
-            mov @vdpWriteAddress, r13
-            ori r13, >4000
-            swpb r13
-            movb r13, @vdpwa
-            swpb r13
-            movb r13, @vdpwa
-            
-            mov @p, r13
-            li r14, vdpwd
-            inc r13
-        __write_data_1:
-            movb *r13+, *r14
-            dec r12
-            jne __write_data_1
-            limi 2
-            
-        __write_data_2:
-    end;
-
     var
         i, len, outlen: integer;
     begin
         len := ord (p^);
         outlen := max (len, length);
         if f.fileidx = 0 then 
-            begin
-                while vdpWriteAddress + outlen > 24 * 32 do
-                    scroll;
-                if outlen > len then
-                    begin
-                        vrbw (vdpWriteAddress, 32, outlen - len);
-                        inc (vdpWriteAddress, outlen - len)
-                    end;
-                __write_data (p, len);
-                inc (vdpWriteAddress, len)
-            end
+            outputString (p, outlen)
         else
             begin
                 for i := succ (len) to outlen do
@@ -1110,42 +845,6 @@ procedure waitkey;
         until keypressed
     end;
     
-procedure loadCharset;
-    var 
-        i, j: integer;
-    begin
-        limi0;
-        gromwa := #$06; // >06b4: standard char set
-        gromwa := #$b4;
-        setVdpAddress ($0800 + 8 * 31 or WriteAddr);
-        for i := 1 to 7 do
-            vdpwd := #$3f;
-        vdpwd := #0;
-        for i := 32 to 127 do
-            begin
-                for j := 1 to 7 do
-                    vdpwd := gromrd;
-                vdpwd := #0
-            end;
-        limi2
-    end;
-
-procedure setVdpRegs (var vdpRegs: TVdpRegList);
-    var 
-        i: integer;
-        dummy: char;
-    begin
-        limi0;
-        dummy := vdpsta;
-        for i := 0 to 7 do
-            begin
-                vdpwa := chr (vdpRegs [i]);
-                vdpwa := chr ($80 + i)
-            end;
-        limi2;
-    end;
-    
-    
 type
     PSet = ^__set_array;
     PPSet = ^PSet;
@@ -1231,7 +930,6 @@ function __set_super_not_equal (var s, t: __set_array): boolean;
 begin
     output.fileidx := 0;
     input.fileidx := 0;
-    loadCharset;
-    gotoxy (0, 0);
+    setVideoMode (TextMode);
     reserveVdpBufs
 end.
