@@ -6,8 +6,8 @@ var
     i: integer;
 
 begin
-    setColor (white);
-    setBkColor (black);
+    setForeColor (white);
+    setBackColor (black);
     setVideoMode (BitmapMode);
     
     for i := 1 to 20 do

@@ -28,6 +28,10 @@ function peekV (addr: integer): uint8;
 procedure setVideoMode (mode: TVideoMode);
 function getVideoMode: TVideoMode;
 
+procedure setBackColor (color: TColor);
+procedure setTextColor (color: TColor);
+procedure setColor (group: integer; fore, back: TColor);
+
 procedure gotoxy (x, y: integer);
 function whereX: integer;
 function whereY: integer;
@@ -233,9 +237,10 @@ procedure setVideoMode (mode: TVideoMode);
                     for i := 0 to 2 do
                         vmbw (screen, imageTable + i * $100, $100);
                     vrbw (colorTable, 0, $1800);
-                    pokeV (spriteAttributeTable, $d0);	// sprites off
                 end
         end;
+        if videoMode <> TextMode then
+            pokeV (spriteAttributeTable, $d0);	// sprites off
         for i := 0 to 1 do
             setVdpReg (i, vdpRegs [videoMode, i])
     end;
@@ -243,6 +248,25 @@ procedure setVideoMode (mode: TVideoMode);
 function getVideoMode: TVideoMode;
     begin
         getVideoMode := videoMode
+    end;
+    
+procedure setBackColor (color: TColor);
+    begin
+        setVdpReg (7, ord (foreColor) shl 4 or ord (color))
+    end;
+    
+procedure setTextColor (color: TColor);
+    var
+        i: integer;
+    begin
+        setVdpReg (7, ord (color) shl 4 or ord (backColor));
+        for i := 0 to 31 do
+            setColor (i, color, transparent)
+    end;
+    
+procedure setColor (group: integer; fore, back: TColor);
+    begin
+        pokeV (colorTable + group and $1f, ord (fore) shl 4 or ord (back))
     end;
 
 procedure _rt_scroll_up (start, stop, len, inc1, inc2: integer); assembler;

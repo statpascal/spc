@@ -47,19 +47,17 @@ begin
     q [0] := d;
     q [1] := d;
     
-    setColor (transparent);
-    setBkColor (black);
     setVideoMode (BitmapMode);
     
     count := 0;
     repeat
         inc (count);
-        setColor (TColor (2 + (count div 10) mod 14));
+        setForeColor (TColor (2 + (count div 10) mod 14));
         drawline (p [0]);
         add (p [0], q [0]);
         if count > 50 then
             begin
-                setColor (transparent);
+                setForeColor (transparent);
                 drawLine (p [1]);
                 add (p [1], q [1])
             end

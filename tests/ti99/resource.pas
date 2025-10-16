@@ -44,6 +44,7 @@ procedure p;
 	buf: array [1..screenSize] of uint8;
     begin
         setVideoMode (StandardMode);
+        setTextColor (black);
     
 	move (addr (q)^, buf, screenSize);
 	vmbw (buf, 0, screenSize);

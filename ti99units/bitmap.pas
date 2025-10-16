@@ -4,8 +4,7 @@ interface
 
 uses vdp;
 
-procedure setColor (color: TColor);
-procedure setBkColor (color: TColor);
+procedure setForeColor (color: TColor);
 
 procedure plot (x, y: integer);
 procedure line (x0, y0, x1, y1: integer);
@@ -15,16 +14,11 @@ implementation
 var
     activeColor: uint8;
 
-procedure setColor (color: TColor);
+procedure setForeColor (color: TColor);
     begin
         activeColor := ord (color) shl 4;
     end;
 
-procedure setBkColor (color: TColor);
-    begin
-        // write VDP reg
-    end;
-    
 const
     invalid = -1;
     cachedChar: integer = invalid;
