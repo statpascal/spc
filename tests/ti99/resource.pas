@@ -52,8 +52,7 @@ procedure p;
 	waitkey;
         vdpwrite (integer (addr (q) + screenSize), screenSize);
 
-	repeat
-	until not keypressed
+	while keypressed do
     end;
 
 begin

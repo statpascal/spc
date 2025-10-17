@@ -397,13 +397,11 @@ procedure gotoxy (x, y: integer);
     var
         offs: integer;
     begin
-        case videoMode of
-            StandardMode: 
-                offs := abs (y shl 5 + x);
-            TextMode:
-                offs := abs (40 * y + x)
-        end;
-        vdpWriteAddress := min (imageTable + offs, pred (imageTableEnd))
+        if videoMode = TextMode then
+            offs := (y shl 2 + y) shl 3
+        else
+            offs := y shl 5;
+        vdpWriteAddress := min (imageTable + abs (offs + x), pred (imageTableEnd))
     end;
     
 function whereX: integer;
