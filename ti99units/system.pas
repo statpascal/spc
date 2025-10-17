@@ -111,6 +111,8 @@ function length (s: PChar): integer;
 function pos (ch: char; s: PChar): integer;
 function copy (s: PChar; start, len: integer): string;
 
+function upcase (ch: char): char;
+
 procedure __str_int (n, length, precision: integer; s: PChar);
 
 function __short_str_char (ch: char): string1;
@@ -131,8 +133,6 @@ procedure __new (var p: pointer; count, size: integer);
 procedure __dispose (p: pointer);
 procedure mark (var p: pointer);
 procedure release (p: pointer);
-
-
 
 function hexstr (n: integer): string4;
 function hexstr2 (n: uint8): string2;
@@ -235,7 +235,7 @@ function compareWord (var src, dest; length: integer): boolean; assembler;
     comparebyte_2:
         li r12, >0100
         movb r12, *r15
-        jmp comparebyte_4		// TODO: add rt with near/far return
+        jmp comparebyte_4
         
     comparebyte_3:
         clr r12
@@ -741,6 +741,14 @@ function copy (s: PChar; start, len: integer): string;
             end
         else
             result [0] := #0
+    end;
+    
+function upcase (ch: char): char;
+    begin
+        if (ch >= 'a') and (ch <= 'z') then
+            result := chr (ord (ch) - 32)
+        else
+            result := ch
     end;
     
 const 

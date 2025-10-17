@@ -32,6 +32,15 @@ procedure setBackColor (color: TColor);
 procedure setTextColor (color: TColor);
 procedure setColor (group: integer; fore, back: TColor);
 
+procedure showHChar (x, y, val, count: integer);
+procedure showVChar (x, y, val, count: integer);
+
+type
+    TCharPattern = string [16];
+
+procedure setCharPattern (ch: uint8; pattern: TCharPattern);
+function getCharPattern (ch: uint8): TCharPattern;
+
 procedure gotoxy (x, y: integer);
 function whereX: integer;
 function whereY: integer;
@@ -227,6 +236,7 @@ procedure setVideoMode (mode: TVideoMode);
                 begin
                     imageTableEnd := imageTable + 24 * 32;
                     loadCharSet ($06b4, patternTable);
+                    setTextColor (black);
                     clrscr;
                 end;
             BitmapMode:
@@ -260,13 +270,66 @@ procedure setTextColor (color: TColor);
         i: integer;
     begin
         setVdpReg (7, ord (color) shl 4 or ord (backColor));
-        for i := 0 to 31 do
-            setColor (i, color, transparent)
+        if videoMode = StandardMode then
+            for i := 0 to 31 do
+                setColor (i, color, transparent)
     end;
     
 procedure setColor (group: integer; fore, back: TColor);
     begin
         pokeV (colorTable + group and $1f, ord (fore) shl 4 or ord (back))
+    end;
+
+procedure showHChar (x, y, val, count: integer);
+    begin
+        gotoxy (x, y);
+        vrbw (vdpWriteAddress, val, min (count, imageTableEnd - vdpWriteAddress))
+    end;
+    
+procedure showVChar (x, y, val, count: integer);
+    var
+        i: integer;
+    begin
+        for i := 0 to min (count, 24 - y) do
+            begin
+                gotoxy (x, y + i);
+                write (chr (val))
+            end
+    end;
+
+procedure setCharPattern (ch: uint8; pattern: TCharPattern);
+    var
+        chardef: array [0..7] of uint8;
+        i: integer;
+        
+    function hexval (ch: char): integer;
+        begin
+            if ch in ['0'..'9'] then
+                hexval := ord (ch) - ord ('0')
+            else if ch in ['A'..'F'] then
+                hexval := ord (ch) - ord ('A')
+            else if ch in ['a'..'f'] then
+                hexval := ord (ch) - ord ('a')
+            else
+                hexval := 0
+        end;
+        
+    begin
+        fillChar (pattern [succ (length (pattern))], pred (sizeof (pattern) - length (pattern)), 0);
+        for i := 0 to 7 do
+            chardef [i] := hexval (pattern [2 * i + 1]) * 16 + hexval (pattern [2 * i + 2]);
+        vmbw (chardef, patternTable + 8 * ch, 8)
+    end;
+        
+function getCharPattern (ch: uint8): TCharPattern;
+    var
+        chardef: array [0..7] of uint8;
+        i: integer;
+    begin
+        vmbr (chardef, patternTable + 8 * ch, 8);
+        result := '';
+        for i := 0 to 7 do
+            result := result + hexstr2 (chardef [i])
     end;
 
 procedure _rt_scroll_up (start, stop, len, inc1, inc2: integer); assembler;
@@ -331,13 +394,16 @@ procedure _rt_scroll_up (start, stop, len, inc1, inc2: integer); assembler;
 end;
 
 procedure gotoxy (x, y: integer);
+    var
+        offs: integer;
     begin
         case videoMode of
             StandardMode: 
-                vdpWriteAddress := imageTable + y shl 5 + x;
+                offs := abs (y shl 5 + x);
             TextMode:
-                vdpWriteAddress := imageTable + 40 * y + x
-        end
+                offs := abs (40 * y + x)
+        end;
+        vdpWriteAddress := min (imageTable + offs, pred (imageTableEnd))
     end;
     
 function whereX: integer;
