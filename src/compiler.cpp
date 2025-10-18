@@ -519,6 +519,12 @@ TType *TBlock::parseRoutineType (bool isFunction, bool farCall) {
             // avoid invalid entry in symbol table
             returnType = &stdType.Void;
     }
+    
+    if (lexer.getToken () == TToken::Identifier && lexer.getIdentifier () == "near") {
+        lexer.getNextToken ();
+        farCall = false;
+    }
+    
     return compiler.createMemoryPoolObject<TRoutineType> (std::move (parameters), returnType, farCall);
 }
 

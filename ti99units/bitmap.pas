@@ -22,6 +22,7 @@ procedure setForeColor (color: TColor);
 const
     invalid = -1;
     cachedChar: integer = invalid;
+    
 var
     cachePattern, cacheColor: array [0..7] of uint8;
     

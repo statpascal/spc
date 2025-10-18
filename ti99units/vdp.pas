@@ -180,17 +180,25 @@ procedure setVdpReg (nr, val: uint8);
             3:
                 if videoMode = BitmapMode then
                     colorTable := $2000 * (val shr 7)
+                else if videoMode = StandardMode then
+                    colorTable := $40 * val
                 else
-                    colorTable := $40 * val;
+                    colorTable := -1;
             4:
                 if videoMode = BitmapMode then
                     patternTable := $2000 * (val and $07 shr 2)
                 else
                     patternTable := $800 * (val and $07);
             5:
-                spriteAttributeTable := $80 * (val and $7f);
+                if videoMode = TextMode then
+                    spriteAttributeTable := -1
+                else
+                    spriteAttributeTable := $80 * (val and $7f);
             6:
-                spritePatternTable := $800 * (val and $07);
+                if videoMode = TextMode then
+                    spritePatternTable := -1
+                else
+                    spritePatternTable := $800 * (val and $07);
             7:
                 begin
                     foreColor := TColor (val shr 4);
@@ -213,7 +221,7 @@ function peekV (addr: integer): uint8;
 procedure setVideoMode (mode: TVideoMode);    
     const
         vdpRegs: array [TVideoMode, 0..7] of uint8 = (
-            ($00, $f0, $02, $00, $00, $00, $00, $17),
+            ($00, $f0, $01, $00, $00, $00, $00, $17),
             ($00, $e0, $00, $0e, $01, $06, $00, $07),
             ($02, $e0, $06, $ff, $03, $78, $07, $00)
         );

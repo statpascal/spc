@@ -2117,7 +2117,7 @@ void T9900Generator::endRoutineBody (std::size_t level, TSymbolList &symbolList,
 }
 
 TCodeGenerator::TParameterLocation T9900Generator::classifyType (const TType *type) {
-    if (type->isEnumerated () || type->isPointer () || type->isReference () || (type->isRoutine () && TConfig::target != TConfig::TTarget::TI_BANKCART))
+    if (type->isEnumerated () || type->isPointer () || type->isReference () || (type->isRoutine () && (!static_cast<const TRoutineType *> (type)->isFarCall () || TConfig::target != TConfig::TTarget::TI_BANKCART)))
         return TParameterLocation::IntReg;
     if (type == &stdType.Real || type == &stdType.Single)
         return TParameterLocation::FloatReg;
