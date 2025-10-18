@@ -3,13 +3,14 @@ program vdptables;
 uses vdp;
 
 const
-    name: array [1..5] of string [11] = ('image', 'color', 'pattern', 'sprite attr', 'sprite pat');
+    Tables = 5;
+    name: array [1..tables] of string [11] = ('image', 'color', 'pattern', 'sprite attr', 'sprite pat');
     col: array [TVideoMode] of integer = (13, 20, 27);
     mode: array [TVideoMode] of string [4] = ('text', 'std', 'bmp');
 
 var
-    table: array [TVideoMode, 1..5] of integer;
-    i: integer;
+    table: array [TVideoMode, 1..Tables] of integer;
+    i: 1..Tables;
     j: TVideoMode;
     
 begin
@@ -29,7 +30,7 @@ begin
             write (mode [j])
         end;
         
-    for i := 1 to 5 do
+    for i := 1 to Tables do
         begin
             gotoxy (0, succ (i));
             write (name [i]);
