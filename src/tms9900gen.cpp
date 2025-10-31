@@ -1,6 +1,8 @@
 /** \file tms9900gen.hpp
 */
 
+#define NO_INT
+
 #include <dlfcn.h>
 #include <unistd.h>
 #include <cassert>
@@ -1983,7 +1985,9 @@ void T9900Generator::generateCode (TProgram &program) {
     outputComment (std::string ());
     outputLabel (progstart);
     outputCode (T9900Op::lwpi, workspace);
-//    outputCode (T9900Op::limi, 0);
+#ifdef NO_INT
+    outputCode (T9900Op::limi, 0);
+#endif    
     if (TConfig::target == TConfig::TTarget::TI_BANKCART)
         outputCode (T9900Op::clr, T9900Operand (0x6000, T9900Operand::TAddressingMode::Memory), T9900Operand (), "activate bank 0");
 //    outputCode (T9900Op::b, makeLabelMemory ("__main_start"));
@@ -2355,7 +2359,8 @@ T9900Operand T9900Generator::parseInteger (TCompilerImpl &compiler, TLexer &lexe
         lexer.getNextToken ();
         return ret;
     }
-    std::int64_t val = lexer.getInteger ();
+    bool neg = lexer.checkToken (TToken::Sub);
+    std::int64_t val = neg ? -lexer.getInteger () : lexer.getInteger ();
     compiler.checkToken (TToken::IntegerConst, "Integer constant expected");
     if (val < minval || val > maxval) {
         compiler.errorMessage (TCompilerImpl::AssemblerError, "Integer out of range (allowed is " + std::to_string (minval) + " - " + std::to_string (maxval) + ")");;
@@ -2493,7 +2498,10 @@ void T9900Generator::parseAssemblerBlock (TSymbol *symbol, TBlock &block) {
                     }
                     break;
             }
-            output.push_back (T9900Operation (desc.opcode, op1, op2));
+#ifdef NO_INT
+            if (desc.opcode != T9900Op::limi)
+#endif            
+                output.push_back (T9900Operation (desc.opcode, op1, op2));
         } else {
             if (lexer.getToken () == TToken::Colon)
                 lexer.getNextToken ();

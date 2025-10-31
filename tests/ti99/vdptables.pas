@@ -4,7 +4,7 @@ uses vdp;
 
 const
     Tables = 5;
-    name: array [1..tables] of string [11] = ('image', 'color', 'pattern', 'sprite attr', 'sprite pat');
+    name: array [1..Tables] of string [11] = ('image', 'color', 'pattern', 'sprite attr', 'sprite pat');
     col: array [TVideoMode] of integer = (13, 20, 27);
     mode: array [TVideoMode] of string [4] = ('text', 'std', 'bmp');
 

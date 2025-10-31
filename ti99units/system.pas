@@ -49,6 +49,7 @@ function getKey: char;
 // Utilites
 
 procedure move (var src, dest; length: integer);
+procedure moveWord (var src, dest; length: integer);
 function compareWord (var src, dest; length: integer): boolean;
 procedure fillChar (var dest; count: integer; value: char);
 procedure fillChar (var dest; count: integer; value: uint8);
@@ -133,6 +134,7 @@ procedure __new (var p: pointer; count, size: integer);
 procedure __dispose (p: pointer);
 procedure mark (var p: pointer);
 procedure release (p: pointer);
+procedure initHeap (first, size: integer);
 
 function hexstr (n: integer): string4;
 function hexstr2 (n: uint8): string2;
@@ -172,7 +174,7 @@ uses vdp, dsr;
 
 const
     heapPtr: integer = $2000;
-    heapMax = $4000;
+    heapMax: integer = $4000;
     
 procedure __new (var p: pointer; count, size: integer);
     var
@@ -180,7 +182,10 @@ procedure __new (var p: pointer; count, size: integer);
     begin
         n := (count * size + 1) and not 1;
         if heapPtr + n > heapMax then
-            p := nil
+        begin
+            p := nil;
+            writeln ('OUT OF MEM')
+        end
         else 
             begin
                 p := pointer (heapPtr);
@@ -202,6 +207,12 @@ procedure release (p: pointer);
     begin
         heapPtr := integer (p)
     end;
+    
+procedure initHeap (first, size: integer);
+    begin
+        heapPtr := first;
+        heapMax := first + size
+    end;        
 
 // 
 
@@ -217,6 +228,20 @@ procedure move (var src, dest; length: integer); assembler;
         jne move_1
         
     move_2:
+end;
+
+procedure moveWord (var src, dest; length: integer); assembler;
+        mov @src, r12
+        mov @dest, r13
+        mov @length, r14
+        jeq moveword_2
+        
+    moveword_1:    
+        mov *r12+, *r13+
+        dec r14
+        jne moveword_1
+        
+    moveword_2:
 end;
 
 function compareWord (var src, dest; length: integer): boolean; assembler;
@@ -357,9 +382,12 @@ procedure __write_char (var f: text; ch: char; length, precision: integer);
     var
         s: string [1];
     begin
-        s [0] := #1;
-        s [1] := ch;
-        __write_string (f, s, length, -1);
+        if ch > #31 then	// TODO: handle bell, backspace, etc...
+            begin
+                s [0] := #1;
+                s [1] := ch;
+                __write_string (f, s, length, -1)
+            end
     end;
     
 procedure __write_string (var f: text; p: PChar; length, precision: integer);
