@@ -14,6 +14,8 @@
 #include <algorithm>
 #include <filesystem>
 
+#include <boost/format.hpp>
+
 #include "tms9900gen.hpp"
 
 /*
@@ -771,6 +773,16 @@ void T9900Generator::getAssemblerCode (std::vector<std::uint8_t> &opcodes, bool 
         for (T9900Operation &op: codeBlock.codeSequence)
             listing.push_back (op.makeString ());
     }
+    
+    boost::format fmter ("; %4d %4x %6d %s");
+    listing.push_back (std::string ());
+    listing.push_back ("; Routine Map");
+    listing.push_back ("; Bank Addr Length Name");
+    for (unsigned bank = 0; bank <= subPrograms.back ().bank; ++bank)
+        listing.push_back (boost::str (fmter % bank % sharedCode.address % sharedCode.size % "runtime"));
+    listing.push_back (boost::str (fmter % mainProgram.bank % mainProgram.address % mainProgram.size % "main"));
+    for (TCodeBlock &codeBlock: subPrograms) 
+        listing.push_back (boost::str (fmter % codeBlock.bank % codeBlock.address % codeBlock.size % codeBlock.symbol->getName ()));
 }
 
 void T9900Generator::setOutput (TCodeSequence *output) {

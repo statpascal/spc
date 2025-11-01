@@ -1,7 +1,7 @@
 program sieve (output);
 
 const 
-    n = 10000;
+    n = 1000;
     rep = 1;
 
 var
@@ -26,7 +26,7 @@ begin
                             end
                     end;
                 inc (i)
-            end;
+            end
     end;
     count := 0;
     for i := 2 to n do
