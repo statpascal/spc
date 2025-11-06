@@ -208,8 +208,12 @@ private:
     T9900Operand parseInteger (TCompilerImpl &compiler, TLexer &lexer, std::int64_t minval, std::int64_t maxvval);
     T9900Operand parseGeneralAddress (TCompilerImpl &compiler, TLexer &lexer);
     
+    static const unsigned totalBanks = 128;
+    std::array<std::uint16_t, totalBanks> bankOffset;
+    unsigned maxBank;
+    
     void calcLength (TCodeBlock &);
-    void assignBank (TCodeBlock &, std::size_t &bank, std::size_t &org);
+    void assignBank (TCodeBlock &);
     void resolveBankLabels (TCodeBlock &proc);
     std::string getBankName (const TSymbol *);
     std::string getBankName (const std::string &);

@@ -23,10 +23,13 @@ var
     f: text;
     
 begin
-    assign (f, 'DSK1.TEST.TXT');
+    assign (f, 'DSK1.FILETXT');
     rewrite (f);
+    writeln ('Rewrite: ', IOResult);
     writeData (f);
+    writeln ('WriteData: ', IOResult);
     close (f);
+    writeln ('Close: ', IOResult);
     
     writeln ('File written - now writing to screen');
     writeData (output);

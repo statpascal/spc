@@ -425,7 +425,7 @@ procedure __write_boolean (var f: text; b: boolean; length, precision: integer);
 
 const
     nFiles = 3;
-    fileBufSize = 245;
+    fileBufSize = 256;
     
 type
     TFileDescriptor = record
@@ -445,22 +445,23 @@ function IOResult: integer;
     
 procedure reserveVdpBufs;
     var 
-        i: integer;
+        i, vdpaddr: integer;
     begin
+        vdpaddr := vdpFree - 1;
+        writeln ('Starting at max: ', vdpaddr);
         for i := 1 to nFiles do
             with openFiles [i] do
                 begin
-                    dec (vdpFree, fileBufSize);
+                    dec (vdpaddr, fileBufSize);
                     isOpen := false;
-                    bufAddr := succ (vdpFree);
-                    dec (vdpFree, sizeof (TPab));
-                    pabAddr := succ (vdpFree)
+                    bufAddr := succ (vdpaddr);
+                    dec (vdpaddr, sizeof (TPab));
+                    pabAddr := succ (vdpaddr)
                 end
     end;
         
 procedure __assign (var f; filename: string);
     begin
-        
         __file_data (f).pab.name := filename
     end;
     

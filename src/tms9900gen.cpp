@@ -689,19 +689,32 @@ void T9900Generator::calcLength (TCodeBlock &proc) {
         proc.size += op.getSize (proc.size);
 }
 
-void T9900Generator::assignBank (TCodeBlock &proc, std::size_t &bank, std::size_t &org) {
-    if (org + proc.size >= 0x7ff0) {
-//    if (org + proc.size >= 0x6d00) {	// force earlier switch for tests
-        ++bank;
-        org = 0x6000 + sharedCode.size;
+void T9900Generator::assignBank (TCodeBlock &proc) {
+    if (proc.size + sharedCode.size >= 0x7ffe) {
+        std::cout << "Code size of "<< (proc.symbol ? proc.symbol->getName () : "main") << " exceeds bank size" << std::endl;
+        exit (1);
     }
-    // TODO: check overflow of bank !!!!
+    unsigned bank = 0;
+    while (bank <= maxBank && bankOffset [bank] + proc.size > 0x7ffe)
+        ++bank;
+        
+    if (bank > maxBank) {
+        if (bank == totalBanks) {
+            std::cout << "Out of code space in " << proc.symbol->getName () << std::endl;
+            exit (1);
+        } else {
+            ++maxBank;
+            bankOffset [bank] = 0x6000 + sharedCode.size;
+        }
+    }
+        
     proc.bank = bank;
-    proc.address = org;
-    proc.codeSequence.push_front (T9900Operation (T9900Op::bank, org == 0x6000 ? -1 : bank, org));
+    proc.address = bankOffset [bank];
+    proc.codeSequence.push_front (T9900Operation (T9900Op::bank, proc.address == 0x6000 ? -1 : bank, proc.address));
     if (proc.symbol)
         bankMapping [getBankName (proc.symbol)] = bank;
-    org += (proc.size + 1) & ~1;
+        
+    bankOffset [bank] += (proc.size + 1) & ~1;
 }
     
 void T9900Generator::resolveBankLabels (TCodeBlock &proc) {
@@ -735,18 +748,18 @@ void T9900Generator::getAssemblerCode (std::vector<std::uint8_t> &opcodes, bool 
     }
         
     if (TConfig::target == TConfig::TTarget::TI_BANKCART) {
-        std::size_t org = 0x6000;
-        std::size_t bank = 0;
-        assignBank (sharedCode, bank, org);
+        maxBank = 0;
+        bankOffset [maxBank] = 0x6000;
+        assignBank (sharedCode);
         
-        assignBank (mainProgram, bank, org);
+        assignBank (mainProgram);
         for (TCodeBlock &proc: subPrograms)
-            assignBank (proc, bank, org);
+            assignBank (proc);
             
         // last word of each bank is filled with bank switching address (to be pushed in far calls)
         sharedCode.codeSequence.push_back (T9900Operation (T9900Op::comment, T9900Operand (), T9900Operand (),  std::string ("")));
         sharedCode.codeSequence.push_back (T9900Operation (T9900Op::comment, T9900Operand (), T9900Operand (),  std::string ("Bank ids at end of each page")));
-        for (std::size_t i = 0; i <= bank; ++i) {
+        for (std::size_t i = 0; i <= maxBank; ++i) {
             sharedCode.codeSequence.push_back (T9900Operation (T9900Op::bank, i, 0x7ffe));
             sharedCode.codeSequence.push_back (T9900Operation (T9900Op::data, 0x6000 + 2 * i));
         }

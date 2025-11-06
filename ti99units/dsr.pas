@@ -110,7 +110,7 @@ function dsrLink (var pab: TPab; pabVdpAddr: integer): boolean;
         // make sure all cards are turned off
         for cruAddr := $10 to $1f do
             setCRUBit (cruAddr shl 8, false);
-        
+
         cruAddr := $1000;
         completed := false;
         repeat
@@ -122,23 +122,18 @@ function dsrLink (var pab: TPab; pabVdpAddr: integer): boolean;
                         begin
                             if dsrList^.name = device then
                                 begin
-                                    memW [$83f2 div 2] := dsrList^.address;	// R9 (GPLWS)
-                                    memW [$83f8 div 2] := cruAddr;		// R12 (GPLWS)
-
-(* The DSRLNK routine in the Editor/Assembler module would also set the following memory
-   addresses (not saving R15 of GPLWS). It is unclear if that is really needed - at least
-   the orignal disk DSR does not seem to require it:
-                                    
+                                    memW [$83f2 div 2] := dsrList^.address;		// R9 (GPLWS)
+                                    memW [$83f8 div 2] := cruAddr;			// R12 (GPLWS)
                                     memW [$837c shr 1] := 0;
                                     memW [$83d0 shr 1] := cruAddr;
-                                    memW [$83d2 shr 1] := integer (dsrList);
-                                    memW [$8e02 shr 1] := 1;	// R1 (GPLWS)
-                                    saveR15 := memW [$83fe shr 1];
-                                    memW [$83fe shr 1] := $8c02;
-                                    -- restore R15 (GPLWS) after call
-                                    memW [$83fe shr 1] := saveR15
-*)                                    
-                                    calldsr (completed)
+                                    memW [$83d2 shr 1] := integer (dsrList^.next);
+                                    memW [$83e4 shr 1] := integer (dsrList^.next);	// R2 (GPLWS)
+                                    memW [$83e2 shr 1] := 1;				// R1 (GPLWS)
+//                                    saveR15 := memW [$83fe shr 1];
+//                                    memW [$83fe shr 1] := $8c02;
+                                    calldsr (completed);
+//                                    -- restore R15 (GPLWS) after call
+//                                    memW [$83fe shr 1] := saveR15
                                 end;
                             dsrList := dsrList^.next
                         end
