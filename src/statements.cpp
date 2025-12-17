@@ -140,7 +140,9 @@ TStatement *TSimpleStatement::parse (TBlock &declarations) {
                             (left->getType ()->isSet () && right->getType ()->isSet ()) ||
                             (left->getType ()->isShortString () && right->getType ()->isShortString () && left->getType ()->getSize () >= right->getType ()->getSize ())
                         )
-                        && static_cast<TFunctionCall *> (right)->getReturnStorage () && !compiler.getCodeGenerator ().isFunctionCallInlined (*static_cast<TFunctionCall *> (right))) {
+                        && static_cast<TFunctionCall *> (right)->getReturnStorage () 
+                        // TODO: evil hack for TMS9900 to get uint64 operations inlined
+                        && (left->getType () == &stdType.Uint64 || !compiler.getCodeGenerator ().isFunctionCallInlined (*static_cast<TFunctionCall *> (right)))) {
                         static_cast<TFunctionCall *> (right)->setReturnStorage (left, declarations);
                         return compiler.createMemoryPoolObject<TRoutineCall> (right);
                     }

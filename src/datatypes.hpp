@@ -312,7 +312,7 @@ class TStdType {
 public:
     TStdType ();
     
-    TEnumeratedType Boolean, Char, Int64;
+    TEnumeratedType Boolean, Char, Int64, Uint64;
     TSubrangeType Uint8, Int8, Uint16, Int16, Uint32, Int32;
     TVoidType Void, GenericVar;
     TRealType Real;

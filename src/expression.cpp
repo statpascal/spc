@@ -483,6 +483,11 @@ TType *TExpressionBase::checkOperatorTypes (TExpressionBase *&left, TExpressionB
           *rtype = convertBaseType (right, block);
     if (!ltype || !rtype)
         return nullptr;
+        
+#ifdef CREATE_9900        
+    if (ltype == &stdType.Uint64 && rtype == &stdType.Uint64 && (operation == TToken::Or || operation == TToken::And))
+        return &stdType.Uint64;
+#endif        
 
     if (ltype->isVector () || rtype->isVector ())
         return checkVectorOperatorTypes (left, right, operation, block);
@@ -746,7 +751,12 @@ TExpressionBase *TSimpleExpression::parse (TBlock &block) {
                 else if (type->isShortString ())
                     left = createRuntimeCall ("__short_str_concat", nullptr, {left, right}, block, false);
                 else if (!mergeConstants (left, right, type, operation, block))
-                    left = compiler.createMemoryPoolObject<TSimpleExpression> (left, right, operation, type);
+#ifdef CREATE_9900
+                    if (type == &stdType.Uint64 && operation == TToken::Or)
+                        left = createRuntimeCall ("__int64_or", &stdType.Uint64, {left, right}, block, false);
+                    else
+#endif                
+                        left = compiler.createMemoryPoolObject<TSimpleExpression> (left, right, operation, type);
             }
     }
     return left;
@@ -792,7 +802,12 @@ TExpressionBase *TTerm::parse (TBlock &block) {
                         tcb = TStdType::getScalarTypeCode (static_cast<TVectorType *> (right->getType ())->getBaseType ());
                     left = createRuntimeCall (vecRuntimeFunc.at (operation), type, {left, right, createInt64Constant (tca, block), createInt64Constant (tcb, block)}, block, false);
                 } else if (!mergeConstants (left, right, type, operation, block))
-                    left = compiler.createMemoryPoolObject<TTerm> (left, right, operation, type);
+#ifdef CREATE_9900
+                    if (type == &stdType.Uint64 && operation == TToken::And)
+                        left = createRuntimeCall ("__int64_and", &stdType.Uint64, {left, right}, block, false);
+                    else
+#endif                
+                        left = compiler.createMemoryPoolObject<TTerm> (left, right, operation, type);
             }
         operation = lexer.getToken ();
     }

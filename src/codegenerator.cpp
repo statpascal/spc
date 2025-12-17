@@ -35,7 +35,11 @@ TRuntimeData *TBaseGenerator::getRuntimeData () const {
 }
 
 TType *TBaseGenerator::getMemoryOperationType (TType *const type) {
+#ifdef CREATE_9900
+    static const std::array<TType *, 4> baseTypes = {&stdType.Uint8, &stdType.Int8, &stdType.Uint16, &stdType.Int16};
+#else
     static const std::array<TType *, 9> baseTypes = {&stdType.Uint8, &stdType.Int8, &stdType.Uint16, &stdType.Int16, &stdType.Uint32, &stdType.Int32, &stdType.Int64, &stdType.Real, &stdType.Single};
+#endif    
     if (std::find (baseTypes.begin (), baseTypes.end (), type) != baseTypes.end ())
         return type;
     if (type->isEnumerated ()) {
@@ -45,10 +49,12 @@ TType *TBaseGenerator::getMemoryOperationType (TType *const type) {
                 return enumType->isSigned () ? &stdType.Int8 : &stdType.Uint8;
             case 2:
                 return enumType->isSigned () ? &stdType.Int16 : &stdType.Uint16;
+#ifndef CREATE_9900
             case 4:
                 return enumType->isSigned () ? &stdType.Int32 : &stdType.Uint32;
             case 8:
                 return &stdType.Int64;
+#endif                
         }
     }
     if (type->isPointer () || type->isRoutine ()) {

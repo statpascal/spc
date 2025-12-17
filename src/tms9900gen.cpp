@@ -78,7 +78,8 @@ const T9900Reg
     intScratchReg1 = T9900Reg::r0,
     intScratchReg2 = T9900Reg::r12,
     intScratchReg3 = T9900Reg::r13,
-    intScratchReg4 = T9900Reg::r14;
+    intScratchReg4 = T9900Reg::r14,
+    intScratchReg5 = T9900Reg::r15;
     
 
 const std::size_t
@@ -1292,8 +1293,30 @@ void T9900Generator::codeInlinedFunction (TFunctionCall &functionCall) {
         outputCode (T9900Op::inc, val);
         saveReg (val);
         outputLabel (ll);
-        
     }  
+    if (s == "__int64_or" || s == "__int64_and") {
+        visit (functionCall.getReturnStorage ());    
+        visit (args [0]);
+        visit (args [1]);
+        T9900Reg 
+            right = fetchReg (intScratchReg1),
+            left = fetchReg (intScratchReg2),
+            dest = fetchReg (intScratchReg3);
+        for (int i = 0; i < 4; ++i) {
+            T9900Operand::TAddressingMode mode = (i == 3) ? T9900Operand::TAddressingMode::RegInd : T9900Operand::TAddressingMode::RegIndInc;
+            outputCode (T9900Op::mov, T9900Operand (left, mode), intScratchReg4);
+            if (s == "__int64_or")
+                outputCode (T9900Op::soc, T9900Operand (right, mode), intScratchReg4);
+            else {
+                outputCode (T9900Op::mov, T9900Operand (right, mode), intScratchReg5);
+                outputCode (T9900Op::inv, intScratchReg5);
+                outputCode (T9900Op::szc, intScratchReg5, intScratchReg4);
+            }
+            outputCode (T9900Op::mov, intScratchReg4, T9900Operand (dest, mode));
+        }
+        if (!functionCall.isIgnoreReturn ())
+            visit (functionCall.getReturnStorage ());    
+    }
 }
 
 bool T9900Generator::isFunctionCallInlined (TFunctionCall &functionCall) {
@@ -1779,6 +1802,8 @@ void T9900Generator::generateCode (TAssignment &assignment) {
                     *expression = assignment.getExpression ();
     TType *type = lValue->getType (),
           *st = getMemoryOperationType (type);
+          
+    std::cout << type->getName () << " is " << st->getName () << std::endl;
          
     visit (expression);
     visit (lValue);

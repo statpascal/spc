@@ -170,12 +170,14 @@ bool TShortStringType::isShortString () const {
 
 TEnumeratedType::TEnumeratedType (const std::string &name, std::int64_t minVal, std::int64_t maxVal):
   name (name), minVal (minVal), maxVal (maxVal), size (sizeof (std::int64_t)) {
-    checkLimits<std::uint8_t> () ||
-    checkLimits<std::int8_t> () ||
-    checkLimits<std::uint16_t> () ||
-    checkLimits<std::int16_t> () ||
-    checkLimits<std::uint32_t> () ||
-    checkLimits<std::int32_t> ();
+    if (name != "uint64") {	// TODO: ugly
+        checkLimits<std::uint8_t> () ||
+        checkLimits<std::int8_t> () ||
+        checkLimits<std::uint16_t> () ||
+        checkLimits<std::int16_t> () ||
+        checkLimits<std::uint32_t> () ||
+        checkLimits<std::int32_t> ();
+    }
 }
 
 template<typename T> bool TEnumeratedType::checkLimits () {
@@ -576,11 +578,12 @@ bool TRoutineType::matchesOverload (const TRoutineType *other) const {
 TStdType::TStdType ():
   Boolean ("boolean", 0, 1),
   Char ("char", 0, 255), 
+  Uint64 ("uint64", std::numeric_limits<std::uint64_t>::min (), std::numeric_limits<std::uint64_t>::max ()),
   Int64 ("int64", std::numeric_limits<std::int64_t>::min (), std::numeric_limits<std::int64_t>::max ()),
-  Uint8 ("uint8", &Int64, std::numeric_limits<std::uint8_t>::min (), std::numeric_limits<std::uint8_t>::max ()), 
-  Int8 ("int8", &Int64, std::numeric_limits<std::int8_t>::min (), std::numeric_limits<std::int8_t>::max ()), 
   Uint16 ("uint16", &Int64, std::numeric_limits<std::uint16_t>::min (), std::numeric_limits<std::uint16_t>::max ()), 
   Int16 ("int16", &Int64, std::numeric_limits<std::int16_t>::min (), std::numeric_limits<std::int16_t>::max ()), 
+  Int8 ("int8", &Int64, std::numeric_limits<std::int8_t>::min (), std::numeric_limits<std::int8_t>::max ()), 
+  Uint8 ("uint8", &Int64, std::numeric_limits<std::uint8_t>::min (), std::numeric_limits<std::uint8_t>::max ()), 
   Uint32 ("uint32", &Int64, std::numeric_limits<std::uint32_t>::min (), std::numeric_limits<std::uint32_t>::max ()), 
   Int32 ("int32", &Int64, std::numeric_limits<std::int32_t>::min (), std::numeric_limits<std::int32_t>::max ()),
   Void (), 

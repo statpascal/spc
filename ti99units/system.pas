@@ -165,6 +165,8 @@ function __set_super (var s, t: __set_array): boolean;
 function __set_sub_not_equal (var s, t: __set_array): boolean;
 function __set_super_not_equal (var s, t: __set_array): boolean;
 
+function __int64_or (var a, b: uint64): uint64; intrinsic;
+function __int64_and (var a, b: uint64): uint64; intrinsic;
 
 implementation
 

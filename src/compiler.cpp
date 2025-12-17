@@ -1382,7 +1382,7 @@ TMemoryPoolFactory &TCompilerImpl::getMemoryPoolFactory () {
 }
 
 void TCompilerImpl::createPredefinedSymbols () {
-    for (TType *t: std::vector<TType *> {&stdType.Void, &stdType.Boolean, &stdType.Char, &stdType.Uint8, &stdType.Int8, &stdType.Uint16, &stdType.Int16, &stdType.Uint32, &stdType.Int32, &stdType.Int64, &stdType.Real, &stdType.Single, &stdType.String})
+    for (TType *t: std::vector<TType *> {&stdType.Void, &stdType.Boolean, &stdType.Char, &stdType.Uint8, &stdType.Int8, &stdType.Uint16, &stdType.Int16, &stdType.Uint32, &stdType.Int32, &stdType.Int64, &stdType.Uint64, &stdType.Real, &stdType.Single, &stdType.String})
         predefinedSymbols->addNamedType (t->getName (), t);
 //    predefinedSymbols->addNamedType (TConfig::binFileType, memoryPoolFactory.create<TFileType> (nullptr, memoryPoolFactory.create<TSymbolList> (nullptr, memoryPoolFactory)));
 //    predefinedSymbols->addNamedType ("text", memoryPoolFactory.create<TFileType> (nullptr, memoryPoolFactory.create<TSymbolList> (nullptr, memoryPoolFactory)));
