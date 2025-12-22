@@ -127,7 +127,7 @@ void TBaseGenerator::addRecordFieldOffset (TRecordType::TRecordFields &recordFie
 
 void TBaseGenerator::alignType (TType *type) {
     const unsigned maxAlign = TConfig::alignment;
-    static const unsigned alignment [] = {1, 1, 2, 4, 4, 8, 8, 8};
+    static const unsigned alignment [] = {1, 1, 2, 4, 4, 8, 8, 8, 8};
     assert (maxAlign <= 8);
     
     if (!type->getAlignment ()) {
@@ -149,7 +149,7 @@ void TBaseGenerator::alignType (TType *type) {
 */
         } else {
             const std::size_t size = type->getSize ();
-            type->setAlignment (size < maxAlign ? alignment [size] : alignment [maxAlign - 1]);
+            type->setAlignment (size < maxAlign ? alignment [size] : alignment [maxAlign]);
             if (type->isPointer () || type->isVector () || type->isSet ())
                 if (TType *baseType = type->getBaseType ())
                     alignType (baseType);

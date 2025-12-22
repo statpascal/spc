@@ -240,7 +240,7 @@ TStatement *TRepeatStatement::parse (TBlock &declarations) {
     if (declarations.getCompiler ().getLexer ().checkToken (TToken::Until) && (condition = TExpression::parse (declarations))) {
         TExpressionBase::performTypeConversion (&stdType.Boolean, condition, declarations);
         statements.push_back (compiler.createMemoryPoolObject<TGotoStatement> (label, 
-            compiler.createMemoryPoolObject<TPrefixedExpression> (condition, TToken::Not, declarations)));
+            TPrefixedExpression::generate (condition, TToken::Not, declarations)));
         return compiler.createMemoryPoolObject<TLabeledStatement> (
             label, compiler.createMemoryPoolObject<TStatementSequence> (std::move (statements)));
     }
@@ -259,7 +259,7 @@ TStatement *TWhileStatement::parse (TBlock &declarations) {
     if (condition) {
         TExpressionBase::performTypeConversion (&stdType.Boolean, condition, declarations);
         statements.push_back (compiler.createMemoryPoolObject<TGotoStatement> (l2,
-            compiler.createMemoryPoolObject<TPrefixedExpression> (condition, TToken::Not, declarations)));
+            TPrefixedExpression::generate (condition, TToken::Not, declarations)));
 
     }
     compiler.checkToken (TToken::Do, "'do' expected in 'while'-statement");

@@ -10,7 +10,11 @@
 namespace statpascal {
 
 struct TConfig {
+#ifdef CREATE_9900
+    static const std::size_t alignment = 2;
+#else
     static const std::size_t alignment = std::min<std::size_t> (std::alignment_of<std::max_align_t> (), 8);
+#endif    
     static const std::size_t setwords = 4;
     static const std::size_t setLimit = setwords * 8 * sizeof (std::int64_t);
     static const std::string globalRuntimeDataPtr; //  = "__globalruntimedata";

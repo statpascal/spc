@@ -165,8 +165,10 @@ function __set_super (var s, t: __set_array): boolean;
 function __set_sub_not_equal (var s, t: __set_array): boolean;
 function __set_super_not_equal (var s, t: __set_array): boolean;
 
-function __int64_or (var a, b: uint64): uint64; intrinsic;
-function __int64_and (var a, b: uint64): uint64; intrinsic;
+function __uint64_or (var a, b: uint64): uint64; intrinsic;
+function __uint64_and (var a, b: uint64): uint64; intrinsic;
+function __uint64_and_not (var a, b: uint64): uint64; intrinsic;
+function __uint64_not (var a: uint64): uint64; intrinsic;
 
 implementation
 
@@ -450,7 +452,6 @@ procedure reserveVdpBufs;
         i, vdpaddr: integer;
     begin
         vdpaddr := vdpFree - 1;
-        writeln ('Starting at max: ', vdpaddr);
         for i := 1 to nFiles do
             with openFiles [i] do
                 begin

@@ -683,26 +683,33 @@ void TExpression::acceptCodeGenerator (TCodeGenerator &codeGenerator) {
 }
 
 
-TPrefixedExpression::TPrefixedExpression (TExpressionBase *base_para, TToken operation, TBlock &block):
-  base (base_para), operation (operation) {
+TExpressionBase *TPrefixedExpression::generate (TExpressionBase *base_para, TToken operation, TBlock &block) {
     TCompilerImpl &compiler = block.getCompiler ();
-    convertBaseType (base, block);
-    TType *type = base->getType ();
-    setType (type);
-    
+    TType *type = TExpressionBase::convertBaseType (base_para, block);
     bool typeOK = false;
+    
     switch (operation) {
         case TToken::Sub:
             typeOK = type == &stdType.Int64 || type == &stdType.Real;
             break;
         case TToken::Not:
             typeOK = type == &stdType.Int64 || type == &stdType.Boolean;
+#ifdef CREATE_9900
+            if (type == &stdType.Uint64) 
+                return createRuntimeCall ("__uint64_not", &stdType.Uint64, {base_para}, block, false);
+#endif            
             break;
         default:
             break;
     }
     if (!typeOK)
         compiler.errorMessage (TCompilerImpl::InvalidType, "Prefix applied to invalid type");
+    return compiler.createMemoryPoolObject<TPrefixedExpression> (base_para, operation, type);
+}
+
+TPrefixedExpression::TPrefixedExpression (TExpressionBase *base_para, TToken operation, TType *type):
+  base (base_para), operation (operation) {
+    setType (type);
 }
 
 void TPrefixedExpression::acceptCodeGenerator (TCodeGenerator &codeGenerator) {
@@ -731,7 +738,7 @@ TExpressionBase *TSimpleExpression::parse (TBlock &block) {
     TExpressionBase *left = TTerm::parse (block);
     if (signPresent && left) 
         if (!evaluateConstant (left, left->getType (), TToken::Sub, block))
-            left = compiler.createMemoryPoolObject<TPrefixedExpression> (left, TToken::Sub, block);
+            left = TPrefixedExpression::generate (left, TToken::Sub, block);
     
     while (lexer.getToken () == TToken::Add || lexer.getToken () == TToken::Sub || lexer.getToken () == TToken::Or || lexer.getToken () == TToken::Xor) {
         TToken operation = lexer.getToken ();
@@ -753,7 +760,7 @@ TExpressionBase *TSimpleExpression::parse (TBlock &block) {
                 else if (!mergeConstants (left, right, type, operation, block))
 #ifdef CREATE_9900
                     if (type == &stdType.Uint64 && operation == TToken::Or)
-                        left = createRuntimeCall ("__int64_or", &stdType.Uint64, {left, right}, block, false);
+                        left = createRuntimeCall ("__uint64_or", &stdType.Uint64, {left, right}, block, false);
                     else
 #endif                
                         left = compiler.createMemoryPoolObject<TSimpleExpression> (left, right, operation, type);
@@ -803,9 +810,16 @@ TExpressionBase *TTerm::parse (TBlock &block) {
                     left = createRuntimeCall (vecRuntimeFunc.at (operation), type, {left, right, createInt64Constant (tca, block), createInt64Constant (tcb, block)}, block, false);
                 } else if (!mergeConstants (left, right, type, operation, block))
 #ifdef CREATE_9900
-                    if (type == &stdType.Uint64 && operation == TToken::And)
-                        left = createRuntimeCall ("__int64_and", &stdType.Uint64, {left, right}, block, false);
-                    else
+                    if (type == &stdType.Uint64 && operation == TToken::And) {
+                        std::string s = "__uint64_and";
+                        if (right->isFunctionCall ()) 
+                            if (TRoutineValue *routine = dynamic_cast<TRoutineValue *> (static_cast<TFunctionCall *> (right)->getFunction ()))
+                                if (routine->getSymbol ()->getName () == "__uint64_not") {
+                                    s = "__uint64_and_not";
+                                    right = static_cast<TFunctionCall *> (right)->getArguments () [0];
+                                }
+                        left = createRuntimeCall (s, &stdType.Uint64, {left, right}, block, false);
+                    } else
 #endif                
                         left = compiler.createMemoryPoolObject<TTerm> (left, right, operation, type);
             }
@@ -829,7 +843,7 @@ TExpressionBase *TFactor::parse (TBlock &block) {
         lexer.getNextToken ();
         if ((expr = TFactor::parse (block)))
             if (!evaluateConstant (expr, expr->getType (), TToken::Not, block))
-                expr = compiler.createMemoryPoolObject<TPrefixedExpression> (expr, TToken::Not, block);
+                expr = TPrefixedExpression::generate (expr, TToken::Not, block);
     } else if (token == TToken::Identifier)
         expr = parseIdentifier (block);
     else if (token == TToken::IntegerConst || token == TToken::RealConst || token == TToken::CharConst || token == TToken::StringConst || token == TToken::SizeOf) {

@@ -200,14 +200,16 @@ private:
 class TPrefixedExpression: public TExpressionBase {
 using inherited = TExpressionBase;
 public:
-    TPrefixedExpression (TExpressionBase *base, TToken operation, TBlock &);
+    static TExpressionBase *generate (TExpressionBase *base, TToken operation, TBlock &);
     
     virtual void acceptCodeGenerator (TCodeGenerator &) override;
     
     TExpressionBase *getExpression () const;
     TToken getOperation () const;
     
-private:
+    TPrefixedExpression (TExpressionBase *base, TToken operation, TType *type);
+    
+private:    
     TExpressionBase *base;    
     TToken operation;
 };

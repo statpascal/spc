@@ -1294,24 +1294,31 @@ void T9900Generator::codeInlinedFunction (TFunctionCall &functionCall) {
         saveReg (val);
         outputLabel (ll);
     }  
-    if (s == "__int64_or" || s == "__int64_and") {
+    if (s == "__uint64_or" || s == "__uint64_and" || s == "__uint64_and_not" || s == "__uint64_not") {
+        bool isNot = s == "__uint64_not";
         visit (functionCall.getReturnStorage ());    
         visit (args [0]);
-        visit (args [1]);
-        T9900Reg 
-            right = fetchReg (intScratchReg1),
+        if (!isNot)
+            visit (args [1]);
+        T9900Reg right;
+            if (!isNot)
+                right = fetchReg (intScratchReg1);
+        T9900Reg
             left = fetchReg (intScratchReg2),
             dest = fetchReg (intScratchReg3);
         for (int i = 0; i < 4; ++i) {
             T9900Operand::TAddressingMode mode = (i == 3) ? T9900Operand::TAddressingMode::RegInd : T9900Operand::TAddressingMode::RegIndInc;
             outputCode (T9900Op::mov, T9900Operand (left, mode), intScratchReg4);
-            if (s == "__int64_or")
+            if (s == "__uint64_or")
                 outputCode (T9900Op::soc, T9900Operand (right, mode), intScratchReg4);
-            else {
+            else if (s == "__uint64_and") {
                 outputCode (T9900Op::mov, T9900Operand (right, mode), intScratchReg5);
                 outputCode (T9900Op::inv, intScratchReg5);
                 outputCode (T9900Op::szc, intScratchReg5, intScratchReg4);
-            }
+            } else if (s == "__uint64_and_not") {
+                outputCode (T9900Op::szc, T9900Operand (right, mode), intScratchReg4);
+            } else if (isNot)
+                outputCode (T9900Op::inv, intScratchReg4);
             outputCode (T9900Op::mov, intScratchReg4, T9900Operand (dest, mode));
         }
         if (!functionCall.isIgnoreReturn ())
@@ -1552,12 +1559,23 @@ void T9900Generator::codeMultiplyConst (const T9900Reg reg, const std::size_t n)
     }
 }
 
-void T9900Generator::inlineMove (T9900Reg src, T9900Reg dst, T9900Reg count) {            
+void T9900Generator::inlineMove (bool isWord, T9900Reg src, T9900Reg dst, T9900Reg count) {
     const std::string ll = getNextLocalLabel ();
     outputLabel (ll);
-    outputCode (T9900Op::movb, T9900Operand (src, T9900Operand::TAddressingMode::RegIndInc), T9900Operand (dst, T9900Operand::TAddressingMode::RegIndInc));
+    outputCode (isWord ? T9900Op::mov : T9900Op::movb, T9900Operand (src, T9900Operand::TAddressingMode::RegIndInc), T9900Operand (dst, T9900Operand::TAddressingMode::RegIndInc));
     outputCode (T9900Op::dec, count);
     outputCode (T9900Op::jne, ll);
+}
+
+void T9900Generator::inlineMove (bool isWord, T9900Reg src, T9900Reg dst, int n) {
+    if (n <= 8) {
+        while (--n > 0)
+            outputCode (isWord ? T9900Op::mov : T9900Op::movb, T9900Operand (src, T9900Operand::TAddressingMode::RegIndInc), T9900Operand (dst, T9900Operand::TAddressingMode::RegIndInc));
+        outputCode (isWord ? T9900Op::mov : T9900Op::movb, T9900Operand (src, T9900Operand::TAddressingMode::RegInd), T9900Operand (dst, T9900Operand::TAddressingMode::RegInd));
+    } else {
+        outputCode (T9900Op::li, intScratchReg2, n);
+        inlineMove (isWord, src, dst, intScratchReg2);
+    }
 }
 
 void T9900Generator::codeMove (const TType *type) {
@@ -1577,14 +1595,15 @@ void T9900Generator::codeMove (const TType *type) {
         const std::string ll2 = getNextLocalLabel ();
         outputCode (T9900Op::jeq, ll2);
         outputCode (T9900Op::srl, count, 8);
-        inlineMove (src, dst, count);
+        inlineMove (false, src, dst, count);
         outputLabel (ll2);
     } else {
-        T9900Reg count = getSaveReg (intScratchReg2);
-        outputCode (T9900Op::li, count, n);
         T9900Reg dst = fetchReg (intScratchReg3);
         T9900Reg src = fetchReg (intScratchReg4);
-        inlineMove (src, dst, count);
+        if (type->getAlignment () == 2 && !(n & 1))
+            inlineMove (true, src, dst, n / 2);
+        else
+            inlineMove (false, src, dst, n);
     }
 }
 
@@ -1803,8 +1822,6 @@ void T9900Generator::generateCode (TAssignment &assignment) {
     TType *type = lValue->getType (),
           *st = getMemoryOperationType (type);
           
-    std::cout << type->getName () << " is " << st->getName () << std::endl;
-         
     visit (expression);
     visit (lValue);
     if (st != &stdType.UnresOverload) {
@@ -2171,6 +2188,8 @@ void T9900Generator::endRoutineBody (std::size_t level, TSymbolList &symbolList,
 }
 
 TCodeGenerator::TParameterLocation T9900Generator::classifyType (const TType *type) {
+    if (type == &stdType.Uint64)
+        return TParameterLocation::Stack;
     if (type->isEnumerated () || type->isPointer () || type->isReference () || (type->isRoutine () && (!static_cast<const TRoutineType *> (type)->isFarCall () || TConfig::target != TConfig::TTarget::TI_BANKCART)))
         return TParameterLocation::IntReg;
     if (type == &stdType.Real || type == &stdType.Single)
@@ -2274,7 +2293,7 @@ void T9900Generator::codeBlock (TBlock &block, bool hasStackFrame, bool isFar, T
             outputCode (T9900Op::li, T9900Reg::r12, staticDataDefinition.label);
             outputCode (T9900Op::li, T9900Reg::r13, firstStatic);
             outputCode (T9900Op::li, T9900Reg::r14, staticSize);
-            inlineMove (T9900Reg::r12, T9900Reg::r13, T9900Reg::r14);
+            inlineMove (false, T9900Reg::r12, T9900Reg::r13, T9900Reg::r14);
             outputCode (T9900Op::b, T9900Operand (T9900Reg::r11, T9900Operand::TAddressingMode::RegInd));
         }
     }
