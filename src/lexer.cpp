@@ -44,6 +44,7 @@ private:
     typedef std::unordered_map<char, TToken> TCharTokenMap;
 
     void initLexer ();
+    void checkConditional ();
     bool skipComment ();
     bool skipWhiteSpace ();
     
@@ -193,6 +194,20 @@ void TLexer::TLexerImpl::setFilename (const std::string &fn) {
     setSource (buf.str ());
 }
 
+void TLexer::TLexerImpl::checkConditional () {
+    sVal.clear ();
+    if (std::string (sourceIt, 7) == "{$ifdef")
+        if (std::string (sourceIt, 13) != "{$ifdef ti99}") {
+            while (*sourceIt && std::string (sourceIt, 8) != "{$endif}") {
+                if (*sourceIt == '\n') {
+                    ++lineNumber;
+                    lineBegin = sourceIt + 1;
+                }
+                ++sourceIt;
+            }
+        }
+}
+
 bool TLexer::TLexerImpl::skipComment () {
     if (*sourceIt == '(' && *(sourceIt + 1) == '*') {
         sourceIt += 2;
@@ -208,6 +223,7 @@ bool TLexer::TLexerImpl::skipComment () {
         }
         return true;        
     } else if (*sourceIt == '{') {
+        checkConditional ();
         do {
             ++sourceIt;
             if (*sourceIt == '\n') {
