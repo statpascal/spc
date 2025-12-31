@@ -77,6 +77,7 @@ private:
     TType *parsePointerType ();
     TType *parseSubrangeType ();
     TType *parseVectorType ();
+    TType *parsePackedType ();
     TType *parseTypeIdentifier ();	// can be defined type or subrange beginning with const
     TType *parseType ();
     

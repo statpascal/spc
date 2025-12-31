@@ -130,6 +130,7 @@ TLexer::TLexerImpl::TLexerImpl ():
     {"procedure", 	TToken::Procedure}, 
     {"program", 	TToken::Program}, 
     {"with", 		TToken::With}, 
+    {"packed",          TToken::Packed},
     {"record", 		TToken::Record}, 
     {"repeat", 		TToken::Repeat}, 
     {"set", 		TToken::Set}, 

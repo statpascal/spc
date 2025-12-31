@@ -578,6 +578,19 @@ TType *TBlock::parseVectorType () {
         return nullptr;
 }
 
+TType *TBlock::parsePackedType () {
+    lexer.getNextToken ();
+    switch (lexer.getToken ()) {
+        case TToken::Array:
+            return parseArrayType ();
+        case TToken::Record:
+            return parseRecordType ();
+        default:
+            compiler.errorMessage (TCompilerImpl::TCompilerImpl::InvalidType, "'packed' can only be used with array or record types");
+            return nullptr;
+    }
+}
+
 TType *TBlock::parseTypeIdentifier () {
     const std::string s = lexer.getIdentifier ();
     if (symbols->searchSymbol (s, TSymbol::Constant))
@@ -608,6 +621,7 @@ TType *TBlock::parseType () {
       { TToken::CharConst,      &TBlock::parseSubrangeType },
       { TToken::Sub,		&TBlock::parseSubrangeType },
       { TToken::Vector,		&TBlock::parseVectorType },
+      { TToken::Packed,         &TBlock::parsePackedType },
       { TToken::Identifier,	&TBlock::parseTypeIdentifier }
     };
     

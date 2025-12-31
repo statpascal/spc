@@ -50,7 +50,7 @@ function getKey: char;
 
 procedure move (var src, dest; length: integer);
 procedure moveWord (var src, dest; length: integer);
-function compareWord (var src, dest; length: integer): boolean;
+function compareWord (var src, dest; length: integer): integer;
 procedure fillChar (var dest; count: integer; value: char);
 procedure fillChar (var dest; count: integer; value: uint8);
 
@@ -248,29 +248,33 @@ procedure moveWord (var src, dest; length: integer); assembler;
     moveword_2:
 end;
 
-function compareWord (var src, dest; length: integer): boolean; assembler;
-        mov *r10, r15
-        mov @src, r12
-        mov @dest, r13
-        mov @length, r14
-        jeq comparebyte_2
+function compareWord (var src, dest; length: integer): integer; assembler;
+        mov  *r10, r15
+        mov  @src, r12
+        mov  @dest, r13
+        mov  @length, r14
+        jeq  comparebyte_2
         
     comparebyte_1:
-        c *r12+, *r13+
-        jne comparebyte_3
-        dec r14
-        jne comparebyte_1
+        c    *r12+, *r13+
+        jh   comparebyte_3
+        jl   comparebyte_4
+        dec  r14
+        jne  comparebyte_1
         
     comparebyte_2:
-        li r12, >0100
-        movb r12, *r15
-        jmp comparebyte_4
+        clr  *r15
+        jmp  comparebyte_5
         
     comparebyte_3:
-        clr r12
+        li   r12, 1
         movb r12, *r15
+        jmp  comparebyte_5
         
     comparebyte_4:
+        seto *r15
+        
+    comparebyte_5:
 end;
 
 procedure fillChar (var dest; count: integer; value: char); assembler;
@@ -931,12 +935,12 @@ function __set_diff (var s, t: __set_array): __generic_set_type;
 
 function __set_equal (var s, t: __set_array): boolean;
     begin
-        __set_equal := compareWord (s, t, __set_words)
+        __set_equal := compareWord (s, t, __set_words) = 0
     end;
     
 function __set_not_equal (var s, t: __set_array): boolean;
     begin
-        __set_not_equal := not compareWord (s, t, __set_words)
+        __set_not_equal := compareWord (s, t, __set_words) <> 0
     end;
     
 function __set_sub (var s, t: __set_array): boolean;
