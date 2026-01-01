@@ -59,6 +59,12 @@ function max (a, b: integer): integer; intrinsic name '__max';
 function sqr (a: integer): integer; intrinsic name '__sqr';
 function abs (n: integer): integer; intrinsic name '__abs';
 
+// RND
+
+procedure randomize (n: integer);
+function rnd: integer;
+function random (n: integer): integer;
+
 // file handling
 
 procedure __write_lf (var f: text);
@@ -317,6 +323,32 @@ function getKey: char;
         else
             getKey := InvalidKey;
         limi2
+    end;
+
+// RNG
+    
+var
+    seed: integer absolute $83c0;
+
+procedure randomize (n: integer);
+    begin
+        seed := n
+    end;
+    
+function rnd: integer; assembler;
+        mov  @seed, r12
+        li   r13, >6fe5
+        mpy  r12, r13
+        ai   r14, >7ab9
+        mov  r14, @seed
+        src  r14, 5
+        mov  *r10, r12
+        mov  r14, *r12
+end;        
+
+function random (n: integer): integer;
+    begin
+        random := rnd mod n
     end;
     
 function __read_line_console: string;
