@@ -59,10 +59,9 @@ function max (a, b: integer): integer; intrinsic name '__max';
 function sqr (a: integer): integer; intrinsic name '__sqr';
 function abs (n: integer): integer; intrinsic name '__abs';
 
-// RND
+// RNG
 
 procedure randomize (n: integer);
-function rnd: integer;
 function random (n: integer): integer;
 
 // file handling
@@ -335,22 +334,17 @@ procedure randomize (n: integer);
         seed := n
     end;
     
-function rnd: integer; assembler;
+function random (n: integer): integer; assembler;
         mov  @seed, r12
         li   r13, >6fe5
         mpy  r12, r13
         ai   r14, >7ab9
         mov  r14, @seed
-        src  r14, 5
+        mpy  @n, r14
         mov  *r10, r12
         mov  r14, *r12
 end;        
 
-function random (n: integer): integer;
-    begin
-        random := rnd mod n
-    end;
-    
 function __read_line_console: string;
     const
         FctnS = #136;
