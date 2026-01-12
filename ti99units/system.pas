@@ -50,6 +50,7 @@ function getKey: char;
 
 procedure move (var src, dest; length: integer);
 procedure moveWord (var src, dest; length: integer);
+function compareByte (var src, dest; length: integer): integer;
 function compareWord (var src, dest; length: integer): integer;
 procedure fillChar (var dest; count: integer; value: char);
 procedure fillChar (var dest; count: integer; value: uint8);
@@ -258,10 +259,39 @@ function compareWord (var src, dest; length: integer): integer; assembler;
         mov  @src, r12
         mov  @dest, r13
         mov  @length, r14
+        jeq  compareword_2
+        
+    compareword_1:
+        c    *r12+, *r13+
+        jh   compareword_3
+        jl   compareword_4
+        dec  r14
+        jne  compareword_1
+        
+    compareword_2:
+        clr  *r15
+        jmp  compareword_5
+        
+    compareword_3:
+        li   r12, 1
+        mov  r12, *r15
+        jmp  compareword_5
+        
+    compareword_4:
+        seto *r15
+        
+    compareword_5:
+end;
+
+function compareByte (var src, dest; length: integer): integer; assembler;
+        mov  *r10, r15
+        mov  @src, r12
+        mov  @dest, r13
+        mov  @length, r14
         jeq  comparebyte_2
         
     comparebyte_1:
-        c    *r12+, *r13+
+        cb   *r12+, *r13+
         jh   comparebyte_3
         jl   comparebyte_4
         dec  r14
@@ -273,7 +303,7 @@ function compareWord (var src, dest; length: integer): integer; assembler;
         
     comparebyte_3:
         li   r12, 1
-        movb r12, *r15
+        mov  r12, *r15
         jmp  comparebyte_5
         
     comparebyte_4:
@@ -335,14 +365,13 @@ procedure randomize (n: integer);
     end;
     
 function random (n: integer): integer; assembler;
-        mov  @seed, r12
-        li   r13, >6fe5
-        mpy  r12, r13
-        ai   r14, >7ab9
-        mov  r14, @seed
-        mpy  @n, r14
+        li   r12, 25385
+        mpy  @seed, r12
+        inc  r13
+        mov  r13, @seed
+        mpy  @n, r13
         mov  *r10, r12
-        mov  r14, *r12
+        mov  r13, *r12
 end;        
 
 function __read_line_console: string;

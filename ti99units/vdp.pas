@@ -51,6 +51,8 @@ procedure scroll;
 procedure outputString (p: PChar; outlen: integer);
 procedure outputLine;
 
+procedure enableScreenSaver (b: boolean);
+
 // other low level routines
 
 procedure setCRUBit (addr: integer; val: boolean);
@@ -520,6 +522,13 @@ procedure outputLine;
         end;
         while vdpWriteAddress >= imageTableEnd do
             scroll
+    end;
+    
+procedure enableScreenSaver (b: boolean);
+    var
+        clrsc: integer absolute $83d6;
+    begin
+        clrsc := ord (not b)
     end;
     
 procedure setCRUBit (addr: integer; val: boolean); assembler;
