@@ -40,12 +40,9 @@ Stack layout of activation frame:
 |---------------------------------|
 |  return address	          |
 |---------------------------------|
-|  saved frame pointer of caller  |	<- R9
+|  saved frame pointer of caller  |	<- R9 (frame pointer)
 |---------------------------------|
-|				  |
-|  frame pointers of higher 	  |
-|  nesting levels (if existing)   |
-|  in descending order		  |
+|  saved display entry for level  |
 |---------------------------------|
 |                                 |
 |  local variables                |
@@ -53,7 +50,7 @@ Stack layout of activation frame:
 |---------------------------------|
 |                                 |
 |  saved regs of caller           |
-|                                 |  	<- R10
+|                                 |  	<- R10 (stack pointer)
 |---------------------------------|
 |  free memory                    |
 
@@ -83,10 +80,13 @@ const T9900Reg
     
 
 const std::size_t
-    intStackRegs = intStackReg.size ();
+    intStackRegs = intStackReg.size (),
+    displayTop = 65536,
+    displaySize = 8;
     
 const std::string 
     dblAbsMask = "__dbl_abs_mask";
+    
 
 }  // namespace
 
@@ -1494,7 +1494,7 @@ void T9900Generator::codeSymbol (const TSymbol *s, const T9900Reg reg) {
         outputCode (T9900Op::mov, T9900Reg::r9, reg), 
         outputCode (T9900Op::ai, reg, s->getOffset (), s->getName ());
     } else {
-        outputCode (T9900Op::mov, T9900Operand (T9900Reg::r9, 2 * (s->getLevel () - currentLevel + 1)), reg);
+        outputCode (T9900Op::mov, T9900Operand (displayTop - 2 * (s->getLevel () - 1), T9900Operand::TAddressingMode::Memory), reg);
         outputCode (T9900Op::ai, reg, s->getOffset (), s->getName ());
     }
 }
@@ -2146,21 +2146,22 @@ void T9900Generator::beginRoutineBody (const std::string &routineName, std::size
 
     if (level > 1) {    
         if (hasStackFrame) {
-            int stackCount = 2 * level + symbolList.getLocalSize () + 2 * saveRegs.size ();
+            int stackCount = symbolList.getLocalSize () + 2 * saveRegs.size () + 2;
+            outputCode (T9900Op::ai, T9900Reg::r10, -6);
+            outputCode (T9900Op::mov, T9900Operand (displayTop - 2 * (level - 1), T9900Operand::TAddressingMode::Memory), T9900Operand (T9900Reg::r10, T9900Operand::TAddressingMode::RegIndInc));
+            outputCode (T9900Op::mov, T9900Reg::r9, T9900Operand (T9900Reg::r10, T9900Operand::TAddressingMode::RegInd));
+            outputCode (T9900Op::mov, T9900Reg::r10, T9900Reg::r9);
+            outputCode (T9900Op::mov, T9900Reg::r9, T9900Operand (displayTop - 2 * (level - 1), T9900Operand::TAddressingMode::Memory));
+            outputCode (T9900Op::mov, T9900Reg::r11, T9900Operand (T9900Reg::r10, 2));
+
             outputCode (T9900Op::ai, T9900Reg::r10, -stackCount);
             outputCode (T9900Op::mov, T9900Reg::r10, T9900Reg::r12);
             const T9900Operand op (T9900Operand (T9900Reg::r12, T9900Operand::TAddressingMode::RegIndInc));
             for (std::set<T9900Reg>::reverse_iterator it = saveRegs.rbegin (); it != saveRegs.rend (); ++it)
                 outputCode (T9900Op::mov, *it, op);
-            outputCode (T9900Op::ai, T9900Reg::r12, symbolList.getLocalSize ());
-            for (int i = level - 3; i >= 0; --i)
-                outputCode (T9900Op::mov, i ? T9900Operand (T9900Reg::r9, -2 * i) : T9900Operand (T9900Reg::r9, T9900Operand::TAddressingMode::RegInd), op);
-            outputCode (T9900Op::mov, T9900Reg::r9, T9900Operand (T9900Reg::r12, T9900Operand::TAddressingMode::RegInd));
-            outputCode (T9900Op::mov, T9900Reg::r12, T9900Reg::r9);
-            outputCode (T9900Op::mov, T9900Reg::r11, T9900Operand ( T9900Reg::r12, 2));
         }
     } else
-        outputCode (T9900Op::li, T9900Reg::r10, 65536 - symbolList.getLocalSize (), "init stack ptr");
+        outputCode (T9900Op::li, T9900Reg::r10, 65536 - symbolList.getLocalSize () - 2 * displaySize, "init stack ptr");
 }
 
 void T9900Generator::endRoutineBody (std::size_t level, TSymbolList &symbolList, const std::set<T9900Reg> &saveRegs, bool hasStackFrame, bool isFar) {
@@ -2172,6 +2173,7 @@ void T9900Generator::endRoutineBody (std::size_t level, TSymbolList &symbolList,
                 outputCode (T9900Op::mov, T9900Operand (T9900Reg::r10, T9900Operand::TAddressingMode::RegInd), *it);
 
         if (hasStackFrame) {
+            outputCode (T9900Op::mov, T9900Operand (T9900Reg::r9, -2), T9900Operand (displayTop - 2 * (level - 1), T9900Operand::TAddressingMode::Memory));
             outputCode (T9900Op::mov, T9900Reg::r9, T9900Reg::r10);
             codePop (T9900Reg::r9);
             codePop (T9900Reg::r11);
@@ -2226,7 +2228,7 @@ void T9900Generator::assignStackOffsets (TBlock &block) {
     
     const std::size_t alignment = 1,
                       level = symbolList.getLevel (),
-                      displaySize = (level - 1) * 2;
+                      displaySave = 2;
     ssize_t pos = 0;
     
     assignParameterOffsets (block);
@@ -2237,7 +2239,7 @@ void T9900Generator::assignStackOffsets (TBlock &block) {
         if (s->checkSymbolFlag (TSymbol::Alias))
             s->setAliasData ();
         else if (s->checkSymbolFlag (TSymbol::Variable) && s->getRegister () == TSymbol::InvalidRegister)
-            s->setOffset (s->getOffset () - pos - displaySize + 2);
+            s->setOffset (s->getOffset () - pos - displaySave);
 
     symbolList.setLocalSize (pos);
 }
@@ -2247,7 +2249,7 @@ void T9900Generator::assignRegisters (TSymbolList &blockSymbols) {
 
 void T9900Generator::assignGlobalVariables (TSymbolList &blockSymbols) {
     std::size_t globalSize = blockSymbols.getLocalSize (), firstSymbolOffset,
-                startAddress = 65536 - globalSize;	// TODO: check memory full!!!!
+                startAddress = 65536 - 2 * displaySize - globalSize;	// TODO: check memory full!!!!
     bool firstSymbol = true;
     for (TSymbol *s: blockSymbols)
         if ((s->checkSymbolFlag (TSymbol::Variable) || s->checkSymbolFlag (TSymbol::StaticVariable)) && (!s->checkSymbolFlag (TSymbol::Absolute) ||s->checkSymbolFlag (TSymbol::Alias))) {
