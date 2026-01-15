@@ -137,15 +137,15 @@ private:
     T9900Reg fetchReg (T9900Reg);
     T9900Reg getSaveReg (T9900Reg);
     
-    void clearRegsUsed ();
-    void setRegUsed (T9900Reg);
-    bool isRegUsed (T9900Reg) const;
+//    void clearRegsUsed ();
+//    void setRegUsed (T9900Reg);
+//    bool isRegUsed (T9900Reg) const;
     
     bool codeRangeCheck, createCompilerListing;
     std::size_t currentLevel;
     
     std::size_t intStackCount;
-    std::array<bool, static_cast<std::size_t> (T9900Reg::nrRegs)> regsUsed;
+//    std::array<bool, static_cast<std::size_t> (T9900Reg::nrRegs)> regsUsed;
     
     std::size_t dblConstCount;
     std::vector<TConstantDefinition> constantDefinitions;

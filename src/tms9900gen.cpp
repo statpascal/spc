@@ -1648,6 +1648,7 @@ T9900Reg T9900Generator::getSaveReg (T9900Reg reg) {
     return intStackReg [intStackCount];
 }
 
+/*
 void T9900Generator::clearRegsUsed () {
     std::fill (regsUsed.begin (), regsUsed.end (), false);
 }
@@ -1659,6 +1660,7 @@ void T9900Generator::setRegUsed (T9900Reg r) {
 bool T9900Generator::isRegUsed (const T9900Reg r) const {
     return regsUsed [static_cast<std::size_t> (r)];
 }
+*/
 
 void T9900Generator::generateCode (TVariable &variable) {
     const T9900Reg reg = getSaveReg (intScratchReg1);
@@ -2360,7 +2362,7 @@ void T9900Generator::generateBlock (TBlock &block) {
 //    std::cout << "Entering: " << block.getSymbol ()->getName () << ", level: " << blockSymbols.getLevel () << std::endl;
 
     assignStackOffsets (block);
-    clearRegsUsed ();
+//    clearRegsUsed ();	// for leaf func optimization
     
     codeBlock (block, true, isFar, currentLevel == 1 ? mainProgram.codeSequence : subPrograms.back ().codeSequence);
 
