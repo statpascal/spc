@@ -142,6 +142,8 @@ procedure mark (var p: pointer);
 procedure release (p: pointer);
 procedure initHeap (first, size: integer);
 
+procedure halt;
+
 function hexstr (n: integer): string4;
 function hexstr2 (n: uint8): string2;
 
@@ -223,6 +225,10 @@ procedure initHeap (first, size: integer);
         heapPtr := first;
         heapMax := first + size
     end;        
+    
+procedure halt; assembler;
+        blwp @0
+end;
 
 // 
 
