@@ -1489,7 +1489,10 @@ void T9900Generator::generateCode (TRoutineValue &routineValue) {
 
 void T9900Generator::codeSymbol (const TSymbol *s, const T9900Reg reg) {
     if (s->getLevel () == 1)	// global
-        outputCode (T9900Op::li, reg, s->getOffset (), s->getName ());
+        if (s->checkSymbolFlag (TSymbol::Absolute) && s->getAlias ())
+            outputCode (T9900Op::li, reg, s->getAlias ()->getName (), s->getName ());
+        else
+            outputCode (T9900Op::li, reg, s->getOffset (), s->getName ());
     else if (s->getLevel () == currentLevel) {
         outputCode (T9900Op::mov, T9900Reg::r9, reg), 
         outputCode (T9900Op::ai, reg, s->getOffset (), s->getName ());

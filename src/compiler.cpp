@@ -666,7 +666,10 @@ void TBlock::parseVarParameterDeclaration (TSymbolList &symbolList, bool createR
         for (const std::string &s: identifiers) {
             TSymbolList::TAddSymbolResult result;
             if (aliasSymbol)
-                result = symbolList.addAlias (s, type, aliasSymbol);
+                if (aliasSymbol->checkSymbolFlag (TSymbol::Routine))
+                    result = symbolList.addAbsoluteProc (s, type, aliasSymbol);
+                else
+                    result = symbolList.addAlias (s, type, aliasSymbol);
             else if (absoluteAddress)
                 result = symbolList.addAbsolute (s, type, absoluteAddress->getInteger ());
             else if (isParameter)

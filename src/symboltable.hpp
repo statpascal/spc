@@ -117,6 +117,7 @@ public:
     TAddSymbolResult addConstant (const std::string &name, const TSimpleConstant *);
     TAddSymbolResult addAlias (const std::string &name, TType *type, TSymbol *alias);
     TAddSymbolResult addAbsolute (const std::string &name, TType *type, std::int64_t addr);
+    TAddSymbolResult addAbsoluteProc (const std::string &name, TType *type, TSymbol *procAlias);
     TAddSymbolResult addLabel (const std::string &name);
     TAddSymbolResult addNamedType (const std::string &name, TType *type);
     

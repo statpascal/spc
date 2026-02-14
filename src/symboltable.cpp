@@ -78,6 +78,13 @@ TSymbolList::TAddSymbolResult TSymbolList::addAbsolute (const std::string &name,
     } return result;
 }
 
+TSymbolList::TAddSymbolResult TSymbolList::addAbsoluteProc (const std::string &name, TType *type, TSymbol *procAlias) {
+    TAddSymbolResult result = addSymbol (name, type, TSymbol::Absolute, procAlias); 
+    if (!result.alreadyPresent)
+        result.symbol->setLevel (1);
+    return result;
+}
+
 TSymbolList::TAddSymbolResult TSymbolList::addLabel (const std::string &name) {
     return addSymbol (name, nullptr, TSymbol::Label, nullptr);
 }
