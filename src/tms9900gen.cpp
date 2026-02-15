@@ -357,7 +357,7 @@ void T9900Generator::optimizePeepHole (TCodeSequence &code) {
         }
         
         // li reg1, imm
-        // add reg1, reg2
+        // a reg1, reg2
         // ->
         // ai reg2, imm
         else if (op1 == T9900Op::li && op2 == T9900Op::a && isSameCalcStackReg (op_1_1, op_2_1) && op_2_2.t == T9900Operand::TAddressingMode::Reg) {
@@ -612,7 +612,7 @@ void T9900Generator::optimizePeepHole (TCodeSequence &code) {
         // ai reg, imm2
         // ->
         // li reg, imm1 + imm2
-        else if (op1 == T9900Op::li && op2 == T9900Op::ai && isSameReg (op_1_1, op_2_1)) {
+        else if (op1 == T9900Op::li && op2 == T9900Op::ai && isSameReg (op_1_1, op_2_1) && !op_1_2.isLabel () && !op_2_2.isLabel ()) {
             op2 = op1;
             op_2_2.val += op_1_2.val;
             comm_2 = comm_1 + " " + comm_2;
