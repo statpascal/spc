@@ -1294,7 +1294,7 @@ void T9900Generator::codeInlinedFunction (TFunctionCall &functionCall) {
         saveReg (val);
         outputLabel (ll);
     }  
-    if (s == "__uint64_or" || s == "__uint64_and" || s == "__uint64_and_not" || s == "__uint64_not") {
+    if (s == "__uint64_or" || s == "__uint64_xor" || s == "__uint64_and" || s == "__uint64_and_not" || s == "__uint64_not") {
         bool isNot = s == "__uint64_not";
         visit (functionCall.getReturnStorage ());    
         visit (args [0]);
@@ -1311,6 +1311,8 @@ void T9900Generator::codeInlinedFunction (TFunctionCall &functionCall) {
             outputCode (T9900Op::mov, T9900Operand (left, mode), intScratchReg4);
             if (s == "__uint64_or")
                 outputCode (T9900Op::soc, T9900Operand (right, mode), intScratchReg4);
+            else if (s == "__uint64_xor")
+                outputCode (T9900Op::xor_, T9900Operand (right, mode), intScratchReg4);
             else if (s == "__uint64_and") {
                 outputCode (T9900Op::mov, T9900Operand (right, mode), intScratchReg5);
                 outputCode (T9900Op::inv, intScratchReg5);
@@ -1323,6 +1325,15 @@ void T9900Generator::codeInlinedFunction (TFunctionCall &functionCall) {
         }
         if (!functionCall.isIgnoreReturn ())
             visit (functionCall.getReturnStorage ());    
+    }
+    if (s == "__uint64_equal") {
+        visit (args [0]);
+        visit (args [1]);
+        const T9900Reg right = fetchReg (intScratchReg2),
+                       left = fetchReg (intScratchReg3);
+        outputComment ("__uint64_equal");
+        outputCode (T9900Op::li, left, 1);
+        saveReg (left);
     }
 }
 

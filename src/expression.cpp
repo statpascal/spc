@@ -485,7 +485,7 @@ TType *TExpressionBase::checkOperatorTypes (TExpressionBase *&left, TExpressionB
         return nullptr;
         
 #ifdef CREATE_9900        
-    if (ltype == &stdType.Uint64 && rtype == &stdType.Uint64 && (operation == TToken::Or || operation == TToken::And))
+    if (ltype == &stdType.Uint64 && rtype == &stdType.Uint64 && (operation == TToken::Or || operation == TToken::And || operation == TToken::Xor))
         return &stdType.Uint64;
 #endif        
 
@@ -639,6 +639,14 @@ TExpressionBase *TExpression::parse (TBlock &block) {
         {TToken::LessThan,	"__vec_less"},
         {TToken::GreaterThan,	"__vec_greater"}
     };
+    static const std::map<TToken, std::string> uint64RuntimeFunc = {
+        {TToken::Equal, 	"__uint64_equal"},
+        {TToken::NotEqual,	"__uint64_not_equal"},
+        {TToken::LessEqual,	"__uint64_less_equal"},
+        {TToken::GreaterEqual,	"__uint64_greater_equal"},
+        {TToken::LessThan,	"__uint64_less"},
+        {TToken::GreaterThan,	"__uint64_greater"}
+    };
     
     TCompilerImpl &compiler = block.getCompiler ();
     TExpressionBase *left = TSimpleExpression::parse (block);
@@ -663,6 +671,10 @@ TExpressionBase *TExpression::parse (TBlock &block) {
                     left = createRuntimeCall (setRuntimeFunc.at (operation), type, {left, right}, block, false);
                 } else if (left->getType () == &stdType.String)
                     left = createRuntimeCall (strRuntimeFunc.at (operation), type, {left, right}, block, true);
+#ifdef CREATE_9900                    
+                else if (left->getType () == &stdType.Uint64)
+                    left = createRuntimeCall (uint64RuntimeFunc.at (operation), type, {left, right}, block, true);
+#endif                    
                 else if (left->getType ()->isShortString ())
                     left = createRuntimeCall (shortStrRuntimeFunc.at (operation), type, {left, right}, block, true);
                 else if (left->getType ()->isVector ()) {
@@ -757,13 +769,16 @@ TExpressionBase *TSimpleExpression::parse (TBlock &block) {
                     left = createRuntimeCall ("__str_concat", type, {left, right}, block, false);
                 else if (type->isShortString ())
                     left = createRuntimeCall ("__short_str_concat", nullptr, {left, right}, block, false);
-                else if (!mergeConstants (left, right, type, operation, block))
+                else if (!mergeConstants (left, right, type, operation, block)) {
 #ifdef CREATE_9900
                     if (type == &stdType.Uint64 && operation == TToken::Or)
                         left = createRuntimeCall ("__uint64_or", &stdType.Uint64, {left, right}, block, false);
+                    else if (type == &stdType.Uint64 && operation == TToken::Xor)
+                        left = createRuntimeCall ("__uint64_xor", &stdType.Uint64, {left, right}, block, false);
                     else
 #endif                
                         left = compiler.createMemoryPoolObject<TSimpleExpression> (left, right, operation, type);
+                }
             }
     }
     return left;

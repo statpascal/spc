@@ -174,9 +174,12 @@ function __set_sub_not_equal (var s, t: __set_array): boolean;
 function __set_super_not_equal (var s, t: __set_array): boolean;
 
 function __uint64_or (var a, b: uint64): uint64; intrinsic;
+function __uint64_xor (var a, b: uint64): uint64; intrinsic;
 function __uint64_and (var a, b: uint64): uint64; intrinsic;
 function __uint64_and_not (var a, b: uint64): uint64; intrinsic;
 function __uint64_not (var a: uint64): uint64; intrinsic;
+
+function __uint64_equal (var a, b: uint64): boolean; intrinsic;
 
 implementation
 
