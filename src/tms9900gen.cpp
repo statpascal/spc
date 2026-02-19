@@ -1236,103 +1236,187 @@ void T9900Generator::generateCode (TTerm &term) {
 }
 
 void T9900Generator::codeInlinedFunction (TFunctionCall &functionCall) {
+    enum class TIntrinsic { Abs, Min, Max, Sqr, InSet, Or, Xor, And, AndNot, Not, 
+        Equal, NotEqual, LessEqual, GreaterEqual, Less, Greater };
+    static const std::map<std::string, TIntrinsic> intrinsics = {
+        {"__abs", TIntrinsic::Abs},
+        {"__min", TIntrinsic::Min},
+        {"__max", TIntrinsic::Max},
+        {"__sqr", TIntrinsic::Sqr},
+        {"__in_set", TIntrinsic::InSet},
+        {"__uint64_or", TIntrinsic::Or},
+        {"__uint64_xor", TIntrinsic::Xor},
+        {"__uint64_and", TIntrinsic::And},
+        {"__uint64_and_not", TIntrinsic::AndNot},
+        {"__uint64_not", TIntrinsic::Not},
+        {"__uint64_equal", TIntrinsic::Equal},
+        {"__uint64_not_equal", TIntrinsic::NotEqual},
+        {"__uint64_less_equal", TIntrinsic::LessEqual},
+        {"__uint64_greater_equal", TIntrinsic::GreaterEqual},
+        {"__uint64_less", TIntrinsic::Less},
+        {"__uint64_greater", TIntrinsic::Greater}
+    };
 
     TExpressionBase *function = functionCall.getFunction ();
     const std::vector<TExpressionBase *> &args = functionCall.getArguments ();
     const std::string s = static_cast<TRoutineValue *> (function)->getSymbol ()->getExtSymbolName ();
     
-    if (s == "__abs") {
-        visit (args [0]);
-        const T9900Reg reg = fetchReg (intScratchReg1);
-        outputCode (T9900Op::abs, reg);
-        saveReg (reg);
+    std::map<std::string, TIntrinsic>::const_iterator it = intrinsics.find (s);
+    if (it == intrinsics.end ()) {
+        std::cout << "Fatal error: intrinsic " << s << " not found" << std::endl;
+        exit (1);
     }
-    if (s == "__min" || s == "__max") {
-        visit (args [0]);
-        visit (args [1]);
-        const T9900Reg right = fetchReg (intScratchReg2),
-                       left = fetchReg (intScratchReg3);
-        outputComment ("no.opt");
-        outputCode (T9900Op::c, left, right);
-        const std::string ll = getNextLocalLabel ();
-        outputCode (s == "__min" ? T9900Op::jlt : T9900Op::jgt, ll);
-        outputCode (T9900Op::mov, right, left);
-        saveReg (left);
-        outputLabel (ll);
-    }
-    if (s == "__sqr") {
-        visit (args [0]);
-        const T9900Reg reg = fetchReg (intScratchReg2);
-        outputCode (T9900Op::mpy, reg, reg);
-        outputCode (T9900Op::mov, static_cast<T9900Reg> (static_cast<unsigned> (reg) + 1), reg);
-        saveReg (reg);
-    }
-    if (s == "__in_set") {
-        visit (args [0]);
-        T9900Reg val = fetchReg (intScratchReg3);
-        outputCode (T9900Op::li, intScratchReg4, 1);
-        outputCode (T9900Op::mov, val, intScratchReg1);
-        outputCode (T9900Op::andi, intScratchReg1, 15);
-        std::string ll = getNextLocalLabel ();
-        outputCode (T9900Op::jeq, ll);
-        outputCode (T9900Op::sla, intScratchReg4, 0);
-        outputLabel (ll);
-        outputCode (T9900Op::sra, val, 3);
-        saveReg (val);
+    const TIntrinsic intrinsic = it->second;
+    
+    switch (intrinsic) {
+        case TIntrinsic::Abs: {
+            visit (args [0]);
+            const T9900Reg reg = fetchReg (intScratchReg1);
+            outputCode (T9900Op::abs, reg);
+            saveReg (reg); }
+            break;
+        case TIntrinsic::Min:
+        case TIntrinsic::Max: {
+            visit (args [0]);
+            visit (args [1]);
+            const T9900Reg right = fetchReg (intScratchReg2),
+                           left = fetchReg (intScratchReg3);
+            outputComment ("no.opt");
+            outputCode (T9900Op::c, left, right);
+            const std::string ll = getNextLocalLabel ();
+            outputCode (intrinsic == TIntrinsic::Min ? T9900Op::jlt : T9900Op::jgt, ll);
+            outputCode (T9900Op::mov, right, left);
+            saveReg (left);
+            outputLabel (ll); }
+            break;
+        case TIntrinsic::Sqr: {
+            visit (args [0]);
+            const T9900Reg reg = fetchReg (intScratchReg2);
+            outputCode (T9900Op::mpy, reg, reg);
+            outputCode (T9900Op::mov, static_cast<T9900Reg> (static_cast<unsigned> (reg) + 1), reg);
+            saveReg (reg); }
+            break;
+        case TIntrinsic::InSet: {
+            visit (args [0]);
+            T9900Reg val = fetchReg (intScratchReg3);
+            outputCode (T9900Op::li, intScratchReg4, 1);
+            outputCode (T9900Op::mov, val, intScratchReg1);
+            outputCode (T9900Op::andi, intScratchReg1, 15);
+            std::string ll = getNextLocalLabel ();
+            outputCode (T9900Op::jeq, ll);
+            outputCode (T9900Op::sla, intScratchReg4, 0);
+            outputLabel (ll);
+            outputCode (T9900Op::sra, val, 3);
+            saveReg (val);
         
-        visit (args [1]);
-        const T9900Reg set = fetchReg (intScratchReg2);
-        val = fetchReg (intScratchReg3);
+            visit (args [1]);
+            const T9900Reg set = fetchReg (intScratchReg2);
+            val = fetchReg (intScratchReg3);
 
-        outputCode (T9900Op::a, val, set);
-        outputCode (T9900Op::mov, T9900Operand (set, T9900Operand::TAddressingMode::RegInd), set);
-        outputCode (T9900Op::clr, val);
-        outputCode (T9900Op::coc, intScratchReg4, set);
-        ll = getNextLocalLabel ();
-        outputCode (T9900Op::jne, ll);
-        outputCode (T9900Op::inc, val);
-        saveReg (val);
-        outputLabel (ll);
+            outputCode (T9900Op::a, val, set);
+            outputCode (T9900Op::mov, T9900Operand (set, T9900Operand::TAddressingMode::RegInd), set);
+            outputCode (T9900Op::clr, val);
+            outputCode (T9900Op::coc, intScratchReg4, set);
+            ll = getNextLocalLabel ();
+            outputCode (T9900Op::jne, ll);
+            outputCode (T9900Op::inc, val);
+            saveReg (val);
+            outputLabel (ll); }
+            break;
+        default: break;
     }  
-    if (s == "__uint64_or" || s == "__uint64_xor" || s == "__uint64_and" || s == "__uint64_and_not" || s == "__uint64_not") {
-        bool isNot = s == "__uint64_not";
+    
+    if (intrinsic >= TIntrinsic::Or && intrinsic <= TIntrinsic::Not) {
         visit (functionCall.getReturnStorage ());    
         visit (args [0]);
-        if (!isNot)
-            visit (args [1]);
         T9900Reg right;
-            if (!isNot)
-                right = fetchReg (intScratchReg1);
+        if (intrinsic != TIntrinsic::Not) {
+            visit (args [1]);
+            right = fetchReg (intScratchReg1);
+        }
         T9900Reg
             left = fetchReg (intScratchReg2),
             dest = fetchReg (intScratchReg3);
         for (int i = 0; i < 4; ++i) {
             T9900Operand::TAddressingMode mode = (i == 3) ? T9900Operand::TAddressingMode::RegInd : T9900Operand::TAddressingMode::RegIndInc;
             outputCode (T9900Op::mov, T9900Operand (left, mode), intScratchReg4);
-            if (s == "__uint64_or")
-                outputCode (T9900Op::soc, T9900Operand (right, mode), intScratchReg4);
-            else if (s == "__uint64_xor")
-                outputCode (T9900Op::xor_, T9900Operand (right, mode), intScratchReg4);
-            else if (s == "__uint64_and") {
-                outputCode (T9900Op::mov, T9900Operand (right, mode), intScratchReg5);
-                outputCode (T9900Op::inv, intScratchReg5);
-                outputCode (T9900Op::szc, intScratchReg5, intScratchReg4);
-            } else if (s == "__uint64_and_not") {
-                outputCode (T9900Op::szc, T9900Operand (right, mode), intScratchReg4);
-            } else if (isNot)
-                outputCode (T9900Op::inv, intScratchReg4);
+            switch (intrinsic) {
+                case TIntrinsic::Or:
+                    outputCode (T9900Op::soc, T9900Operand (right, mode), intScratchReg4);
+                    break;
+                case TIntrinsic::Xor:
+                    outputCode (T9900Op::xor_, T9900Operand (right, mode), intScratchReg4);
+                    break;
+                case TIntrinsic::And:
+                    outputCode (T9900Op::mov, T9900Operand (right, mode), intScratchReg5);
+                    outputCode (T9900Op::inv, intScratchReg5);
+                    outputCode (T9900Op::szc, intScratchReg5, intScratchReg4);
+                    break;
+                case TIntrinsic::AndNot:
+                    outputCode (T9900Op::szc, T9900Operand (right, mode), intScratchReg4);
+                    break;
+                case TIntrinsic::Not:
+                    outputCode (T9900Op::inv, intScratchReg4);
+                    break;
+                default:
+                    break;
+            }
             outputCode (T9900Op::mov, intScratchReg4, T9900Operand (dest, mode));
         }
         if (!functionCall.isIgnoreReturn ())
             visit (functionCall.getReturnStorage ());    
     }
-    if (s == "__uint64_equal") {
+    
+    if (intrinsic >= TIntrinsic::Equal && intrinsic <= TIntrinsic::Greater) {
+        const std::string l0 = getNextLocalLabel (), l1 = getNextLocalLabel ();
         visit (args [0]);
         visit (args [1]);
         const T9900Reg right = fetchReg (intScratchReg2),
                        left = fetchReg (intScratchReg3);
-        outputComment ("__uint64_equal");
-        outputCode (T9900Op::li, left, 1);
+        outputCode (T9900Op::clr, intScratchReg1);
+        for (int i = 0; i < 4; ++i) {
+            bool lastWord = (i == 3);
+            T9900Operand::TAddressingMode mode = lastWord ? T9900Operand::TAddressingMode::RegInd : T9900Operand::TAddressingMode::RegIndInc;
+            outputCode (T9900Op::c, T9900Operand (left, mode), T9900Operand (right, mode));
+            switch (intrinsic) {
+                case TIntrinsic::Equal:
+                    outputCode (T9900Op::jne, l0);
+                    break;
+                case TIntrinsic::NotEqual:
+                    outputCode (T9900Op::jeq, l0);
+                    break;
+                case TIntrinsic::LessEqual:
+                    outputCode (T9900Op::jh, l0);
+                    if (!lastWord)
+                        outputCode (T9900Op::jl, l1);
+                    break;
+                case TIntrinsic::GreaterEqual:
+                    outputCode (T9900Op::jl, l0);
+                    if (!lastWord)
+                        outputCode (T9900Op::jh, l1);
+                    break;
+                case TIntrinsic::Less:
+                    if (lastWord)
+                        outputCode (T9900Op::jhe, l0);
+                    else
+                        outputCode (T9900Op::jh, l0);
+                    outputCode (T9900Op::jl, l1);
+                    break;
+                case TIntrinsic::Greater:
+                    if (lastWord)
+                        outputCode (T9900Op::jle, l0);
+                    else
+                        outputCode (T9900Op::jl, l0);
+                    outputCode (T9900Op::jh, l1);
+                    break;
+                default:
+                    break;
+            }
+        }
+        outputLabel (l1);
+        outputCode (T9900Op::inc, intScratchReg1);
+        outputLabel (l0);
+        outputCode (T9900Op::mov, intScratchReg1, left);
         saveReg (left);
     }
 }

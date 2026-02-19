@@ -180,6 +180,11 @@ function __uint64_and_not (var a, b: uint64): uint64; intrinsic;
 function __uint64_not (var a: uint64): uint64; intrinsic;
 
 function __uint64_equal (var a, b: uint64): boolean; intrinsic;
+function __uint64_not_equal (var a, b: uint64): boolean; intrinsic;
+function __uint64_less_equal (var a, b: uint64): boolean; intrinsic;
+function __uint64_greater_equal (var a, b: uint64): boolean; intrinsic;
+function __uint64_less (var a, b: uint64): boolean; intrinsic;
+function __uint64_greater (var a, b: uint64): boolean; intrinsic;
 
 implementation
 
