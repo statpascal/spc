@@ -28,7 +28,7 @@ TBlock::TBlock (TCompilerImpl &compiler, TSymbolList *symbols, TSymbol *ownSymbo
 
 const TSimpleConstant *TBlock::parseConstantLiteral () {
     const TSimpleConstant *result = nullptr;
-    switch (lexer.getToken ()) {
+    switch (compiler.getToken ()) {
         case TToken::IntegerConst:
             result = compiler.createMemoryPoolObject<TSimpleConstant> (lexer.getInteger (), &stdType.Int64);
             break;
@@ -50,20 +50,20 @@ const TSimpleConstant *TBlock::parseConstantLiteral () {
             result = compiler.createMemoryPoolObject<TSimpleConstant> (static_cast<std::int64_t> (1), &stdType.Int64);
             compiler.errorMessage (TCompilerImpl::SyntaxError, "Constant literal expected");
     }
-    lexer.getNextToken ();
+    compiler.getNextToken ();
     return result;
 }
 
 const TSimpleConstant *TBlock::parseSetConstant () {
     TEnumeratedType *baseType = nullptr;
     TSimpleConstant *result = compiler.createMemoryPoolObject<TSimpleConstant> ();
-    lexer.getNextToken ();
+    compiler.getNextToken ();
     bool firstExpression = true;
     
-    if (!lexer.checkToken (TToken::SquareBracketClose)) {
+    if (!compiler.checkToken (TToken::SquareBracketClose)) {
         do {
             const TSimpleConstant *c1 = parseConstExpression (), *c2 = nullptr;
-            if (lexer.checkToken (TToken::Points))
+            if (compiler.checkToken (TToken::Points))
                 c2 = parseConstExpression ();
                 
             if (firstExpression) {
@@ -86,7 +86,7 @@ const TSimpleConstant *TBlock::parseSetConstant () {
                 else
                     result->addSetValue (c1->getInteger ());
             }
-        } while (lexer.checkToken (TToken::Comma));
+        } while (compiler.checkToken (TToken::Comma));
         compiler.checkToken (TToken::SquareBracketClose, "']' expected to end set constructor");          
     }
     result->setType (compiler.createMemoryPoolObject<TSetType> (baseType));
@@ -94,13 +94,13 @@ const TSimpleConstant *TBlock::parseSetConstant () {
 }
 
 const TSimpleConstant *TBlock::parseConstantSizeof () {
-    lexer.getNextToken ();
+    compiler.getNextToken ();
     compiler.checkToken (TToken::BracketOpen, "'(' expected in sizeof");
     const TType *type = nullptr;
-    if (lexer.getToken () == TToken::Identifier) 
+    if (compiler.getToken () == TToken::Identifier) 
         if (TSymbol *symbol = symbols->searchSymbol (lexer.getIdentifier (), TSymbol::NamedType)) {
             type = symbol->getType ();
-            lexer.getNextToken ();
+            compiler.getNextToken ();
         }
     if (!type) 
         if (const TExpressionBase *expr = TExpression::parse (*this))
@@ -112,9 +112,9 @@ const TSimpleConstant *TBlock::parseConstantSizeof () {
 
 const TSimpleConstant *TBlock::parseConstFactor () {
     const TSimpleConstant *result = nullptr;
-    if (lexer.getToken () == TToken::Identifier) {
+    if (compiler.getToken () == TToken::Identifier) {
         const std::string identifier = lexer.getIdentifier ();
-        lexer.getNextToken ();
+        compiler.getNextToken ();
         if (TSymbol *symbol = symbols->searchSymbol (identifier)) {
             if (symbol->checkSymbolFlag (TSymbol::Constant))
                 result = dynamic_cast<const TSimpleConstant *> (symbol->getConstant ());
@@ -124,8 +124,8 @@ const TSimpleConstant *TBlock::parseConstFactor () {
                 compiler.errorMessage (TCompilerImpl::ConstExpected, "'" + identifier + "' cannot be used as a constant");
         } else
             compiler.errorMessage (TCompilerImpl::IdentifierNotFound, "'" + identifier + "' is not declared");
-    } else if (lexer.getToken () == TToken::BracketOpen) {
-        lexer.getNextToken ();
+    } else if (compiler.getToken () == TToken::BracketOpen) {
+        compiler.getNextToken ();
         result = parseConstExpression ();
         compiler.checkToken (TToken::BracketClose, "')' expected in constant expression");
     } else 
@@ -135,9 +135,9 @@ const TSimpleConstant *TBlock::parseConstFactor () {
 
 const TSimpleConstant *TBlock::parseConstTerm () {
     const TSimpleConstant *result = parseConstFactor ();
-    TToken token = lexer.getToken ();
+    TToken token = compiler.getToken ();
     while (token == TToken::Mul || token == TToken::Div || token == TToken::DivInt) {
-        lexer.getNextToken ();
+        compiler.getNextToken ();
         const TSimpleConstant *c = parseConstFactor ();
         if (result->getType () == &stdType.Int64 && c->getType () == &stdType.Int64)
             if (token == TToken::Mul)
@@ -157,13 +157,13 @@ const TSimpleConstant *TBlock::parseConstTerm () {
                 result = compiler.createMemoryPoolObject<TSimpleConstant> (result->getDouble () / c->getDouble (), &stdType.Real);
         else 
             compiler.errorMessage (TCompilerImpl::IncompatibleTypes);
-        token = lexer.getToken ();
+        token = compiler.getToken ();
     }
     return result;
 }
 
 const TSimpleConstant *TBlock::parseConstExpression () {
-    bool isNegative = lexer.checkToken (TToken::Sub);
+    bool isNegative = compiler.checkToken (TToken::Sub);
     const TSimpleConstant *result = parseConstTerm ();
     if (isNegative) {
         if (result->getType () == &stdType.Int64)
@@ -175,9 +175,9 @@ const TSimpleConstant *TBlock::parseConstExpression () {
 //            result->setType (nullptr);
         }
     }
-    TToken token = lexer.getToken ();
+    TToken token = compiler.getToken ();
     while (token == TToken::Add || token == TToken::Sub) {
-        lexer.getNextToken ();
+        compiler.getNextToken ();
         const TSimpleConstant *c = parseConstTerm ();
         if (result->getType () == &stdType.Int64 && c->getType () == &stdType.Int64)
             if (token == TToken::Add)
@@ -198,7 +198,7 @@ const TSimpleConstant *TBlock::parseConstExpression () {
             else
                 compiler.errorMessage (TCompilerImpl::IncompatibleTypes, "Error in constant expression");
         }
-        token = lexer.getToken ();
+        token = compiler.getToken ();
     }
     return result;
 }
@@ -206,9 +206,9 @@ const TSimpleConstant *TBlock::parseConstExpression () {
 
 TSymbol *TBlock::checkVariable () {
     TSymbol *symbol = nullptr;
-    if (lexer.getToken () == TToken::Identifier) {
+    if (compiler.getToken () == TToken::Identifier) {
         const std::string identifier = lexer.getIdentifier ();
-        lexer.getNextToken ();
+        compiler.getNextToken ();
         symbol = symbols->searchSymbol (identifier);
         if (!symbol) 
             compiler.errorMessage (TCompilerImpl::IdentifierNotFound, "'" + identifier + "' is not declared");
@@ -281,17 +281,17 @@ void TBlock::parseDeclarationList (std::vector<std::string> &identifiers, TType 
     bool goon = true;
     identifiers.clear ();
     do {
-        if (lexer.getToken () == TToken::Identifier) {
+        if (compiler.getToken () == TToken::Identifier) {
             identifiers.push_back (lexer.getIdentifier ());
-            lexer.getNextToken ();
-            goon = lexer.checkToken (TToken::Comma);
+            compiler.getNextToken ();
+            goon = compiler.checkToken (TToken::Comma);
         } else {
             compiler.errorMessage (TCompilerImpl::IdentifierExpected);
             goon = false;
         }
     } while (goon);
     
-    if (allowGenericVar && lexer.getToken () != TToken::Colon)
+    if (allowGenericVar && compiler.getToken () != TToken::Colon)
         type = &stdType.GenericVar;
     else {
         compiler.checkToken (TToken::Colon, "':' expected in declaration");
@@ -300,7 +300,7 @@ void TBlock::parseDeclarationList (std::vector<std::string> &identifiers, TType 
 }
 
 void TBlock::parseExternalDeclaration (std::string &libName, std::string &symbolName) {
-    if (lexer.getToken () != TToken::Semicolon) {
+    if (compiler.getToken () != TToken::Semicolon) {
         if (!checkSymbolName (symbolName)) {
             const TSimpleConstant *lib = parseConstExpression ();
             if (lib->getType () == &stdType.String)
@@ -319,8 +319,8 @@ void TBlock::parseExternalDeclaration (std::string &libName, std::string &symbol
 }
     
 bool TBlock::checkSymbolName (std::string &symbolName) {
-    if (lexer.getToken () == TToken::Identifier && lexer.getIdentifier () == "name") {
-        lexer.getNextToken ();
+    if (compiler.getToken () == TToken::Identifier && lexer.getIdentifier () == "name") {
+        compiler.getNextToken ();
         const TSimpleConstant *name = parseConstExpression ();
         if (name->getType () != &stdType.String)
             compiler.errorMessage (TCompilerImpl::InvalidType, "External function name expected");
@@ -334,16 +334,16 @@ bool TBlock::checkSymbolName (std::string &symbolName) {
 // Parse types
 
 TType *TBlock::parseEnumerationType () {
-    lexer.getNextToken ();
+    compiler.getNextToken ();
     std::vector<std::string> values;
     do {
-        if (lexer.getToken () != TToken::Identifier)
+        if (compiler.getToken () != TToken::Identifier)
             compiler.errorMessage (TCompilerImpl::IdentifierExpected, "Identifier required in declaration of enumerated type");
         else {
             values.push_back (lexer.getIdentifier ());
-            lexer.getNextToken ();
+            compiler.getNextToken ();
         }
-    } while (lexer.checkToken (TToken::Comma));
+    } while (compiler.checkToken (TToken::Comma));
     compiler.checkToken (TToken::BracketClose, "Missing ')' at end of enumeration");
 
     if (!values.empty ()) {
@@ -358,7 +358,7 @@ TType *TBlock::parseEnumerationType () {
 }
 
 TType *TBlock::parseArrayType () {
-    lexer.getNextToken ();
+    compiler.getNextToken ();
     compiler.checkToken (TToken::SquareBracketOpen, "'[' required in array declaration");
         
     std::stack<TEnumeratedType *> indexTypes;
@@ -368,7 +368,7 @@ TType *TBlock::parseArrayType () {
             indexTypes.push (static_cast<TEnumeratedType *> (indexType));
         else
             compiler.errorMessage (TCompilerImpl::IncompatibleTypes, "Ordinal type required as array index");
-    } while (lexer.checkToken (TToken::Comma));
+    } while (compiler.checkToken (TToken::Comma));
     
     compiler.checkToken (TToken::SquareBracketClose, "']' required in array declaration");
     compiler.checkToken (TToken::Of, "'of' required in array declaration");
@@ -384,8 +384,8 @@ TType *TBlock::parseArrayType () {
 
 TType *TBlock::parseShortString () {
     std::size_t length = 255;
-    lexer.getNextToken ();
-    if (lexer.checkToken (TToken::SquareBracketOpen)) {
+    compiler.getNextToken ();
+    if (compiler.checkToken (TToken::SquareBracketOpen)) {
         const TSimpleConstant *size = parseConstExpression ();
         compiler.checkToken (TToken::SquareBracketClose, "']' required in shortstring declaration");
         if (size->getType () != &stdType.Int64)
@@ -405,25 +405,25 @@ void TBlock::parseRecordFieldList (TRecordType *recordType) {
     std::vector<std::string> identifiers;
     do {
         TType *type = nullptr;
-        if (lexer.getToken () != TToken::End && lexer.getToken () != TToken::Case) {
+        if (compiler.getToken () != TToken::End && compiler.getToken () != TToken::Case) {
             parseDeclarationList (identifiers, type, false);
             if (type)
                 for (const std::string &s: identifiers)
                     if (recordType->addComponent (s, type).alreadyPresent)
                         compiler.errorMessage (TCompilerImpl::IdentifierAlreadyDeclared, "Record component '" + s + "' already declared");
         }
-    } while (lexer.checkToken (TToken::Semicolon));
-    if (lexer.checkToken (TToken::Case))
+    } while (compiler.checkToken (TToken::Semicolon));
+    if (compiler.checkToken (TToken::Case))
         parseRecordVariantPart (recordType);
 }
 
 void TBlock::parseRecordVariantPart (TRecordType *recordType) {
     std::string identifier;
     TType *type = nullptr;
-    if (lexer.getToken () == TToken::Identifier) {
+    if (compiler.getToken () == TToken::Identifier) {
         identifier = lexer.getIdentifier ();
-        lexer.getNextToken ();
-        if (!lexer.checkToken (TToken::Colon)) {
+        compiler.getNextToken ();
+        if (!compiler.checkToken (TToken::Colon)) {
             TSymbol *s = symbols->searchSymbol (identifier, TSymbol::NamedType);
             if (!s) 
                 compiler.errorMessage (TCompilerImpl::InvalidType, "'" + identifier + "' is not a type");
@@ -445,12 +445,12 @@ void TBlock::parseRecordVariantPart (TRecordType *recordType) {
     }
     compiler.checkToken (TToken::Of, "'of' expected in variant declaration");
     do {
-        if (lexer.getToken () != TToken::End) {
+        if (compiler.getToken () != TToken::End) {
             do {
                 const TSimpleConstant *c = parseConstExpression ();
                 if (c && c->getType () != type)
                     compiler.errorMessage (TCompilerImpl::InvalidType, "Invalid type used in tag value");
-            } while (lexer.checkToken (TToken::Comma));
+            } while (compiler.checkToken (TToken::Comma));
             compiler.checkToken (TToken::Colon, "':' expected in variant declaration");
             compiler.checkToken (TToken::BracketOpen, "'(' expected in variant declaration");
             recordType->enterVariant (compiler.createMemoryPoolObject<TSymbolList> (nullptr, compiler.getMemoryPoolFactory ()));
@@ -458,14 +458,14 @@ void TBlock::parseRecordVariantPart (TRecordType *recordType) {
             recordType->leaveVariant ();
             compiler.checkToken (TToken::BracketClose, "')' expected in variant declaration");
         }
-    } while (lexer.checkToken (TToken::Semicolon));
+    } while (compiler.checkToken (TToken::Semicolon));
 }
 
 TType *TBlock::parseRecordType () {
-    lexer.getNextToken ();
+    compiler.getNextToken ();
     TRecordType *recordType = compiler.createMemoryPoolObject<TRecordType> (compiler.createMemoryPoolObject<TSymbolList> (nullptr, compiler.getMemoryPoolFactory ()));
     
-    if (lexer.getToken () != TToken::End)
+    if (compiler.getToken () != TToken::End)
         parseRecordFieldList (recordType);
     compiler.checkToken (TToken::End, "'end' required at end of record declaration");
     
@@ -473,7 +473,7 @@ TType *TBlock::parseRecordType () {
 }
 
 TType *TBlock::parseSetType () {
-    lexer.getNextToken ();
+    compiler.getNextToken ();
     compiler.checkToken (TToken::Of, "'of' expected in set declaration");
     TType *type = parseType ();
     if (type) {
@@ -491,8 +491,8 @@ TType *TBlock::parseSetType () {
 
 TType *TBlock::parseFileType () {
     TType *baseType = nullptr;
-    lexer.getNextToken ();
-    if (lexer.checkToken (TToken::Of))
+    compiler.getNextToken ();
+    if (compiler.checkToken (TToken::Of))
         baseType = parseType ();
     if (baseType && !baseType->isSerializable ())
         compiler.errorMessage (TCompilerImpl::InvalidType, "Invalid type used for file");
@@ -520,8 +520,8 @@ TType *TBlock::parseRoutineType (bool isFunction, bool farCall) {
             returnType = &stdType.Void;
     }
     
-    if (lexer.getToken () == TToken::Identifier && lexer.getIdentifier () == "near") {
-        lexer.getNextToken ();
+    if (compiler.getToken () == TToken::Identifier && lexer.getIdentifier () == "near") {
+        compiler.getNextToken ();
         farCall = false;
     }
     
@@ -529,23 +529,23 @@ TType *TBlock::parseRoutineType (bool isFunction, bool farCall) {
 }
 
 TType *TBlock::parseFunctionType () {
-    lexer.getNextToken ();
+    compiler.getNextToken ();
     TType *result = parseRoutineType (true, true);
     return result;
 }
 
 TType *TBlock::parseProcedureType () {
-    lexer.getNextToken ();
+    compiler.getNextToken ();
     return parseRoutineType (false, true);
 }
 
 TType *TBlock::parsePointerType () {
-    lexer.getNextToken ();
+    compiler.getNextToken ();
     TPointerType *result = nullptr;
-    if (parsingTypeDeclaration && lexer.getToken () == TToken::Identifier) {
+    if (parsingTypeDeclaration && compiler.getToken () == TToken::Identifier) {
         result = compiler.createMemoryPoolObject<TPointerType> (lexer.getIdentifier ());
         unresolvedPointerTypes.push_back (result);
-        lexer.getNextToken ();
+        compiler.getNextToken ();
     } else 
         if (TType *type = parseType ())
             result = compiler.createMemoryPoolObject<TPointerType> (type);
@@ -570,7 +570,7 @@ TType *TBlock::parseSubrangeType () {
 }
 
 TType *TBlock::parseVectorType () {
-    lexer.getNextToken ();
+    compiler.getNextToken ();
     compiler.checkToken (TToken::Of, "'of' expected in vector declaration");
     if (TType *type = parseType ())
         return compiler.createMemoryPoolObject<TVectorType> (type);
@@ -579,8 +579,8 @@ TType *TBlock::parseVectorType () {
 }
 
 TType *TBlock::parsePackedType () {
-    lexer.getNextToken ();
-    switch (lexer.getToken ()) {
+    compiler.getNextToken ();
+    switch (compiler.getToken ()) {
         case TToken::Array:
             return parseArrayType ();
         case TToken::Record:
@@ -596,7 +596,7 @@ TType *TBlock::parseTypeIdentifier () {
     if (symbols->searchSymbol (s, TSymbol::Constant))
         return parseSubrangeType ();
         
-    lexer.getNextToken ();
+    compiler.getNextToken ();
     if (TSymbol *symbol = symbols->searchSymbol (s, TSymbol::NamedType))
         return symbol->getType ();
         
@@ -625,7 +625,7 @@ TType *TBlock::parseType () {
       { TToken::Identifier,	&TBlock::parseTypeIdentifier }
     };
     
-    TDispatcherMap::const_iterator it = dispatcher.find (lexer.getToken ());
+    TDispatcherMap::const_iterator it = dispatcher.find (compiler.getToken ());
     if (it != dispatcher.end ()) {
         TType *type = (this->*(it->second)) ();
         if (type)
@@ -648,10 +648,10 @@ void TBlock::parseVarParameterDeclaration (TSymbolList &symbolList, bool createR
             
         TSymbol *aliasSymbol = nullptr;
         const TSimpleConstant *absoluteAddress = nullptr;
-        if (lexer.checkToken (TToken::Absolute)) {
+        if (compiler.checkToken (TToken::Absolute)) {
             if (isParameter)
                 compiler.errorMessage (TCompilerImpl::InvalidUseOfSymbol, "'absolute' cannot be used in parameter declaration");
-            else if (lexer.getToken () == TToken::Identifier)
+            else if (compiler.getToken () == TToken::Identifier)
                 aliasSymbol = checkVariable ();
             else {
                 absoluteAddress = parseConstExpression ();
@@ -683,11 +683,11 @@ void TBlock::parseVarParameterDeclaration (TSymbolList &symbolList, bool createR
 }
 
 void TBlock::parseParameterDeclaration (TSymbolList &symbolList) {
-    if (lexer.checkToken (TToken::BracketOpen)) {
+    if (compiler.checkToken (TToken::BracketOpen)) {
         do {
-            bool referenceParameter = lexer.checkToken (TToken::Var);
+            bool referenceParameter = compiler.checkToken (TToken::Var);
             parseVarParameterDeclaration (symbolList, referenceParameter, true);
-        } while (lexer.checkToken (TToken::Semicolon));
+        } while (compiler.checkToken (TToken::Semicolon));
         compiler.checkToken (TToken::BracketClose, "Parameter list must be closed with ')'");
     }
 }
@@ -696,23 +696,23 @@ void TBlock::parseLabelDeclaration () {
     if (!isUnitInterface) {
         std::string s;
         do {
-            if (lexer.getToken () == TToken::Identifier)
+            if (compiler.getToken () == TToken::Identifier)
                 s = lexer.getIdentifier ();
-            else if (lexer.getToken () == TToken::IntegerConst)
+            else if (compiler.getToken () == TToken::IntegerConst)
                 s = std::to_string (lexer.getInteger ());
             else
                 compiler.errorMessage (TCompilerImpl::IdentifierExpected, "Illegal label declaration: identifier or integer expected");
-            lexer.getNextToken ();
+            compiler.getNextToken ();
             if (symbols->addLabel (s).alreadyPresent)
                 compiler.errorMessage (TCompilerImpl::IdentifierAlreadyDeclared, "`" + s + "' is already declared in the current block");
-        } while (lexer.checkToken (TToken::Comma));
-        if (lexer.checkToken (TToken::Semicolon))
+        } while (compiler.checkToken (TToken::Comma));
+        if (compiler.checkToken (TToken::Semicolon))
             return;
         compiler.errorMessage (TCompilerImpl::SyntaxError, "Label declartion must be terminated with ';'");
     } else
         compiler.errorMessage (TCompilerImpl::InvalidUseOfSymbol, "Label declarations not allowed in interface section of unit");
     compiler.recoverPanicMode ({TToken::Semicolon, TToken::Var, TToken::Const, TToken::Type, TToken::Label, TToken::Procedure, TToken::Function, TToken::Begin, TToken::Terminator});
-    lexer.checkToken (TToken::Semicolon);
+    compiler.checkToken (TToken::Semicolon);
 }
 
 void TBlock::parseConst (const std::string &identifier) {
@@ -764,7 +764,7 @@ const TArrayConstant *TBlock::parseArrayConstant (TArrayType *type) {
     TArrayConstant *arrayConstant = compiler.createMemoryPoolObject<TArrayConstant> (type);
     do 
         arrayConstant->addValue (parseTypedConstant (baseType));
-    while (lexer.checkToken (TToken::Comma));
+    while (compiler.checkToken (TToken::Comma));
     compiler.checkToken (TToken::BracketClose, "Expected ')' at end of typed array constant");
     if (static_cast<std::int64_t> (arrayConstant->getValues ().size ()) != indexType->getMaxVal () - indexType->getMinVal () + 1)
         compiler.errorMessage (TCompilerImpl::InvalidNumberInitializers, "Number of array initializers does not match array size");
@@ -779,20 +779,20 @@ const TRecordConstant *TBlock::parseRecordConstant (TRecordType *type) {
     do {
         std::string component;
         const TSymbol *s = nullptr;
-        if (lexer.getToken () == TToken::Identifier) {
+        if (compiler.getToken () == TToken::Identifier) {
             component = lexer.getIdentifier ();
             s = recordMembers.searchSymbol (component);
             if (!s)
                 compiler.errorMessage (TCompilerImpl::ComponentNotFound, "'" + component + "' is not a record member");
         } else
             compiler.errorMessage (TCompilerImpl::SyntaxError, "Field name expected");
-        lexer.getNextToken ();
+        compiler.getNextToken ();
         compiler.checkToken (TToken::Colon, "':' expected in typed record constant");
         if (s)
             recordConstant->addValue (component, parseTypedConstant (s->getType ()));
         else
-            lexer.getNextToken ();
-    } while (lexer.checkToken (TToken::Semicolon));
+            compiler.getNextToken ();
+    } while (compiler.checkToken (TToken::Semicolon));
     compiler.checkToken (TToken::BracketClose, "Expected ')' at end of typed record constant");
     return recordConstant;
 }
@@ -818,51 +818,51 @@ void TBlock::parseTypedConst (const std::string &identifier) {
 
 void TBlock::parseConstDeclaration () {
     do {
-        if (lexer.getToken () != TToken::Identifier)
+        if (compiler.getToken () != TToken::Identifier)
             compiler.errorMessage (TCompilerImpl::IdentifierExpected, "Const declaration must start with an identifier");
         else {
             const std::string name = lexer.getIdentifier ();
-            lexer.getNextToken ();
-            if (lexer.checkToken (TToken::Equal))
+            compiler.getNextToken ();
+            if (compiler.checkToken (TToken::Equal))
                 parseConst (name);
-            else if (lexer.checkToken (TToken::Colon))
+            else if (compiler.checkToken (TToken::Colon))
                 parseTypedConst (name);
             else
                 compiler.errorMessage (TCompilerImpl::SyntaxError, "'=' or ':' required in const declaration");
         }
-        if (!lexer.checkToken (TToken::Semicolon)) {
+        if (!compiler.checkToken (TToken::Semicolon)) {
             compiler.errorMessage (TCompilerImpl::SyntaxError,  "Const declaration must be terminated with ';'");
             compiler.recoverPanicMode ({TToken::Semicolon, TToken::Var, TToken::Const, TToken::Type, TToken::Label, TToken::Procedure, TToken::Function, TToken::Begin});
-            lexer.checkToken (TToken::Semicolon);
+            compiler.checkToken (TToken::Semicolon);
         }
-    } while (lexer.getToken () == TToken::Identifier);
+    } while (compiler.getToken () == TToken::Identifier);
 }
 
 void TBlock::parseTypeDeclaration () {
     parsingTypeDeclaration = true;
     do {
         bool startRecovery = false;
-        if (lexer.getToken () != TToken::Identifier) 
+        if (compiler.getToken () != TToken::Identifier) 
             compiler.errorMessage (TCompilerImpl::IdentifierExpected, "Type declaration must start with an identifier");
         else {
             const std::string name = lexer.getIdentifier ();
-            lexer.getNextToken ();
+            compiler.getNextToken ();
             compiler.checkToken (TToken::Equal, "'=' required in type declaration");
             if (TType *type = parseType ())
                 if (symbols->addNamedType (name, type).alreadyPresent)
                     compiler.errorMessage (TCompilerImpl::IdentifierAlreadyDeclared, "`" + name + "' is already declared in the current block");
         }
-        if (!lexer.checkToken (TToken::Semicolon))
+        if (!compiler.checkToken (TToken::Semicolon))
             startRecovery = true;
         // eat cdecls - TODO: check if proc/func type
-        if (lexer.checkToken (TToken::CDecl) && !lexer.checkToken (TToken::Semicolon)) 
+        if (compiler.checkToken (TToken::CDecl) && !compiler.checkToken (TToken::Semicolon)) 
             startRecovery = true;
         if (startRecovery) {
             compiler.errorMessage (TCompilerImpl::SyntaxError,  "Type declaration must be terminated with ';'");
             compiler.recoverPanicMode ({TToken::Semicolon, TToken::Var, TToken::Const, TToken::Type, TToken::Label, TToken::Procedure, TToken::Function, TToken::Begin});
-            lexer.checkToken (TToken::Semicolon);
+            compiler.checkToken (TToken::Semicolon);
         }
-    } while (lexer.getToken () == TToken::Identifier);
+    } while (compiler.getToken () == TToken::Identifier);
     parsingTypeDeclaration = false;
 
     for (TPointerType *pointerType: unresolvedPointerTypes) {
@@ -884,17 +884,17 @@ void TBlock::parseTypeDeclaration () {
 void TBlock::parseVarDeclaration () {
     do {
         parseVarParameterDeclaration (*symbols, false, false);
-        if (!lexer.checkToken (TToken::Semicolon)) {
+        if (!compiler.checkToken (TToken::Semicolon)) {
             compiler.errorMessage (TCompilerImpl::SyntaxError, "Declaration must be terminated with ';'");
             compiler.recoverPanicMode ({TToken::Semicolon, TToken::Var, TToken::Const, TToken::Type, TToken::Label, TToken::Procedure, TToken::Function, TToken::Begin, TToken::Terminator});
-            lexer.checkToken (TToken::Semicolon);
+            compiler.checkToken (TToken::Semicolon);
         }
-    } while (lexer.getToken () == TToken::Identifier);
+    } while (compiler.getToken () == TToken::Identifier);
 }
 
 void TBlock::parseSubroutine (bool isFunction) {
     std::string identifier, symbolName, libName;
-    if (lexer.getToken () != TToken::Identifier) {
+    if (compiler.getToken () != TToken::Identifier) {
         compiler.errorMessage (TCompilerImpl::IdentifierExpected, "Name of subroutine is missing");
         identifier = "$Missing" + std::to_string (symbols->size ());
     } else {
@@ -902,29 +902,29 @@ void TBlock::parseSubroutine (bool isFunction) {
         symbolName = lexer.getString ();	// case sensitive name
     }
     
-    lexer.getNextToken ();
+    compiler.getNextToken ();
     TRoutineType *routineType = static_cast<TRoutineType *> (parseRoutineType (isFunction, symbols->getLevel () == 1));
     compiler.checkAndSynchronize (TToken::Semicolon, "';' expected at end of subroutine header");
     
     bool isForward = false, isExport = false, isExternal = false, isAssembler = false, isIntrinsic = false;
-    if (lexer.checkToken (TToken::CDecl))
+    if (compiler.checkToken (TToken::CDecl))
         compiler.checkToken (TToken::Semicolon, "';' expected after 'cdecl' declaration");
-    if (lexer.checkToken (TToken::Overload))
+    if (compiler.checkToken (TToken::Overload))
         compiler.checkToken (TToken::Semicolon, "';' expected after 'overload' declaration");
-    if (lexer.checkToken (TToken::Forward))
+    if (compiler.checkToken (TToken::Forward))
         isForward = true;
-    else if (lexer.checkToken (TToken::Export))
+    else if (compiler.checkToken (TToken::Export))
         isExport = true;
-    else if (lexer.checkToken (TToken::External)) {
+    else if (compiler.checkToken (TToken::External)) {
         isExternal = true;
         routineType->setFarCall (false);
         parseExternalDeclaration (libName, symbolName);
-    } else if (lexer.checkToken (TToken::Intrinsic)) {
+    } else if (compiler.checkToken (TToken::Intrinsic)) {
         isIntrinsic = true;
         parseExternalDeclaration (libName, symbolName);
         if (!libName.empty ())
             compiler.errorMessage (TCompilerImpl::IncompatibleTypes, "Cannot use library name with intrinsic declaration");
-    } else if (lexer.checkToken (TToken::Assembler))
+    } else if (compiler.checkToken (TToken::Assembler))
         isAssembler = true;
     if (isForward || isExport || isExternal || isAssembler || isIntrinsic)
         compiler.checkToken (TToken::Semicolon, "';' expected at end of subroutine header");
@@ -1021,17 +1021,17 @@ void TBlock::parseDeclarations (bool isInterface) {
     };
 
     isUnitInterface = isInterface;
-    TDispatcherMap::const_iterator it = dispatcher.find (lexer.getToken ());
+    TDispatcherMap::const_iterator it = dispatcher.find (compiler.getToken ());
     while (it != dispatcher.end ()) {
-        lexer.getNextToken ();
+        compiler.getNextToken ();
         (this->*(it->second)) ();
-        it = dispatcher.find (lexer.getToken ());
+        it = dispatcher.find (compiler.getToken ());
     }
 }
 
 void TBlock::parse () {
     parseDeclarations ();
-    if (lexer.getToken () != TToken::Begin)
+    if (compiler.getToken () != TToken::Begin)
         compiler.errorMessage (TCompilerImpl::SyntaxError, "'begin' expected");
     else {
         statements = TStatement::parse (*this);
@@ -1055,11 +1055,11 @@ TUnit::TUnit (TCompilerImpl &compiler, TSymbolList *predefinedSymbols):
 void TUnit::parseHeader () {
     TLexer &lexer = compiler.getLexer ();
     compiler.checkToken (TToken::Unit, "A unit must start with 'unit'");
-    if (lexer.getToken () != TToken::Identifier)
+    if (compiler.getToken () != TToken::Identifier)
         compiler.errorMessage (TCompilerImpl::SyntaxError, "Unit name expected");
     else
         unitname = lexer.getIdentifier ();
-    lexer.getNextToken ();
+    compiler.getNextToken ();
     
     compiler.checkToken (TToken::Semicolon, "';' expected");
     compiler.checkToken (TToken::Interface, "'interface' expected");
@@ -1081,13 +1081,12 @@ TStatement *TUnit::parseInitFinal (const std::string funcName, TBlock &declarati
     initSymbol->setBlock (compiler.createMemoryPoolObject<TBlock> (compiler, compiler.createMemoryPoolObject<TSymbolList> (allSymbols, compiler.getMemoryPoolFactory ()), initSymbol, &declarations));
     initSymbol->getBlock ()->parse ();
     programBlock.addUsedSymbol (initSymbol);
-    compiler.getLexer ().checkToken (TToken::Semicolon);
+    compiler.checkToken (TToken::Semicolon);
     return compiler.createMemoryPoolObject<TRoutineCall> (
         TExpressionBase::createRuntimeCall (funcName, &stdType.Void, {}, declarations, false));
 }
 
 void TUnit::parseImplementation (TBlock &programBlock) {    
-    TLexer &lexer = compiler.getLexer ();
     compiler.checkToken (TToken::Implementation, "'implementation' expected");
     
     TUsesDeclaration *privateUnits = compiler.createMemoryPoolObject<TUsesDeclaration> (compiler);
@@ -1096,14 +1095,14 @@ void TUnit::parseImplementation (TBlock &programBlock) {
     TBlock declarations (compiler, allSymbols, nullptr, nullptr);	// TODO: own symbol?
     declarations.parseDeclarations ();
     
-    bool initializationTokenPresent = lexer.checkToken (TToken::Initialization),
+    bool initializationTokenPresent = compiler.checkToken (TToken::Initialization),
          oldInitCodePresent = false;
     if (!initializationTokenPresent)
-        oldInitCodePresent = lexer.getToken () == TToken::Begin;
+        oldInitCodePresent = compiler.getToken () == TToken::Begin;
     if (initializationTokenPresent || oldInitCodePresent)
         initializationStatement = parseInitFinal ("$" + unitname + "_init", declarations, programBlock);
     if (!oldInitCodePresent) {
-        if (lexer.checkToken (TToken::Finalization))
+        if (compiler.checkToken (TToken::Finalization))
             finalizationStatement = parseInitFinal ("$" + unitname + "_final", declarations, programBlock);
         compiler.checkToken (TToken::End, "'end' expected");
     }
@@ -1146,20 +1145,20 @@ TUsesDeclaration::TUsesDeclaration (TCompilerImpl &compiler):
 
 void TUsesDeclaration::parse () {
     TLexer &lexer = compiler.getLexer ();
-    if (lexer.checkToken (TToken::Uses)) {
+    if (compiler.checkToken (TToken::Uses)) {
         do {
-            if (lexer.getToken () != TToken::Identifier)
+            if (compiler.getToken () != TToken::Identifier)
                 compiler.errorMessage (TCompilerImpl::SyntaxError, "Unit name expected");
             else
                 unitnames.push_back (lexer.getIdentifier ());
-            lexer.getNextToken ();
-        } while (lexer.checkToken (TToken::Comma));
+            compiler.getNextToken ();
+        } while (compiler.checkToken (TToken::Comma));
         
-        if (!lexer.checkToken (TToken::Semicolon)) {
+        if (!compiler.checkToken (TToken::Semicolon)) {
             compiler.errorMessage (TCompilerImpl::SyntaxError, "';' expected at end of 'uses' declaration");
             compiler.recoverPanicMode ({TToken::Semicolon, TToken::Const, TToken::Type, TToken::Label, TToken::Var, TToken::Function,
                                TToken::Procedure, TToken::Begin, TToken::Forward});
-            lexer.checkToken (TToken::Semicolon);
+            compiler.checkToken (TToken::Semicolon);
         }
     }
     for (const std::string &s: unitnames)
@@ -1210,17 +1209,17 @@ TProgram::TProgram (TCompilerImpl &compiler, TSymbolList *predefinedSymbols):
 void TProgram::parse () {
     TLexer &lexer = compiler.getLexer ();
     std::string programName;
-    if (lexer.checkToken (TToken::Program)) {
-        if (lexer.getToken () == TToken::Identifier) {
+    if (compiler.checkToken (TToken::Program)) {
+        if (compiler.getToken () == TToken::Identifier) {
             programName = lexer.getIdentifier ();
-            lexer.getNextToken ();
+            compiler.getNextToken ();
         } else
             compiler.errorMessage (TCompilerImpl::SyntaxError, "Program name expected");
         // ignore file list
-        if (lexer.checkToken (TToken::BracketOpen)) {
+        if (compiler.checkToken (TToken::BracketOpen)) {
             do 
                 compiler.checkToken (TToken::Identifier, "Identifier expected");
-            while (lexer.checkToken (TToken::Comma));
+            while (compiler.checkToken (TToken::Comma));
             compiler.checkToken (TToken::BracketClose, "')' expected");
         }
         compiler.checkToken (TToken::Semicolon, "';' expected");
@@ -1287,6 +1286,35 @@ void TCompilerImpl::setFilename (const std::string &fn) {
     getLexer ().setFilename (fn);
 }
 
+void TCompilerImpl::getNextToken () {
+    getLexer ().getNextToken ();
+}
+
+TToken TCompilerImpl::getToken () {
+    TToken token = getLexer ().getToken ();
+    while (token >= TToken::BankOn && token <= TToken::BankOff) {
+        switch (token) {
+            case TToken::BankOn:
+                puts ("BANK ON"); break;
+            case TToken::BankOff:
+                puts ("BANK OFF"); break;
+            default:
+                break;
+        }
+        getNextToken ();
+        token = getLexer ().getToken ();
+    }
+    return token;
+}
+
+bool TCompilerImpl::checkToken (TToken t) {
+    if (getToken () == t) {
+        getNextToken ();
+        return true;
+    } else
+        return false;
+}
+
 TCompiler::TCompileResult TCompilerImpl::compile () {
     errorFlag = false;
     
@@ -1305,24 +1333,24 @@ void TCompilerImpl::errorMessage (TCompilerImpl::TErrorType errorType, const std
 void TCompilerImpl::recoverPanicMode (const std::vector<TToken> &syncTokens) {
     bool found = false;
     do {
-        TToken token = getLexer ().getToken ();
+        TToken token = getToken ();
         found = token == TToken::Terminator || std::find (syncTokens.begin (), syncTokens.end (), token) != syncTokens.end ();
         if (!found)
-            getLexer ().getNextToken ();
+            getNextToken ();
     } while (!found);
 }
 
 void TCompilerImpl::checkToken (TToken t, const std::string &msg) {
-    if (!getLexer ().checkToken (t))
+    if (!checkToken (t))
         errorMessage (SyntaxError, msg);
 }
 
 void TCompilerImpl::checkAndSynchronize (TToken t, const std::string &msg) {
-    if (!getLexer ().checkToken (t)) {
+    if (!checkToken (t)) {
         errorMessage (TCompilerImpl::SyntaxError, msg);
         recoverPanicMode ({TToken::Semicolon, TToken::Const, TToken::Type, TToken::Label, TToken::Var, TToken::Function,
                           TToken::Procedure, TToken::Begin, TToken::Forward});
-        getLexer ().checkToken (t);
+        checkToken (t);
     }
 }
 

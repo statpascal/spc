@@ -517,7 +517,6 @@ void TPredefinedRoutine::acceptCodeGenerator (TCodeGenerator &codeGenerator) {
 
 TExpressionBase *TPredefinedRoutine::parse (const std::string &identifier, TBlock &block) {
     TCompilerImpl &compiler = block.getCompiler ();
-    TLexer &lexer = block.getLexer ();
     
     RoutineDescription::TRoutineMap::const_iterator it = RoutineDescription::routineMap.find (identifier);
     if (it == RoutineDescription::routineMap.end ()) {
@@ -529,20 +528,20 @@ TExpressionBase *TPredefinedRoutine::parse (const std::string &identifier, TBloc
     bool success = true;
     std::vector<TRuntimeRoutine::TFormatArguments> formatArguments;
     std::vector<TExpressionBase *> args;
-    if (lexer.checkToken (TToken::BracketOpen)) {
+    if (compiler.checkToken (TToken::BracketOpen)) {
         do {
             TExpressionBase *expression = TExpression::parse (block);
             if (expression && expression->getType ()) {
                 args.push_back (expression);
                 formatArguments.push_back ({expression, nullptr, nullptr});
-                if (lexer.checkToken (TToken::Colon))
+                if (compiler.checkToken (TToken::Colon))
                     formatArguments.back ().length = TExpression::parse (block);
-                if (lexer.checkToken (TToken::Colon))
+                if (compiler.checkToken (TToken::Colon))
                     formatArguments.back ().precision = TExpression::parse (block);
             } else
                 success = false;
-        } while (lexer.checkToken (TToken::Comma));
-        if (!lexer.checkToken (TToken::BracketClose))
+        } while (compiler.checkToken (TToken::Comma));
+        if (!compiler.checkToken (TToken::BracketClose))
             compiler.errorMessage (TCompilerImpl::SyntaxError, "Missing ')' in call to subroutine '" + identifier + "'");
     }
     if (!success)

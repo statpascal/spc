@@ -162,8 +162,10 @@ void TBaseGenerator::assignStackOffsets (ssize_t &pos, TSymbolList &symbolList, 
     std::stable_partition (symbolList.begin (), symbolList.end (), [] (TSymbol *s) { return !s->checkSymbolFlag (TSymbol::StaticVariable); });
     // move temps to begin of list
     std::stable_partition (symbolList.begin (), symbolList.end (), [] (TSymbol *s) { return s->getTempBlock (); });
-    
+
+#ifdef CREATE_9900    
     const ssize_t tempBeginPos = pos;
+#endif    
     ssize_t maxTempPos = pos;
     std::size_t lastTempBlock = 0;
     bool tempFound = false;

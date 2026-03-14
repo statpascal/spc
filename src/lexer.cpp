@@ -24,7 +24,7 @@ public:
     
     void getNextToken ();
     TToken getToken ();
-    bool checkToken (TToken) ;
+//    bool checkToken (TToken) ;
     
     double getDouble () const;
     std::int64_t getInteger () const;
@@ -197,7 +197,7 @@ void TLexer::TLexerImpl::setFilename (const std::string &fn) {
 
 void TLexer::TLexerImpl::checkConditional () {
     sVal.clear ();
-    if (std::string (sourceIt, 7) == "{$ifdef")
+    if (std::string (sourceIt, 7) == "{$ifdef") {
         if (std::string (sourceIt, 13) != "{$ifdef ti99}") {
             while (*sourceIt && std::string (sourceIt, 8) != "{$endif}") {
                 if (*sourceIt == '\n') {
@@ -207,6 +207,10 @@ void TLexer::TLexerImpl::checkConditional () {
                 ++sourceIt;
             }
         }
+    } else if (std::string (sourceIt, 9) == "{$bank:on")
+        currentToken = TToken::BankOn;
+    else if (std::string (sourceIt, 10) == "{$bank:off")
+        currentToken = TToken::BankOff;
 }
 
 bool TLexer::TLexerImpl::skipComment () {
@@ -424,32 +428,35 @@ bool TLexer::TLexerImpl::parseOperator (char base, TToken baseToken, char combin
 }
 
 void TLexer::TLexerImpl::getNextToken () {
+    currentToken = TToken::Error;
     while (skipWhiteSpace () || skipComment ());
     
-    char c = *sourceIt;
-    if (isalpha (c) || c == '_')
-        parseSymbol ();
-    else if (c == '$' || (c == '>' && assemblerMode))
-        parseHex ();
-    else if (c == '&')
-        parseOctal ();
-    else if (isdigit (c) || (c == '.' && isdigit (*(sourceIt + 1))))
-        parseNumber ();
-    else if (c == stringTerminator || c == stringNumericEscape)
-        parseString ();
-    else if (!c)
-        currentToken = TToken::Terminator;
-    else {
-        TCharTokenMap::const_iterator it = reservedSymbols.find (c);
-        if (it == reservedSymbols.end ())
-            setCurrentTokenAndAdvance (TToken::Error);
-        else if (it->second != TToken::Error)
-            setCurrentTokenAndAdvance (it->second);
-        else
-          parseOperator ('.', TToken::Point, '.', TToken::Points) ||
-          parseOperator ('<', TToken::LessThan, '=', TToken::LessEqual, '>', TToken::NotEqual) ||
-          parseOperator ('>', TToken::GreaterThan, '=', TToken::GreaterEqual) ||
-          parseOperator (':', TToken::Colon, '=', TToken::Define);
+    if (currentToken == TToken::Error) {
+        char c = *sourceIt;
+        if (isalpha (c) || c == '_')
+            parseSymbol ();
+        else if (c == '$' || (c == '>' && assemblerMode))
+            parseHex ();
+        else if (c == '&')
+            parseOctal ();
+        else if (isdigit (c) || (c == '.' && isdigit (*(sourceIt + 1))))
+            parseNumber ();
+        else if (c == stringTerminator || c == stringNumericEscape)
+            parseString ();
+        else if (!c)
+            currentToken = TToken::Terminator;
+        else {
+            TCharTokenMap::const_iterator it = reservedSymbols.find (c);
+            if (it == reservedSymbols.end ())
+                setCurrentTokenAndAdvance (TToken::Error);
+            else if (it->second != TToken::Error)
+                setCurrentTokenAndAdvance (it->second);
+            else
+              parseOperator ('.', TToken::Point, '.', TToken::Points) ||
+              parseOperator ('<', TToken::LessThan, '=', TToken::LessEqual, '>', TToken::NotEqual) ||
+              parseOperator ('>', TToken::GreaterThan, '=', TToken::GreaterEqual) ||
+              parseOperator (':', TToken::Colon, '=', TToken::Define);
+        }
     }
 }
 
@@ -459,6 +466,7 @@ inline TToken TLexer::TLexerImpl::getToken () {
     return currentToken;
 }
 
+/*
 bool TLexer::TLexerImpl::checkToken (TToken t) {
     if (getToken () == t) {
         getNextToken ();
@@ -466,6 +474,7 @@ bool TLexer::TLexerImpl::checkToken (TToken t) {
     } else
         return false;
 }
+*/
 
 inline double TLexer::TLexerImpl::getDouble () const {
     return fVal;
@@ -559,9 +568,9 @@ TToken TLexer::getToken () {
     return impl ()->getToken ();
 }
 
-bool TLexer::checkToken (TToken t) {
-    return impl ()->checkToken (t);
-}
+//bool TLexer::checkToken (TToken t) {
+//    return impl ()->checkToken (t);
+//}
 
 double TLexer::getDouble () const {
     return impl ()->getDouble ();

@@ -650,11 +650,11 @@ TExpressionBase *TExpression::parse (TBlock &block) {
     
     TCompilerImpl &compiler = block.getCompiler ();
     TExpressionBase *left = TSimpleExpression::parse (block);
-    TToken operation = block.getLexer ().getToken ();
+    TToken operation = block.getCompiler ().getToken ();
     while (operation == TToken::Equal || operation == TToken::GreaterThan || operation == TToken::LessThan ||
            operation == TToken::GreaterEqual || operation == TToken::LessEqual || operation == TToken::NotEqual ||
            operation == TToken::In) {
-        block.getLexer ().getNextToken ();
+        compiler.getNextToken ();
         TExpressionBase *right = TSimpleExpression::parse (block);
         if (left && right)
             if (TType *type = checkOperatorTypes (left, right, operation, block)) {
@@ -685,7 +685,7 @@ TExpressionBase *TExpression::parse (TBlock &block) {
                 } else
                     left = compiler.createMemoryPoolObject<TExpression> (left, right, operation, type);
             }
-        operation = block.getLexer ().getToken ();
+        operation = block.getCompiler ().getToken ();
     }
     return left;
 }
@@ -742,19 +742,18 @@ TExpressionBase *TSimpleExpression::parse (TBlock &block) {
         {TToken::Xor,	"__vec_xor"}
     };
     
-    TLexer &lexer = block.getLexer ();
     TCompilerImpl &compiler = block.getCompiler ();
     
-    lexer.checkToken (TToken::Add);	// skip + if present    
-    bool signPresent = lexer.checkToken (TToken::Sub);
+    compiler.checkToken (TToken::Add);	// skip + if present    
+    bool signPresent = compiler.checkToken (TToken::Sub);
     TExpressionBase *left = TTerm::parse (block);
     if (signPresent && left) 
         if (!evaluateConstant (left, left->getType (), TToken::Sub, block))
             left = TPrefixedExpression::generate (left, TToken::Sub, block);
     
-    while (lexer.getToken () == TToken::Add || lexer.getToken () == TToken::Sub || lexer.getToken () == TToken::Or || lexer.getToken () == TToken::Xor) {
-        TToken operation = lexer.getToken ();
-        lexer.getNextToken ();
+    while (compiler.getToken () == TToken::Add || compiler.getToken () == TToken::Sub || compiler.getToken () == TToken::Or || compiler.getToken () == TToken::Xor) {
+        TToken operation = compiler.getToken ();
+        compiler.getNextToken ();
         TExpressionBase *right = TTerm::parse (block);
         if (left && right)
             if (TType *type = checkOperatorTypes (left, right, operation, block)) {
@@ -805,14 +804,13 @@ TExpressionBase *TTerm::parse (TBlock &block) {
         {TToken::And,		"__vec_and"}
     };
     
-    TLexer &lexer = block.getLexer ();
     TCompilerImpl &compiler = block.getCompiler ();
     
     TExpressionBase *left = TFactor::parse (block);
-    TToken operation = lexer.getToken ();
+    TToken operation = compiler.getToken ();
     while (operation == TToken::Mul || operation == TToken::Div || operation == TToken::DivInt || operation == TToken::Shl || operation == TToken::Shr ||
            operation == TToken::Mod || operation == TToken::And) {
-        lexer.getNextToken ();
+        compiler.getNextToken ();
         TExpressionBase *right = TFactor::parse (block);
         if (left && right)
             if (TType *type = checkOperatorTypes (left, right, operation, block)) {
@@ -838,7 +836,7 @@ TExpressionBase *TTerm::parse (TBlock &block) {
 #endif                
                         left = compiler.createMemoryPoolObject<TTerm> (left, right, operation, type);
             }
-        operation = lexer.getToken ();
+        operation = compiler.getToken ();
     }
     return left;
 }
@@ -849,13 +847,12 @@ void TTerm::acceptCodeGenerator (TCodeGenerator &codeGenerator) {
 
 
 TExpressionBase *TFactor::parse (TBlock &block) {
-    TLexer &lexer = block.getLexer ();
     TCompilerImpl &compiler = block.getCompiler ();
     
     TExpressionBase *expr = nullptr;
-    const TToken token = lexer.getToken ();
+    const TToken token = compiler.getToken ();
     if (token == TToken::Not) {
-        lexer.getNextToken ();
+        compiler.getNextToken ();
         if ((expr = TFactor::parse (block)))
             if (!evaluateConstant (expr, expr->getType (), TToken::Not, block))
                 expr = TPrefixedExpression::generate (expr, TToken::Not, block);
@@ -870,12 +867,12 @@ TExpressionBase *TFactor::parse (TBlock &block) {
             expr = createRuntimeCall ("__str_make", nullptr, {expr, TExpressionBase::createVariableAccess (TConfig::globalRuntimeDataPtr, block)}, block, false);
 #endif            
         }
-    } else if (lexer.checkToken (TToken::BracketOpen)) {
+    } else if (compiler.checkToken (TToken::BracketOpen)) {
         expr = TExpression::parse (block);
         compiler.checkToken (TToken::BracketClose, "Bracketed expression missing ')'");
-    } else if (lexer.checkToken (TToken::SquareBracketOpen))
+    } else if (compiler.checkToken (TToken::SquareBracketOpen))
         expr = parseSetExpression (block);
-    else if (lexer.checkToken (TToken::AddrOp)) {
+    else if (compiler.checkToken (TToken::AddrOp)) {
         expr = parseAddressOperator (block);
     } else 
         compiler.errorMessage (TCompilerImpl::SyntaxError, "Missing part in expression");
@@ -887,7 +884,7 @@ TExpressionBase *TFactor::parseIdentifier (TBlock &block) {
     TCompilerImpl &compiler = block.getCompiler ();
     
     const std::string identifier = lexer.getIdentifier ();
-    lexer.getNextToken ();
+    compiler.getNextToken ();
     
     TExpressionBase *expr = block.searchActiveRecords (identifier);
     if (!expr) {
@@ -924,13 +921,13 @@ TExpressionBase *TFactor::parseIdentifier (TBlock &block) {
 
     bool done = false;    
     while (!done) 
-        if (lexer.checkToken (TToken::SquareBracketOpen))
+        if (compiler.checkToken (TToken::SquareBracketOpen))
             expr = parseIndex (expr, block);
-        else if (lexer.checkToken (TToken::Point))
+        else if (compiler.checkToken (TToken::Point))
             expr = parseRecordComponent (expr, block);
-        else if (lexer.checkToken (TToken::Dereference))
+        else if (compiler.checkToken (TToken::Dereference))
             expr = parsePointerDereference (expr, block);
-        else if (lexer.checkToken (TToken::BracketOpen))
+        else if (compiler.checkToken (TToken::BracketOpen))
             expr = parseFunctionCall (expr, block);
         else 
             done = true;
@@ -960,18 +957,17 @@ TExpressionBase *TFactor::parseTypeConversion (TSymbol *symbol, TBlock &block) {
 }
 
 TExpressionBase *TFactor::parseFunctionCall (TExpressionBase *function, TBlock &block) {
-    TLexer &lexer = block.getLexer ();
     TCompilerImpl &compiler = block.getCompiler ();
     
     std::vector<TExpressionBase *> args;
     bool success = true;
-    if (!lexer.checkToken (TToken::BracketClose)) {
+    if (!compiler.checkToken (TToken::BracketClose)) {
         do
             if (TExpressionBase *expression = TExpression::parse (block))
                 args.push_back (expression);
             else
                 success = false;
-        while (lexer.checkToken (TToken::Comma));
+        while (compiler.checkToken (TToken::Comma));
         compiler.checkToken (TToken::BracketClose, "Function call missing closing ')'");
     }
 
@@ -996,7 +992,6 @@ TExpressionBase *TFactor::parseFunctionCall (TExpressionBase *function, TBlock &
 }
 
 TExpressionBase *TFactor::parseIndex (TExpressionBase *base, TBlock &block) {
-    TLexer &lexer = block.getLexer ();
     TCompilerImpl &compiler = block.getCompiler ();
     
     createFunctionCall (base, block, true);
@@ -1048,7 +1043,7 @@ TExpressionBase *TFactor::parseIndex (TExpressionBase *base, TBlock &block) {
                     base = nullptr;
             }
         }
-    } while (lexer.checkToken (TToken::Comma));
+    } while (compiler.checkToken (TToken::Comma));
     compiler.checkToken (TToken::SquareBracketClose, "Array index missing closing ']'");
     return base;
 }
@@ -1057,14 +1052,14 @@ TExpressionBase *TFactor::parseRecordComponent (TExpressionBase *base, TBlock &b
     TLexer &lexer = block.getLexer ();
     TCompilerImpl &compiler = block.getCompiler ();
     
-    if (lexer.getToken () != TToken::Identifier) {
+    if (compiler.getToken () != TToken::Identifier) {
         compiler.errorMessage (TCompilerImpl::IdentifierExpected);
         return nullptr;
     }
     
     createFunctionCall (base, block, true);
     const std::string component = lexer.getIdentifier ();
-    lexer.getNextToken ();
+    compiler.getNextToken ();
     if (base)
         if (TType *type = base->getType ()) {
             if (type->isRecord ()) 
@@ -1094,16 +1089,15 @@ TExpressionBase *TFactor::parsePointerDereference (TExpressionBase *base, TBlock
 
 TExpressionBase *TFactor::parseSetExpression (TBlock &block) {
     TCompilerImpl &compiler = block.getCompiler ();
-    TLexer &lexer = block.getLexer ();
     TEnumeratedType *baseType = nullptr;
     std::vector<TExpressionBase *> values;
     std::vector<std::pair<TExpressionBase *, TExpressionBase *>> valuePairs;
     
     bool firstExpression = true;
-    if (!lexer.checkToken (TToken::SquareBracketClose)) {
+    if (!compiler.checkToken (TToken::SquareBracketClose)) {
         do {
             TExpressionBase *expr1 = TExpression::parse (block), *expr2 = nullptr;
-            if (lexer.checkToken (TToken::Points))
+            if (compiler.checkToken (TToken::Points))
                 expr2 = TExpression::parse (block);
             if (expr1) 
                 convertBaseType (expr1, block);
@@ -1131,7 +1125,7 @@ TExpressionBase *TFactor::parseSetExpression (TBlock &block) {
                 else
                     values.push_back (expr1);
             }
-        } while (lexer.checkToken (TToken::Comma));
+        } while (compiler.checkToken (TToken::Comma));
         compiler.checkToken (TToken::SquareBracketClose, "']' expected to end set constructor");          
     }
 

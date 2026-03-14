@@ -30,7 +30,10 @@ enum class TToken {
     Comma, Semicolon, 
     Colon, Point, Define, Points, Dereference, Identifier, CharConst, IntegerConst, 	
     RealConst, StringConst, 
-    Terminator,									
+    Terminator,
+    
+    // compiler directives
+    BankOn, BankOff,
 
     // unrecognized token
     Error
@@ -50,14 +53,18 @@ public:
     void setSource (const std::string &);
     void setSource (std::string &&);
     void setFilename (const std::string &fn);
-    
+
+private:    
+    friend class TCompilerImpl;
     void getNextToken ();
     TToken getToken ();
+    
+public:
     
     /** Returns true and parses next token if the argument is the current token.
         If the argument and the current token do not match, the method returns false
         and does not parse the next token. */
-    bool checkToken (TToken) ;
+//    bool checkToken (TToken) ;
     
     double getDouble () const;
     std::int64_t getInteger () const;

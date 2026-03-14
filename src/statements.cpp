@@ -12,27 +12,27 @@ TStatement *TStatement::parse (TBlock &declarations) {
     TCompilerImpl &compiler = declarations.getCompiler ();
     TLexer &lexer = compiler.getLexer ();
     
-    if (lexer.checkToken (TToken::Begin))
+    if (compiler.checkToken (TToken::Begin))
         return compiler.createMemoryPoolObject<TStatementSequence> (declarations);
-    if (lexer.checkToken (TToken::If))
+    if (compiler.checkToken (TToken::If))
         return compiler.createMemoryPoolObject<TIfStatement> (declarations);
-    if (lexer.checkToken (TToken::Repeat))
+    if (compiler.checkToken (TToken::Repeat))
         return TRepeatStatement::parse (declarations);
-    if (lexer.checkToken (TToken::While))
+    if (compiler.checkToken (TToken::While))
         return TWhileStatement::parse (declarations);
-    if (lexer.checkToken (TToken::For))
+    if (compiler.checkToken (TToken::For))
         return TForStatement::parse (declarations);
-    if (lexer.checkToken (TToken::Case))
+    if (compiler.checkToken (TToken::Case))
         return compiler.createMemoryPoolObject<TCaseStatement> (declarations);
-    if (lexer.checkToken (TToken::Goto))
+    if (compiler.checkToken (TToken::Goto))
         return compiler.createMemoryPoolObject<TGotoStatement> (declarations);
-    if (lexer.checkToken (TToken::With))
+    if (compiler.checkToken (TToken::With))
         return compiler.createMemoryPoolObject<TWithStatement> (declarations);
-    if (lexer.getToken () == TToken::Identifier || lexer.getToken () == TToken::IntegerConst) {
-        std::string s = (lexer.getToken () == TToken::Identifier) ? lexer.getIdentifier () : std::to_string (lexer.getInteger ());
+    if (compiler.getToken () == TToken::Identifier || compiler.getToken () == TToken::IntegerConst) {
+        std::string s = (compiler.getToken () == TToken::Identifier) ? lexer.getIdentifier () : std::to_string (lexer.getInteger ());
         if (TSymbol *symbol = declarations.getSymbols ().searchSymbol (s))
             if (symbol->checkSymbolFlag (TSymbol::Label)) {
-                lexer.getNextToken ();
+                compiler.getNextToken ();
                 return compiler.createMemoryPoolObject<TLabeledStatement> (symbol, declarations);
             }
 //        return compiler.createMemoryPoolObject<TSimpleStatement> (declarations);
@@ -55,19 +55,18 @@ TSymbol *TStatement::createCaseLabel (TBlock &declarations) {
 
 std::vector<TStatement *> TStatement::parseStatementSequence (TBlock &declarations, TToken endToken) {
     TCompilerImpl &compiler = declarations.getCompiler ();
-    TLexer &lexer = compiler.getLexer ();
     
     std::vector<TStatement *> statements;
     bool goon;
     do {
         statements.push_back (TStatement::parse (declarations));
-        TToken token = lexer.getToken ();
+        TToken token = compiler.getToken ();
         if (token != endToken && token != TToken::Semicolon) {
             compiler.errorMessage (TCompilerImpl::SyntaxError, "A semicolon or 'end' is missing");
             compiler.recoverPanicMode ({TToken::End, TToken::Semicolon, TToken::Until, TToken::Else, TToken::Begin,
                                         TToken::Procedure, TToken::Function, TToken::Terminator});
         }
-        goon = lexer.checkToken (TToken::Semicolon);
+        goon = compiler.checkToken (TToken::Semicolon);
     } while (goon);
     return statements;
 }
@@ -122,7 +121,7 @@ TStatement *TSimpleStatement::parse (TBlock &declarations) {
     TExpressionBase *left = TExpression::parse (declarations),
                     *right = nullptr;
                     
-    if (lexer.checkToken (TToken::Define))
+    if (compiler.checkToken (TToken::Define))
         right = TExpression::parse (declarations);
         
     if (left) 
@@ -187,7 +186,6 @@ TIfStatement::TIfStatement (TExpressionBase *condition, TStatement *statement):
 
 void TIfStatement::parse (TBlock &declarations) {
     TCompilerImpl &compiler = declarations.getCompiler ();
-    TLexer &lexer = compiler.getLexer ();
     
     declarations.getSymbols ().beginNewTempBlock ();
     condition = TExpression::parse (declarations);
@@ -195,7 +193,7 @@ void TIfStatement::parse (TBlock &declarations) {
         compiler.errorMessage (TCompilerImpl::IncompatibleTypes, "Boolean required in condition of 'if'-statement");
     compiler.checkToken (TToken::Then, "'then' expected");
     statement1 = TStatement::parse (declarations);
-    if (lexer.checkToken (TToken::Else))
+    if (compiler.checkToken (TToken::Else))
         statement2 = TStatement::parse (declarations);
 }
 
@@ -222,7 +220,7 @@ void TStatementSequence::appendBack (TStatement *statement) {
 
 void TStatementSequence::parse (TBlock &declarations) {
     statements = parseStatementSequence (declarations, TToken::End);
-    declarations.getCompiler ().getLexer ().checkToken (TToken::End);
+    declarations.getCompiler ().checkToken (TToken::End);
 }
 
 void TStatementSequence::acceptCodeGenerator (TCodeGenerator &codeGenerator) {
@@ -237,7 +235,7 @@ TStatement *TRepeatStatement::parse (TBlock &declarations) {
     
     declarations.getSymbols ().beginNewTempBlock ();
     TExpressionBase *condition;
-    if (declarations.getCompiler ().getLexer ().checkToken (TToken::Until) && (condition = TExpression::parse (declarations))) {
+    if (declarations.getCompiler ().checkToken (TToken::Until) && (condition = TExpression::parse (declarations))) {
         TExpressionBase::performTypeConversion (&stdType.Boolean, condition, declarations);
         statements.push_back (compiler.createMemoryPoolObject<TGotoStatement> (label, 
             TPrefixedExpression::generate (condition, TToken::Not, declarations)));
@@ -283,7 +281,6 @@ void TCaseStatement::acceptCodeGenerator (TCodeGenerator &codeGenerator) {
 
 void TCaseStatement::parse (TBlock &declarations) {
     TCompilerImpl &compiler = declarations.getCompiler ();
-    TLexer &lexer = compiler.getLexer ();
     
     declarations.getSymbols ().beginNewTempBlock ();
     expression = TExpression::parse (declarations);
@@ -300,7 +297,7 @@ void TCaseStatement::parse (TBlock &declarations) {
         TSymbol *jumpLabel = createCaseLabel (declarations);
         do {
             const TSimpleConstant *a = declarations.parseConstExpression (), *b = a;
-            if (lexer.checkToken (TToken::Points))
+            if (compiler.checkToken (TToken::Points))
                 b = declarations.parseConstExpression ();
             if (a->getType () != type || b->getType () != type)
                 compiler.errorMessage (TCompilerImpl::InvalidType, "Type of case label does not match");
@@ -318,13 +315,13 @@ void TCaseStatement::parse (TBlock &declarations) {
                 minLabel = std::min (minLabel, aval);
                 maxLabel = std::max (maxLabel, bval);
             }
-        } while (lexer.checkToken (TToken::Comma));
+        } while (compiler.checkToken (TToken::Comma));
         compiler.checkToken (TToken::Colon, "':' expected in 'case'-statement");
         caseList.push_back (TCase {std::move (labels), TStatement::parse (declarations), jumpLabel});
-        parseCase = lexer.checkToken (TToken::Semicolon) && !(lexer.getToken () == TToken::Else || lexer.getToken () == TToken::End);
+        parseCase = compiler.checkToken (TToken::Semicolon) && !(compiler.getToken () == TToken::Else || compiler.getToken () == TToken::End);
     }
     
-    if (lexer.checkToken (TToken::Else))
+    if (compiler.checkToken (TToken::Else))
         defaultStatement = compiler.createMemoryPoolObject<TStatementSequence> (declarations);
     else 
         compiler.checkToken (TToken::End, "'end' expected in 'case'-statement");
@@ -333,21 +330,20 @@ void TCaseStatement::parse (TBlock &declarations) {
 
 TStatement *TForStatement::parse (TBlock &declarations) {
     TCompilerImpl &compiler = declarations.getCompiler ();
-    TLexer &lexer = compiler.getLexer ();
     TSymbol *controlVariable;
     bool isIncrement, isBeginConst, isEndConst;
     std::int64_t beginValue = 0, endValue = 0;
     
     if (!(controlVariable = declarations.checkVariable ()))
-        lexer.getNextToken ();
+        compiler.getNextToken ();
     // TODO: Check if control variable is local
     compiler.checkToken (TToken::Define, "':=' required in 'for'-statement");
     
     declarations.getSymbols ().beginNewTempBlock ();
     TExpressionBase *begin = TExpression::parse (declarations);
-    if (lexer.checkToken (TToken::To))
+    if (compiler.checkToken (TToken::To))
         isIncrement = true;
-    else if (lexer.checkToken (TToken::Downto))
+    else if (compiler.checkToken (TToken::Downto))
         isIncrement = false;
     else
         compiler.errorMessage (TCompilerImpl::SyntaxError, "'to' or 'downto' expected in 'for'-loop");
@@ -427,9 +423,9 @@ void TGotoStatement::parse (TBlock &declarations) {
     TCompilerImpl &compiler = declarations.getCompiler ();
     TLexer &lexer = compiler.getLexer ();
     
-    if (lexer.getToken () == TToken::Identifier || lexer.getToken () == TToken::IntegerConst) {
-        std::string s = (lexer.getToken () == TToken::Identifier) ? lexer.getIdentifier () : std::to_string (lexer.getInteger ());
-        compiler.getLexer ().getNextToken ();
+    if (compiler.getToken () == TToken::Identifier || compiler.getToken () == TToken::IntegerConst) {
+        std::string s = (compiler.getToken () == TToken::Identifier) ? lexer.getIdentifier () : std::to_string (lexer.getInteger ());
+        compiler.getNextToken ();
         // !!!! searchSymbol mit Label
         if (!(label = declarations.getSymbols ().searchSymbol (s)) || !label->checkSymbolFlag (TSymbol::Label))
             compiler.errorMessage (TCompilerImpl::IdentifierExpected, "Invalid use of '" + s + "' in goto");
@@ -453,7 +449,6 @@ TWithStatement::TWithStatement (TBlock &declarations):
 
 void TWithStatement::parse (TBlock &declarations) {
     TCompilerImpl &compiler = declarations.getCompiler ();
-    TLexer &lexer = compiler.getLexer ();
         
     std::size_t count = 0;
     do {
@@ -465,7 +460,7 @@ void TWithStatement::parse (TBlock &declarations) {
             } else
                 compiler.errorMessage (TCompilerImpl::InvalidType, "Record type required in 'with'-statement");
         }
-    } while (lexer.checkToken (TToken::Comma));
+    } while (compiler.checkToken (TToken::Comma));
     compiler.checkToken (TToken::Do, "'do' expected in 'with'-statement");
     statement = TStatement::parse (declarations);
     while (count--)

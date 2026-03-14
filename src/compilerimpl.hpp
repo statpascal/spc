@@ -197,6 +197,15 @@ public:
     void setSource (std::string &&);
     void setFilename (const std::string &);
     
+    void getNextToken ();
+    TToken getToken ();
+    
+    /** Returns true and parses next token if the argument is the current token.
+        If the argument and the current token do not match, the method returns false
+        and does not parse the next token. */
+    bool checkToken (TToken) ;
+
+    
     TCompiler::TCompileResult compile ();
     
     TLexer &getLexer ();

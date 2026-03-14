@@ -2327,7 +2327,7 @@ void T9900Generator::assignStackOffsets (TBlock &block) {
     TSymbolList &symbolList = block.getSymbols ();
     
     const std::size_t alignment = 1,
-                      level = symbolList.getLevel (),
+//                      level = symbolList.getLevel (),
                       displaySave = 2;
     ssize_t pos = 0;
     
@@ -2505,7 +2505,7 @@ T9900Operand T9900Generator::makeLabelMemory (const std::string label, T9900Reg 
 
 T9900Reg T9900Generator::parseRegister (TCompilerImpl &compiler, TLexer &lexer) {
     std::int64_t regNr = -1;
-    if (lexer.getToken () == TToken::Identifier) {
+    if (compiler.getToken () == TToken::Identifier) {
         std::string s= lexer.getIdentifier ();
         if (s [0] == 'R') 
             s [0] = 'r';
@@ -2514,23 +2514,23 @@ T9900Reg T9900Generator::parseRegister (TCompilerImpl &compiler, TLexer &lexer) 
                 regNr = i;
                 break;
             }
-    } else if (lexer.getToken () == TToken::IntegerConst)
+    } else if (compiler.getToken () == TToken::IntegerConst)
         regNr = lexer.getInteger ();
     if (regNr < 0 || regNr > 15) {
         regNr = 0;
         compiler.errorMessage (TCompilerImpl::AssemblerError, "Invalid register");
     }
-    lexer.getNextToken ();
+    compiler.getNextToken ();
     return static_cast<T9900Reg> (regNr);
 }
 
 T9900Operand T9900Generator::parseInteger (TCompilerImpl &compiler, TLexer &lexer, std::int64_t minval, std::int64_t maxval) {
-    if (maxval == 0xffff && lexer.getToken () == TToken::Identifier) {
+    if (maxval == 0xffff && compiler.getToken () == TToken::Identifier) {
         T9900Operand ret = lexer.getString ();
-        lexer.getNextToken ();
+        compiler.getNextToken ();
         return ret;
     }
-    bool neg = lexer.checkToken (TToken::Sub);
+    bool neg = compiler.checkToken (TToken::Sub);
     std::int64_t val = neg ? -lexer.getInteger () : lexer.getInteger ();
     compiler.checkToken (TToken::IntegerConst, "Integer constant expected");
     if (val < minval || val > maxval) {
@@ -2542,23 +2542,23 @@ T9900Operand T9900Generator::parseInteger (TCompilerImpl &compiler, TLexer &lexe
 
 
 T9900Operand T9900Generator::parseGeneralAddress (TCompilerImpl &compiler, TLexer &lexer) {
-    TToken t = lexer.getToken ();
+    TToken t = compiler.getToken ();
     std::string label;
     std::int64_t val;
     T9900Reg reg = T9900Reg::r0;
     switch (t) {
         case TToken::AddrOp: 
-            lexer.getNextToken ();
-            if (lexer.getToken () == TToken::Identifier)
+            compiler.getNextToken ();
+            if (compiler.getToken () == TToken::Identifier)
                 label = lexer.getIdentifier ();
-            else if (lexer.getToken () == TToken::IntegerConst) {
+            else if (compiler.getToken () == TToken::IntegerConst) {
                 val = lexer.getInteger ();
                 if (val < 0 || val > 65535)
                     compiler.errorMessage (TCompilerImpl::AssemblerError, "Memory address out of range");
             } else
                 compiler.errorMessage (TCompilerImpl::AssemblerError, "Label or memory address expected");
-            lexer.getNextToken ();
-            if (lexer.checkToken (TToken::BracketOpen)) {
+            compiler.getNextToken ();
+            if (compiler.checkToken (TToken::BracketOpen)) {
                 reg = parseRegister (compiler, lexer);
                 if (reg == T9900Reg::r0)
                     compiler.errorMessage (TCompilerImpl::AssemblerError, "Cannot use R0 for indexed memory addressing");
@@ -2569,10 +2569,10 @@ T9900Operand T9900Generator::parseGeneralAddress (TCompilerImpl &compiler, TLexe
             else
                 return T9900Operand (reg, val);
         case TToken::Mul: {
-            lexer.getNextToken ();
+            compiler.getNextToken ();
             T9900Reg reg = parseRegister (compiler, lexer);
-            if (lexer.getToken () == TToken::Add) {
-                lexer.getNextToken ();
+            if (compiler.getToken () == TToken::Add) {
+                compiler.getNextToken ();
                 return T9900Operand (reg, T9900Operand::TAddressingMode::RegIndInc);
             } else
                 return T9900Operand (reg, T9900Operand::TAddressingMode::RegInd); }
@@ -2593,12 +2593,12 @@ void T9900Generator::parseAssemblerBlock (TSymbol *symbol, TBlock &block) {
     
     TCodeSequence &output = assemblerBlocks [symbol];
     
-    while (lexer.getToken () != TToken::End && lexer.getToken () != TToken::Error) {
+    while (compiler.getToken () != TToken::End && compiler.getToken () != TToken::Error) {
         const std::string &opcode = lexer.getIdentifier ();
-        if (lexer.getToken () != TToken::DivInt)
+        if (compiler.getToken () != TToken::DivInt)
             compiler.checkToken (TToken::Identifier, "Expected label definition or mnemonic");
         else
-            lexer.getNextToken ();
+            compiler.getNextToken ();
 //        std::cout << opcode << std::endl;
         T9900OpDescription desc;
         T9900Operand op1, op2;
@@ -2658,11 +2658,11 @@ void T9900Generator::parseAssemblerBlock (TSymbol *symbol, TBlock &block) {
                 case T9900Format::F_None:
                     switch (desc.opcode) {
                         case T9900Op::text:
-                            if (lexer.getToken () == TToken::StringConst) 
+                            if (compiler.getToken () == TToken::StringConst) 
                                 op1 = T9900Operand (lexer.getString ());
                             else
                                 compiler.errorMessage (TCompilerImpl::AssemblerError, "Expected string after 'text'");
-                            lexer.getNextToken ();
+                            compiler.getNextToken ();
                             break;
                         default:
                             break;
@@ -2674,8 +2674,8 @@ void T9900Generator::parseAssemblerBlock (TSymbol *symbol, TBlock &block) {
 #endif            
                 output.push_back (T9900Operation (desc.opcode, op1, op2));
         } else {
-            if (lexer.getToken () == TToken::Colon)
-                lexer.getNextToken ();
+            if (compiler.getToken () == TToken::Colon)
+                compiler.getNextToken ();
             output.push_back (T9900Operation (T9900Op::def_label, opcode));
         } 
     }

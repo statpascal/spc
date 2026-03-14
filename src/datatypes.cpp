@@ -387,6 +387,7 @@ std::size_t TPointerType::getSize () const {
         case TConfig::TTarget::AARCH64: 
             return sizeof (void *);
     }
+    return 0;
 }
 
 bool TPointerType::isSerializable () const {
@@ -481,6 +482,7 @@ std::size_t TReferenceType::getSize () const {
         case TConfig::TTarget::AARCH64: 
             return sizeof (void *);
     }
+    return 0;
 }
 
 bool TReferenceType::isSerializable () const {
@@ -520,6 +522,7 @@ std::size_t TRoutineType::getSize () const {
         case TConfig::TTarget::AARCH64: 
             return sizeof (void *);
     }
+    return 0;
 }
 
 bool TRoutineType::isSerializable () const {
@@ -578,12 +581,12 @@ bool TRoutineType::matchesOverload (const TRoutineType *other) const {
 TStdType::TStdType ():
   Boolean ("boolean", 0, 1),
   Char ("char", 0, 255), 
-  Uint64 ("uint64", std::numeric_limits<std::uint64_t>::min (), std::numeric_limits<std::uint64_t>::max ()),
   Int64 ("int64", std::numeric_limits<std::int64_t>::min (), std::numeric_limits<std::int64_t>::max ()),
+  Uint64 ("uint64", std::numeric_limits<std::uint64_t>::min (), std::numeric_limits<std::uint64_t>::max ()),
+  Uint8 ("uint8", &Int64, std::numeric_limits<std::uint8_t>::min (), std::numeric_limits<std::uint8_t>::max ()), 
+  Int8 ("int8", &Int64, std::numeric_limits<std::int8_t>::min (), std::numeric_limits<std::int8_t>::max ()), 
   Uint16 ("uint16", &Int64, std::numeric_limits<std::uint16_t>::min (), std::numeric_limits<std::uint16_t>::max ()), 
   Int16 ("int16", &Int64, std::numeric_limits<std::int16_t>::min (), std::numeric_limits<std::int16_t>::max ()), 
-  Int8 ("int8", &Int64, std::numeric_limits<std::int8_t>::min (), std::numeric_limits<std::int8_t>::max ()), 
-  Uint8 ("uint8", &Int64, std::numeric_limits<std::uint8_t>::min (), std::numeric_limits<std::uint8_t>::max ()), 
   Uint32 ("uint32", &Int64, std::numeric_limits<std::uint32_t>::min (), std::numeric_limits<std::uint32_t>::max ()), 
   Int32 ("int32", &Int64, std::numeric_limits<std::int32_t>::min (), std::numeric_limits<std::int32_t>::max ()),
   Void (), 
