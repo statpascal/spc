@@ -10,7 +10,7 @@ namespace statpascal {
 const ssize_t TSymbol::LabelDefined, TSymbol::UndefinedLabelUsed, TSymbol::InvalidRegister;
 
 TSymbol::TSymbol (const std::string &name, TType *type, std::size_t level, TFlags flags, TSymbol *alias):
-  name (name), level (level), tempBlock (0), flags (flags), alias (alias), block (nullptr), offset (0), parameterPosition (0), assignedRegister (InvalidRegister), aliased (false), used (false), constantValue (nullptr) {
+  name (name), level (level), tempBlock (0), bankNumber (0), flags (flags), alias (alias), block (nullptr), offset (0), parameterPosition (0), assignedRegister (InvalidRegister), aliased (false), used (false), constantValue (nullptr) {
     setType (type);
 }
 
@@ -39,8 +39,10 @@ TSymbolList::TSymbolList (TSymbolList *symbols, TMemoryPoolFactory &memoryPoolFa
   tempPresent (false) {
 }
 
-TSymbolList::TAddSymbolResult TSymbolList::addRoutine (const std::string &name, TRoutineType *type) {
-    return addSymbol (name, type, TSymbol::Routine, nullptr);
+TSymbolList::TAddSymbolResult TSymbolList::addRoutine (const std::string &name, TRoutineType *type, int bankNumber) {
+    TAddSymbolResult result =  addSymbol (name, type, TSymbol::Routine, nullptr);
+    result.symbol->setBankNumber (bankNumber);
+    return result;
 }
 
 TSymbolList::TAddSymbolResult TSymbolList::addVariable (const std::string &name, TType *type) {

@@ -929,7 +929,7 @@ void TBlock::parseSubroutine (bool isFunction) {
     if (isForward || isExport || isExternal || isAssembler || isIntrinsic)
         compiler.checkToken (TToken::Semicolon, "';' expected at end of subroutine header");
     
-    TSymbolList::TAddSymbolResult result = symbols->addRoutine (identifier, routineType);
+    TSymbolList::TAddSymbolResult result = symbols->addRoutine (identifier, routineType, compiler.getBankNumber ());
     TSymbol *symbol = result.symbol;
     if (result.alreadyPresent) {
         if (!symbol->checkSymbolFlag (TSymbol::Forward) || isUnitInterface)
@@ -1265,7 +1265,9 @@ TCompilerImpl::TCompilerImpl (TCodeGenerator &codeGenerator):
   memoryPoolFactory (1024 * 1024),
   codeGenerator (codeGenerator),
   systemUnit (nullptr),
-  errorFlag (false) {
+  errorFlag (false),
+  bankActive (false),
+  bankCount (0) {
     lexerStack.push (&programLexer);
     predefinedSymbols = memoryPoolFactory.create<TSymbolList> (nullptr, memoryPoolFactory);
     createPredefinedSymbols ();
@@ -1295,9 +1297,14 @@ TToken TCompilerImpl::getToken () {
     while (token >= TToken::BankOn && token <= TToken::BankOff) {
         switch (token) {
             case TToken::BankOn:
-                puts ("BANK ON"); break;
+                if (!bankActive) {
+                    ++bankCount;
+                    bankActive = true;
+                }
+                break;
             case TToken::BankOff:
-                puts ("BANK OFF"); break;
+                bankActive = false;
+                break;
             default:
                 break;
         }

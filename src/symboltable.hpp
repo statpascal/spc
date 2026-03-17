@@ -72,6 +72,10 @@ public:
 
     void setLevel (std::size_t);    
     std::size_t getLevel () const;
+    
+    // used for 9900 only
+    void setBankNumber (std::size_t);
+    std::size_t getBankNumber () const;
 
     void addSymbolFlags (TFlags);
     void removeSymbolFlags (TFlags);
@@ -88,7 +92,7 @@ public:
     static const ssize_t LabelDefined = -1, UndefinedLabelUsed = -2, InvalidRegister = -1;
 private:
     std::string name, libName, extSymbolName;
-    std::size_t level, tempBlock;
+    std::size_t level, tempBlock, bankNumber;
     TFlags flags;
     TSymbol *alias;
     TBlock *block;
@@ -109,7 +113,7 @@ public:
         bool alreadyPresent;
     };
 
-    TAddSymbolResult addRoutine (const std::string &name, TRoutineType *type);
+    TAddSymbolResult addRoutine (const std::string &name, TRoutineType *type, int bankNumber = 0);
     TAddSymbolResult addVariable (const std::string &name, TType *type);
     TAddSymbolResult addTempVariable (const std::string &name, TType *type);
     TAddSymbolResult addStaticVariable (const std::string &name, const TConstant *);
@@ -272,6 +276,14 @@ inline void TSymbol::setLevel (std::size_t n) {
 
 inline std::size_t TSymbol::getLevel () const {
     return level;
+}
+
+inline void TSymbol::setBankNumber (std::size_t n) {
+    bankNumber = n;
+}
+
+inline std::size_t TSymbol::getBankNumber () const {
+    return bankNumber;
 }
 
 inline TSymbol::TFlags TSymbol::getSymbolFlags () const {

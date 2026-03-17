@@ -203,8 +203,10 @@ public:
     /** Returns true and parses next token if the argument is the current token.
         If the argument and the current token do not match, the method returns false
         and does not parse the next token. */
-    bool checkToken (TToken) ;
-
+    bool checkToken (TToken);
+    
+    // compiler options
+    std::size_t getBankNumber () const;
     
     TCompiler::TCompileResult compile ();
     
@@ -260,8 +262,8 @@ private:
     std::vector<std::string> unitSearchPathes;
     std::stack<TLexer *> lexerStack;
     
-    bool errorFlag;
-    
+    bool errorFlag, bankActive;
+    std::size_t bankCount;
 };
 
 // inlines
@@ -310,6 +312,10 @@ inline TCodeGenerator &TCompilerImpl::getCodeGenerator () {
 
 inline bool TCompilerImpl::getErrorFlag () const {
     return errorFlag;
+}
+
+inline std::size_t TCompilerImpl::getBankNumber () const {
+    return bankActive ? bankCount : 0;
 }
 
 }

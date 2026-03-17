@@ -90,7 +90,6 @@ private:
     TCodeBlock sharedCode, mainProgram;
     std::vector<TCodeBlock> subPrograms;	// top level subprograms
 
-
     void assignParameterOffsets (TBlock &);
     void assignStackOffsets (TBlock &);    
     void assignRegisters (TSymbolList &);
