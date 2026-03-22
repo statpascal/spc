@@ -684,38 +684,47 @@ void T9900Generator::optimizePeepHole (TCodeSequence &code) {
         code.pop_back ();
 }
 
-void T9900Generator::calcLength (TCodeBlock &proc) {
-    proc.size = 0;
-    for (T9900Operation &op: proc.codeSequence)
-        proc.size += op.getSize (proc.size);
+void T9900Generator::calcLength (TCodeGroup &codeGroup) {
+    codeGroup.size = 0;
+    for (TCodeBlock *proc: codeGroup.codeBlocks) {
+        proc->size = 0;
+        for (T9900Operation &op: proc->codeSequence)
+            proc->size += op.getSize (proc->size);
+        codeGroup.size += proc->size;
+    }
 }
 
-void T9900Generator::assignBank (TCodeBlock &proc) {
-    if (proc.size + sharedCode.size >= 0x7ffe) {
-        std::cout << "Code size of "<< (proc.symbol ? proc.symbol->getName () : "main") << " exceeds bank size" << std::endl;
+void T9900Generator::assignBank (TCodeGroup &codeGroup) {
+    TSymbol *symbol = codeGroup.codeBlocks.front ()->symbol;
+    const std::string name = symbol ? symbol->getName () : "main";
+    if (codeGroup.size + sharedCode.size >= 0x1ffe) {
+        std::cout << "Code size of group starting with" << name << " exceeds bank size" << std::endl;
         exit (1);
     }
     unsigned bank = 0;
-    while (bank <= maxBank && bankOffset [bank] + proc.size > 0x7ffe)
+    while (bank <= maxBank && bankOffset [bank] + codeGroup.size > 0x7ffe)
         ++bank;
         
     if (bank > maxBank) {
         if (bank == totalBanks) {
-            std::cout << "Out of code space in " << proc.symbol->getName () << std::endl;
+            std::cout << "Out of code space in " << name << std::endl;
             exit (1);
         } else {
             ++maxBank;
             bankOffset [bank] = 0x6000 + sharedCode.size;
         }
     }
-        
-    proc.bank = bank;
-    proc.address = bankOffset [bank];
-    proc.codeSequence.push_front (T9900Operation (T9900Op::bank, proc.address == 0x6000 ? -1 : bank, proc.address));
-    if (proc.symbol)
-        bankMapping [getBankName (proc.symbol)] = bank;
-        
-    bankOffset [bank] += (proc.size + 1) & ~1;
+    
+    codeGroup.address =  bankOffset [bank];
+    for (TCodeBlock *proc: codeGroup.codeBlocks) {
+        proc->bank = bank;
+        proc->address = codeGroup.address;
+        codeGroup.address += proc->size;
+        proc->codeSequence.push_front (T9900Operation (T9900Op::bank, proc->address == 0x6000 ? -1 : bank, proc->address));
+        if (proc->symbol)
+            bankMapping [getBankName (proc->symbol)] = bank;
+    }
+    bankOffset [bank] += (codeGroup.size + 1) & ~1;
 }
     
 void T9900Generator::resolveBankLabels (TCodeBlock &proc) {
@@ -738,24 +747,42 @@ std::string T9900Generator::getBankName (const TSymbol *s) {
 void T9900Generator::getAssemblerCode (std::vector<std::uint8_t> &opcodes, bool generateListing, std::vector<std::string> &listing) {
     opcodes.clear ();
     listing.clear ();
-
-    calcLength (sharedCode);    
+    
+    TCodeGroup sharedGroup {0, 0, {&sharedCode}};
+    calcLength (sharedGroup);;
     std::size_t length = sharedCode.size;
-    calcLength (mainProgram);
-    length += mainProgram.size;
+    
+    TCodeGroup mainGroup {0, 0, {&mainProgram}};
+    calcLength (mainGroup);
+    length += mainGroup.size;
+    
+    std::map<std::size_t, std::vector<TCodeBlock *>> bankGroupMap;
+    
     for (TCodeBlock &proc: subPrograms) {
-        calcLength (proc);
-        length += proc.size;
+        if (proc.symbol->getBankNumber ())
+            bankGroupMap [proc.symbol->getBankNumber ()].push_back (&proc);
+        else {
+            codeGroups.push_back (TCodeGroup {0, 0, {&proc}});
+            calcLength (codeGroups.back ());
+            length += codeGroups.back ().size;
+        }
     }
-        
+    for (decltype (bankGroupMap)::value_type &it: bankGroupMap) {
+        codeGroups.push_back (TCodeGroup {0, 0, it.second});
+        calcLength (codeGroups.back ());
+        length += codeGroups.back ().size;
+    }
+    
+    std::sort (codeGroups.begin (), codeGroups.end (), [] (const TCodeGroup &a, const TCodeGroup &b) { return a.size > b.size; });
+            
     if (TConfig::target == TConfig::TTarget::TI_BANKCART) {
         maxBank = 0;
         bankOffset [maxBank] = 0x6000;
-        assignBank (sharedCode);
+        assignBank (sharedGroup);
         
-        assignBank (mainProgram);
-        for (TCodeBlock &proc: subPrograms)
-            assignBank (proc);
+        assignBank (mainGroup);
+        for (TCodeGroup &group: codeGroups)
+            assignBank (group);
             
         // last word of each bank is filled with bank switching address (to be pushed in far calls)
         sharedCode.codeSequence.push_back (T9900Operation (T9900Op::comment, T9900Operand (), T9900Operand (),  std::string ("")));

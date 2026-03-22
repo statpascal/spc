@@ -65,18 +65,23 @@ private:
         std::string label;
         double val;
     };
+    
     struct TSetDefinition {
         std::string label;
         std::array<std::uint64_t, TConfig::setwords> val;
     };
+    
     struct TGlobalDefinition {
         std::string name;
         std::size_t size;
     };
+    
     struct TStringDefinition {
         std::string label, val;
     };
+    
     using TCodeSequence = std::list<T9900Operation>;
+    
     TCodeSequence *currentOutput;
     
     struct TCodeBlock {
@@ -85,10 +90,17 @@ private:
         TCodeSequence codeSequence;
         std::size_t size, address, bank;
     };
-    std::map<std::string, std::uint16_t> bankMapping;
+    
+    struct TCodeGroup {
+        std::size_t size, address;
+        std::vector<TCodeBlock *> codeBlocks;
+    };
 
+    
+    std::map<std::string, std::uint16_t> bankMapping;
     TCodeBlock sharedCode, mainProgram;
     std::vector<TCodeBlock> subPrograms;	// top level subprograms
+    std::vector<TCodeGroup> codeGroups;		// subprograms to be placed in same bank
 
     void assignParameterOffsets (TBlock &);
     void assignStackOffsets (TBlock &);    
@@ -212,8 +224,8 @@ private:
     std::array<std::uint16_t, totalBanks> bankOffset;
     unsigned maxBank;
     
-    void calcLength (TCodeBlock &);
-    void assignBank (TCodeBlock &);
+    void calcLength (TCodeGroup &);
+    void assignBank (TCodeGroup &);
     void resolveBankLabels (TCodeBlock &proc);
     std::string getBankName (const TSymbol *);
     std::string getBankName (const std::string &);
