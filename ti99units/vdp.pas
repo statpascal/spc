@@ -342,7 +342,60 @@ function getCharPattern (ch: uint8): TCharPattern;
             result := result + hexstr2 (chardef [i])
     end;
 
-procedure _rt_scroll_up (start, stop, len, inc1, inc2: integer); assembler;
+procedure gotoxy (x, y: integer);
+    var
+        offs: integer;
+    begin
+        if videoMode = TextMode then
+            offs := (y shl 2 + y) shl 3
+        else
+            offs := y shl 5;
+        vdpWriteAddress := min (imageTable + abs (offs + x), pred (imageTableEnd))
+    end;
+    
+function whereX: integer;
+    begin
+        if videoMode = StandardMode then
+            whereX := vdpWriteAddress and $1f
+        else
+            whereX := (vdpWriteAddress - imageTable) mod 40
+    end;
+    
+function whereY: integer;
+    begin
+        if videoMode = StandardMode then
+            whereY := (vdpWriteAddress - imageTable) shr 5
+        else
+            whereY := (vdpWriteAddress - imageTable) div 40
+    end;
+    
+function screenWidth: integer;
+    begin
+        case videoMode of
+            TextMode:
+                screenWidth := 40;
+            StandardMode:
+                screenWidth := 32;
+            BitmapMode:
+                screenWidth := 256
+        end
+    end;
+    
+procedure clrscr;
+    begin
+        case videoMode of
+            StandardMode:
+                vrbw (imageTable, 32, 24 * 32);
+            TextMode:
+                vrbw (imageTable, 32, 24 * 40)
+        end;
+        gotoxy (0, 0)
+    end;
+    
+
+{$bank:on}
+
+procedure _rt_scroll_up (start, stop, len, inc1, inc2: integer) near; assembler; 
         mov @start, r0
         li r13, vdpwa
         li r14, vdprd
@@ -403,56 +456,6 @@ procedure _rt_scroll_up (start, stop, len, inc1, inc2: integer); assembler;
         limi 2
 end;
 
-procedure gotoxy (x, y: integer);
-    var
-        offs: integer;
-    begin
-        if videoMode = TextMode then
-            offs := (y shl 2 + y) shl 3
-        else
-            offs := y shl 5;
-        vdpWriteAddress := min (imageTable + abs (offs + x), pred (imageTableEnd))
-    end;
-    
-function whereX: integer;
-    begin
-        if videoMode = StandardMode then
-            whereX := vdpWriteAddress and $1f
-        else
-            whereX := (vdpWriteAddress - imageTable) mod 40
-    end;
-    
-function whereY: integer;
-    begin
-        if videoMode = StandardMode then
-            whereY := (vdpWriteAddress - imageTable) shr 5
-        else
-            whereY := (vdpWriteAddress - imageTable) div 40
-    end;
-    
-function screenWidth: integer;
-    begin
-        case videoMode of
-            TextMode:
-                screenWidth := 40;
-            StandardMode:
-                screenWidth := 32;
-            BitmapMode:
-                screenWidth := 256
-        end
-    end;
-    
-procedure clrscr;
-    begin
-        case videoMode of
-            StandardMode:
-                vrbw (imageTable, 32, 24 * 32);
-            TextMode:
-                vrbw (imageTable, 32, 24 * 40)
-        end;
-        gotoxy (0, 0)
-    end;
-    
 procedure scroll;
     begin
         case videoMode of
@@ -468,6 +471,8 @@ procedure scroll;
                 end
         end
     end;
+
+{$bank:off}
     
 procedure outputString (p: PChar; outlen: integer);
 

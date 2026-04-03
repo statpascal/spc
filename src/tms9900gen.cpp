@@ -32,6 +32,8 @@ r12 - r15: saved by caller
 Stack layout of activation frame:
 
 +---------------------------------+
+|  bank of return address         |	far calls only
+|---------------------------------|
 |				  |
 |  parameters			  |
 |				  |

@@ -26,7 +26,9 @@ const
 var
     cachePattern, cacheColor: array [0..7] of uint8;
     
-procedure flushCache;
+{$bank:on}    
+    
+procedure flushCache near;
     begin
         vmbw (cachePattern, patternTable + cachedChar, 8);
         vmbw (cacheColor, colorTable + cachedChar, 8)
@@ -109,5 +111,7 @@ procedure line (x0, y0, x1, y1: integer);
             end;
         flushCache
     end;
+    
+{$bank:off}    
 
 end.

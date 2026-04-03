@@ -186,6 +186,16 @@ function __uint64_greater_equal (var a, b: uint64): boolean; intrinsic;
 function __uint64_less (var a, b: uint64): boolean; intrinsic;
 function __uint64_greater (var a, b: uint64): boolean; intrinsic;
 
+
+type
+    jmp_buf = record
+        ret_bank, ret_addr, result_ptr, saved_r9, saved_r10: integer;
+        saved_display: array [0..7] of integer
+    end;
+    
+function Setjmp (var s: jmp_buf): integer;
+procedure Longjmp (var s: jmp_buf; value: integer);
+
 implementation
 
 uses vdp, dsr;
@@ -1039,6 +1049,54 @@ function __set_super_not_equal (var s, t: __set_array): boolean;
     begin 
         __set_super_not_equal := __set_super (s, t) and not __set_equal (s, t)
     end;
+    
+    
+function Setjmp (var s: jmp_buf): integer; assembler;
+        mov  *r10, r12
+        clr  *r12		// return 0
+        
+        mov  @s, r12
+        mov  @4(r10), *r12+	// ret_bank
+        mov  r11, *r12+		// ret_addr
+        mov  *r10, *r12+	// result_ptr
+        mov  r9, *r12+		// saved_r9
+        mov  r10, *r12+		// saved r10
+        
+    setjmp_1:
+        li   r13, >fff0		// start of display: TODO introduce constants
+        mov  *r13+, *r12+
+        mov  *r13+, *r12+
+        mov  *r13+, *r12+
+        mov  *r13+, *r12+
+        mov  *r13+, *r12+
+        mov  *r13+, *r12+
+        mov  *r13+, *r12+
+        mov  *r13, *r12
+end;
+
+procedure Longjmp (var s: jmp_buf; value: integer); assembler;
+        mov  @s, r11
+        
+        mov  *r11+, r12		// ret_bank
+        mov  *r11+, r13		// ret_addr
+        mov  *r11+, r15		// result_ptr
+        mov  @value, *r15
+        mov  *r11+, r9
+        mov  *r11+, r10
+        
+        li   r14, >fff0
+        mov  *r11+, *r14+
+        mov  *r11+, *r14+
+        mov  *r11+, *r14+
+        mov  *r11+, *r14+
+        mov  *r11+, *r14+
+        mov  *r11+, *r14+
+        mov  *r11+, *r14+
+        mov  *r11, *r14
+        
+        b    @__far_call_2	// bank:addr in R12:R13
+end;
+
 
 begin
     output.fileidx := 0;
