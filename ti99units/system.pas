@@ -193,8 +193,8 @@ type
         saved_display: array [0..7] of integer
     end;
     
-function Setjmp (var s: jmp_buf): integer;
-procedure Longjmp (var s: jmp_buf; value: integer);
+function setjmp (var s: jmp_buf): integer;
+procedure longjmp (var s: jmp_buf; value: integer);
 
 implementation
 
@@ -1051,7 +1051,7 @@ function __set_super_not_equal (var s, t: __set_array): boolean;
     end;
     
     
-function Setjmp (var s: jmp_buf): integer; assembler;
+function setjmp (var s: jmp_buf): integer; assembler;
         mov  *r10, r12
         clr  *r12		// return 0
         
@@ -1074,7 +1074,7 @@ function Setjmp (var s: jmp_buf): integer; assembler;
         mov  *r13, *r12
 end;
 
-procedure Longjmp (var s: jmp_buf; value: integer); assembler;
+procedure longjmp (var s: jmp_buf; value: integer); assembler;
         mov  @s, r11
         
         mov  *r11+, r12		// ret_bank

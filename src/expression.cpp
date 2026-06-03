@@ -862,7 +862,7 @@ TExpressionBase *TFactor::parse (TBlock &block) {
         expr = compiler.createMemoryPoolObject<TConstantValue> (block.parseConstantLiteral ());
         if (token == TToken::StringConst) {
 #ifdef CREATE_9900        
-//            expr = createRuntimeCall ("__copy_str_const", &stdType.ShortString, {expr}, block, false);
+            expr = createRuntimeCall ("__copy_str_const", &stdType.ShortString, {expr}, block, false);
 #else            
             expr = createRuntimeCall ("__str_make", nullptr, {expr, TExpressionBase::createVariableAccess (TConfig::globalRuntimeDataPtr, block)}, block, false);
 #endif            
@@ -902,7 +902,7 @@ TExpressionBase *TFactor::parseIdentifier (TBlock &block) {
 #endif
                 } else if (symbol->getType ()->isShortString ()) {
 #ifdef CREATE_9900
-//                    expr = createRuntimeCall ("__copy_str_const", symbol->getType (), {expr}, block, false);
+                    expr = createRuntimeCall ("__copy_str_const", symbol->getType (), {expr}, block, false);
 #endif                
                 }
             } else if (symbol->checkSymbolFlag (TSymbol::Routine))
