@@ -102,10 +102,19 @@ function __read_string (var f: text): string;
 procedure __read_lf (var f: text);
 
 const
-    TooManyOpenFiles = 1;
-    FileOpenFailed = 2;
-    InvalidFileName = 3;
-    FileNotOpen = 4;
+    FileNoError = 0;
+    FileWriteProtected = 1;
+    FileBadAttributes = 2;
+    FileIllegalOperation = 3;
+    FileDiskFull = 4;
+    FilePastEOF = 5;
+    FileDeviceError = 6;
+    FileError = 7;
+    
+    FileMaxOpen = 8;
+    FileInvalidDsrName = 9;
+    FileInvalidName = 10;
+    FileNotOpen = 11;
 
 var
    InOutRes: integer;
@@ -446,7 +455,7 @@ function __read_line_console: string;
                     if odd (count shr 8) then write (' ') else write (#$1f)
                 end
         until ch = Enter;
-        writeln
+// !!!!        writeln
     end;
 
 procedure __write_lf (var f: text);
@@ -551,7 +560,24 @@ procedure __assign (var f; filename: string);
         __file_data (f).pab.name := filename
     end;
     
-function getFileDescriptor (var f: __file_data; isTextFile: boolean): boolean;
+function execDsr (var f: __file_data): integer;
+    begin
+        if dsrLink (f.pab, openFiles [f.fileidx].pabAddr) then
+            execDsr := f.pab.err_type shr 5
+        else
+            execDsr := FileInvalidDsrName
+    end;
+    
+procedure releaseFileBuffer (var f: __file_data);
+    begin
+        if f.fileidx > 0 then
+            begin
+                openFiles [f.fileidx].isOpen := false;
+                f.fileidx := -1
+            end
+    end;
+
+procedure openFile (var f: __file_data; opcode, ftype, reclen: uint8; isTextFile: boolean);
     var
         i: integer;
     begin
@@ -563,7 +589,7 @@ function getFileDescriptor (var f: __file_data; isTextFile: boolean): boolean;
             if isTextFile then
                 f.fileidx := 0
             else
-                InOutRes := InvalidFileName
+                InOutRes := FileInvalidName
         else
             begin
                 i := 1;
@@ -578,23 +604,15 @@ function getFileDescriptor (var f: __file_data; isTextFile: boolean): boolean;
                     inc (i)
                 until (i > nFiles) or (f.fileidx <> -1)
             end;
-        InOutRes := TooManyOpenFiles * ord (f.fileidx = -1);
-        getFileDescriptor := InOutRes = 0
-    end;
-        
-function execDsr (var f: __file_data): boolean;
-    begin
-        execDsr := dsrLink (f.pab, openFiles [f.fileidx].pabAddr)
-    end;        
-
-procedure openFile (var f: __file_data; opcode, ftype, reclen: uint8; isTextFile: boolean);
-    begin
-        if getFileDescriptor (f, isTextFile) and (f.fileidx <> 0) then
+        InOutRes := FileMaxOpen * ord (f.fileidx = -1);
+        if (InOutRes = 0) and (f.fileidx <> 0) then
             begin
                 f.pab.opcode := opcode;
                 f.pab.err_type := ftype;
                 f.pab.reclen := reclen;
-                InOutRes := FileOpenFailed * ord (not execDsr (f))
+                InOutRes := execDsr (f);
+                if InOutRes <> FileNoError then
+                    releaseFileBuffer (f);
             end
     end;
 
@@ -628,7 +646,7 @@ procedure __write_bin_ign (var f; var data; blocks: integer);
         for i := 0 to pred (blocks) do
             begin
                 vmbw (arrtype (data) [i * __file_data (f).pab.reclen], __file_data (f).pab.vdpaddr, __file_data (f).pab.reclen);
-                execDsr (__file_data (f))
+                InOutRes := execDsr (__file_data (f))
             end
     end;        
     
@@ -652,8 +670,9 @@ procedure __read_bin_ign (var f; var data; blocks: integer);
         __file_data (f).pab.opcode := PabRead;
         for i := 0 to pred (blocks) do
             begin
-                execDsr (__file_data (f));
-                vmbr (arrtype (data) [i * __file_data (f).pab.reclen], __file_data (f).pab.vdpaddr, __file_data (f).pab.reclen)
+                InOutRes := execDsr (__file_data (f));
+                if InOutRes = FileNoError then
+                    vmbr (arrtype (data) [i * __file_data (f).pab.reclen], __file_data (f).pab.vdpaddr, __file_data (f).pab.reclen)
             end
     end;        
     
@@ -698,14 +717,18 @@ function  __read_char (var f: text): char;
     
 function __read_string (var f: text): string;
     begin
+        __read_string := '';
         if f.fileidx = 0 then
             __read_string := __read_line_console
         else if f.fileidx > 0 then
             begin
                 f.pab.opcode := PabRead;
-                execDsr (__file_data (f));
-                vmbr (result [1], f.pab.vdpaddr, f.pab.numchar);
-                result [0] := chr (f.pab.numchar)
+                InOutRes := execDsr (__file_data (f));
+                if InOutRes = FileNoError then
+                    begin
+                        vmbr (result [1], f.pab.vdpaddr, f.pab.numchar);
+                        result [0] := chr (f.pab.numchar)
+                    end
             end
         else
             InOutRes := FileNotOpen
@@ -713,19 +736,17 @@ function __read_string (var f: text): string;
     
 procedure __close (var f);
     begin
-        InOutRes := 0;
         with __file_data (f) do
             begin
                 if fileidx > 0 then
                     begin
                         pab.opcode := PabClose;
-                        execDsr (__file_data (f));
-                        openFiles [fileidx].isOpen := false;
-                        fileidx := -1
+                        InOutRes := execDsr (__file_data (f));
+                        releaseFileBuffer (__file_data (f))
                     end
                 else
                     if fileidx < 0 then
-                        InOutRes := 1
+                        InOutRes := FileNotOpen
             end
     end;
     
@@ -734,7 +755,7 @@ procedure __erase (var f);
         if __file_data (f).fileidx > 0 then
             begin
                 __file_data (f).pab.opcode := PabDelete;
-                execDsr (__file_data (f))
+                InOutRes := execDsr (__file_data (f))
             end
         else
             InOutRes := FileNotOpen
@@ -745,7 +766,7 @@ function __eof (var f): boolean;
         if __file_data (f).fileidx > 0 then
             begin
                 __file_data (f).pab.opcode := PabStatus;
-                execDsr (__file_data (f));
+                InOutRes := execDsr (__file_data (f));
                 __eof := __file_data (f).pab.status and $01 <> 0;
             end
         else
@@ -763,9 +784,11 @@ procedure __end_line (var f: text);
             begin
                 f.pab.opcode := PabWrite;
                 f.pab.numchar := f.bufpos;
-                execDsr (__file_data (f));
+                InOutRes := execDsr (__file_data (f));
                 f.bufpos := 0
             end
+        else
+            InOutRes := FileNotOpen
     end;
 
     
@@ -1102,5 +1125,6 @@ begin
     output.fileidx := 0;
     input.fileidx := 0;
     setVideoMode (TextMode);
-    reserveVdpBufs
+    reserveVdpBufs;
+    InOutRes := FileNoError
 end.
