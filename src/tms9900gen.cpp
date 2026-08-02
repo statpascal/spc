@@ -1,7 +1,7 @@
 /** \file tms9900gen.hpp
 */
 
-#define NO_INT
+// #define NO_INT
 
 #include <dlfcn.h>
 #include <unistd.h>

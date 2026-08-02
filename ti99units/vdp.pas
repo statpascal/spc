@@ -58,6 +58,7 @@ procedure enableScreenSaver (b: boolean);
 procedure setCRUBit (addr: integer; val: boolean);
 procedure limi0;
 procedure limi2;
+procedure setVdpReg (nr, val: uint8);
 
 
 implementation
