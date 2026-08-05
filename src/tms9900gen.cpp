@@ -2149,28 +2149,29 @@ void T9900Generator::generateCode (TProgram &program) {
             codePop (intScratchReg2);
             outputCode (T9900Op::clr, T9900Operand (intScratchReg2, T9900Operand::TAddressingMode::RegInd), T9900Operand (), "switch bank");
             outputCode (T9900Op::b, T9900Operand (T9900Reg::r11, T9900Operand::TAddressingMode::RegInd));
-            
-            outputComment (std::string ());
-            outputLabel (copyStr);
-            outputCode (T9900Op::mov, T9900Operand (T9900Reg::r10, T9900Operand::TAddressingMode::RegInd), intScratchReg2);
-            outputCode (T9900Op::mov, T9900Operand (T9900Reg::r10, 2), intScratchReg3);
-            outputCode (T9900Op::movb, T9900Operand (intScratchReg3, T9900Operand::TAddressingMode::RegInd), intScratchReg4);
-            outputCode (T9900Op::sra, intScratchReg4, 8);
-            const std::string ll = getNextLocalLabel ();
-            outputLabel (ll);
-            outputCode (T9900Op::movb, T9900Operand (intScratchReg3, T9900Operand::TAddressingMode::RegIndInc), T9900Operand (intScratchReg2, T9900Operand::TAddressingMode::RegIndInc));
-            outputCode (T9900Op::dec, intScratchReg4);
-            outputCode (T9900Op::joc, ll);
-            outputCode (T9900Op::ai, T9900Reg::r10, 4);
-            outputCode (T9900Op::b, T9900Operand (T9900Reg::r11, T9900Operand::TAddressingMode::RegInd));
         }
     }
+        
+    outputComment (std::string ());
+    outputLabel (copyStr);
+    outputCode (T9900Op::mov, T9900Operand (T9900Reg::r10, T9900Operand::TAddressingMode::RegInd), intScratchReg2);
+    outputCode (T9900Op::mov, T9900Operand (T9900Reg::r10, 2), intScratchReg3);
+    outputCode (T9900Op::movb, T9900Operand (intScratchReg3, T9900Operand::TAddressingMode::RegInd), intScratchReg4);
+    outputCode (T9900Op::sra, intScratchReg4, 8);
+    std::string ll = getNextLocalLabel ();
+    outputLabel (ll);
+    outputCode (T9900Op::movb, T9900Operand (intScratchReg3, T9900Operand::TAddressingMode::RegIndInc), T9900Operand (intScratchReg2, T9900Operand::TAddressingMode::RegIndInc));
+    outputCode (T9900Op::dec, intScratchReg4);
+    outputCode (T9900Op::joc, ll);
+    outputCode (T9900Op::ai, T9900Reg::r10, 4);
+    outputCode (T9900Op::b, T9900Operand (T9900Reg::r11, T9900Operand::TAddressingMode::RegInd));
+    
     outputComment (std::string ());
     outputLabel (copySet);
     outputCode (T9900Op::mov, T9900Operand (T9900Reg::r10, T9900Operand::TAddressingMode::RegInd), intScratchReg2);
     outputCode (T9900Op::mov, T9900Operand (T9900Reg::r10, 2), intScratchReg3);
     outputCode (T9900Op::li, intScratchReg4, 16);
-    std::string ll = getNextLocalLabel ();
+    ll = getNextLocalLabel ();
     outputLabel (ll);
     outputCode (T9900Op::mov, T9900Operand (intScratchReg3, T9900Operand::TAddressingMode::RegIndInc), T9900Operand (intScratchReg2, T9900Operand::TAddressingMode::RegIndInc));
     outputCode (T9900Op::dec, intScratchReg4);

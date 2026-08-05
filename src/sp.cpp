@@ -68,7 +68,8 @@ void compile9900 (int argc, char **argv) {
     std::filesystem::path exepath = std::filesystem::read_symlink ("/proc/self/exe");
     compiler.setUnitSearchPathes ({".", file.parent_path ().string (), exepath.parent_path ().string () + "/../ti99units"});
     
-    compiler.compile ();
+    if (compiler.compile () == sp::TCompiler::TCompileResult::Error)
+        exit (1);
     
     std::vector<std::string> listing;
     std::vector<std::uint8_t> opcodes;

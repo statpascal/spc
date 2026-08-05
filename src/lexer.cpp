@@ -1,4 +1,5 @@
 #include "lexer.hpp"
+#include "config.hpp"
 
 #include <unordered_map>
 #include <limits>
@@ -198,7 +199,9 @@ void TLexer::TLexerImpl::setFilename (const std::string &fn) {
 void TLexer::TLexerImpl::checkConditional () {
     sVal.clear ();
     if (std::string (sourceIt, 7) == "{$ifdef") {
-        if (std::string (sourceIt, 13) != "{$ifdef ti99}") {
+        if ((std::string (sourceIt, 13) != "{$ifdef ti99}") && 
+            (std::string (sourceIt, 20) != "{$ifdef ti99-banked}" || TConfig::target != TConfig::TTarget::TI_BANKCART) &&
+            (std::string (sourceIt, 19) != "{$ifdef ti99-plain}" || TConfig::target == TConfig::TTarget::TI_BANKCART))
             while (*sourceIt && std::string (sourceIt, 8) != "{$endif}") {
                 if (*sourceIt == '\n') {
                     ++lineNumber;
@@ -206,7 +209,6 @@ void TLexer::TLexerImpl::checkConditional () {
                 }
                 ++sourceIt;
             }
-        }
     } else if (std::string (sourceIt, 9) == "{$bank:on")
         currentToken = TToken::BankOn;
     else if (std::string (sourceIt, 10) == "{$bank:off")

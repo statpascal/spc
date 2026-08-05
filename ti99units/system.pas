@@ -1117,7 +1117,12 @@ procedure longjmp (var s: jmp_buf; value: integer); assembler;
         mov  *r11+, *r14+
         mov  *r11, *r14
         
+{$ifdef ti99-banked}        
         b    @__far_call_2	// bank:addr in R12:R13
+{$endif}
+{$ifdef ti99-plain}
+        b    *r13
+{$endif}
 end;
 
 
