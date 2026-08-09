@@ -224,8 +224,8 @@ function peekV (addr: integer): uint8;
 procedure setVideoMode (mode: TVideoMode);    
     const
         vdpRegs: array [TVideoMode, 0..7] of uint8 = (
-            ($00, $f0, $01, $00, $00, $00, $00, $17),
-            ($00, $e0, $00, $0e, $01, $06, $00, $07),
+            ($00, $f0, $01, $00, $00, $00, $00, $00),
+            ($00, $e0, $00, $0e, $01, $06, $00, $00),
             ($02, $e0, $06, $ff, $03, $78, $07, $00)
         );
     var
@@ -233,8 +233,9 @@ procedure setVideoMode (mode: TVideoMode);
         screen: array [0..255] of uint8;
     begin
         videoMode := mode;
+        setVdpReg (7, ord (foreColor) shl 4 or ord (backColor));
         setVdpReg (1, $80);	// screen off
-        for i := 2 to 7 do
+        for i := 2 to 6 do
             setVdpReg (i, vdpRegs [videoMode, i]);
         case videoMode of
             TextMode:
@@ -247,7 +248,7 @@ procedure setVideoMode (mode: TVideoMode);
                 begin
                     imageTableEnd := imageTable + 24 * 32;
                     loadCharSet ($06b4, patternTable);
-                    setTextColor (black);
+                    setTextColor (foreColor);
                     clrscr;
                 end;
             BitmapMode:
@@ -551,4 +552,7 @@ procedure limi2; assembler;
     limi 2
 end;
     
+begin
+    foreColor := black;
+    backColor := cyan
 end.
