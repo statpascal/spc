@@ -58,7 +58,8 @@ procedure enableScreenSaver (b: boolean);
 procedure setCRUBit (addr: integer; val: boolean);
 procedure limi0;
 procedure limi2;
-procedure setVdpReg (nr, val: uint8);
+procedure setVdpReg (nr, val: uint8);		
+function getVdpReg (nr: uint8): uint8;	// returns cached value from setVdpReg
 
 
 implementation
@@ -167,6 +168,9 @@ procedure loadCharSet (gromAddr, vdpAddr: integer);
         limi2
     end;
     
+var
+    vdpRegs: array [0..7] of uint8;
+    
 procedure setVdpReg (nr, val: uint8);
     var
         dummy: char;
@@ -175,6 +179,7 @@ procedure setVdpReg (nr, val: uint8);
         dummy := vdpsta;
         vdpwa := chr (val);
         vdpwa := chr ($80 + nr);
+        vdpRegs [nr] := val;
         case nr of
             1:
                 memb [$83d4] := val;		// Copy for KSCAN routine
@@ -209,6 +214,14 @@ procedure setVdpReg (nr, val: uint8);
                 end
         end;
         limi2
+    end;
+    
+function getVdpReg (nr: uint8): uint8;
+    begin
+        if nr = 1 then
+            getVdpReg := memb [$83d4] 
+        else
+            getVdpReg := vdpRegs [nr]
     end;
         
 procedure pokeV (addr: integer; val: uint8);
