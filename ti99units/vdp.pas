@@ -70,7 +70,10 @@ const
 var
     vdpWriteAddress, imageTableEnd: integer;
     videoMode: TVideoMode;
-    foreColor, backColor: TColor;
+    
+const
+    foreColor: TColor = black;
+    backColor: TColor = cyan;
     
 procedure setVdpAddress (n: integer);
     begin
@@ -97,7 +100,7 @@ procedure vmbw (var src; dest, length: integer); assembler;
         movb *r12+, *r15
         dec r14
         jne vmbw_1
-        limi 2
+//        limi 2
         
     vmbw_2:
 end;
@@ -120,7 +123,7 @@ procedure vmbr (var dest; src, length: integer); assembler;
         movb *r15, *r12+
         dec r14
         jne vmbr_1
-        limi 2
+//        limi 2
         
     vmbr_2:
 end;
@@ -143,7 +146,7 @@ procedure vrbw (dest: integer; val: uint8; length: integer); assembler;
         movb r14, *r13
         dec r12
         jne vrbw_1
-        limi 2
+//        limi 2
         
     vrbw_2:
 end;
@@ -165,7 +168,7 @@ procedure loadCharSet (gromAddr, vdpAddr: integer);
                     vdpwd := gromrd;
                 vdpwd := #0
             end;
-        limi2
+//        limi2
     end;
     
 var
@@ -213,7 +216,7 @@ procedure setVdpReg (nr, val: uint8);
                     backColor := TColor (val and $0f)
                 end
         end;
-        limi2
+//        limi2
     end;
     
 function getVdpReg (nr: uint8): uint8;
@@ -236,11 +239,12 @@ function peekV (addr: integer): uint8;
 
 procedure setVideoMode (mode: TVideoMode);    
     const
-        vdpRegs: array [TVideoMode, 0..7] of uint8 = (
-            ($00, $f0, $01, $00, $00, $00, $00, $00),
-            ($00, $e0, $00, $0e, $01, $06, $00, $00),
-            ($02, $e0, $06, $ff, $03, $78, $07, $00)
+        vdpRegs: array [TVideoMode, 0..6] of uint8 = (
+            ($00, $f0, $01, $00, $00, $00, $00),
+            ($00, $e0, $00, $0e, $01, $06, $00),
+            ($02, $e0, $06, $ff, $03, $78, $07)
         );
+        
     var
         i: integer;
         screen: array [0..255] of uint8;
@@ -468,7 +472,7 @@ procedure _rt_scroll_up (start, stop, len, inc1, inc2: integer) near; assembler;
         dec r8
         jne _rt_scroll_up_4
         
-        limi 2
+//        limi 2
 end;
 
 procedure scroll;
@@ -511,7 +515,7 @@ procedure outputString (p: PChar; outlen: integer);
             movb *r13+, *r14
             dec r12
             jne __write_data_1
-            limi 2
+//            limi 2
             
         __write_data_2:
     end;
@@ -562,10 +566,10 @@ procedure limi0; assembler;
 end;
 
 procedure limi2; assembler;
-    limi 2
+//    limi 2
 end;
     
 begin
     foreColor := black;
-    backColor := cyan
+    setBackColor (cyan)
 end.

@@ -982,7 +982,7 @@ function keypressed: boolean; assembler;
     keypressed_2:
         mov *r10, r12
         movb r15, *r12
-        limi 2
+//        limi 2
     end;
 
 procedure waitkey;

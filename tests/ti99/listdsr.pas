@@ -9,6 +9,7 @@ var
     
 begin
     // make sure all cards are turned off
+    limi0;    
     for cruAddr := $10 to $1f do
         setCRUBit (cruAddr shl 8, false);
         
@@ -28,5 +29,6 @@ begin
         setCRUBit (cruAddr, false);
         inc (cruAddr, $100)
     until cruAddr = $2000;
+//    limi2;
     waitkey
 end.

@@ -107,6 +107,8 @@ function dsrLink (var pab: TPab; pabVdpAddr: integer): boolean;
         memW [$8356 div 2] := pabVdpAddr + 10 + len;
         memW [$8354 div 2] := len;
         
+        limi0;
+        
         // make sure all cards are turned off
         for cruAddr := $10 to $1f do
             setCRUBit (cruAddr shl 8, false);
@@ -141,6 +143,8 @@ function dsrLink (var pab: TPab; pabVdpAddr: integer): boolean;
             setCRUBit (cruAddr, false);
             inc (cruAddr, $100)
         until (cruAddr = $2000) or completed;
+        
+        limi2;
         
         vmbr (pab, pabVdpAddr, sizeof (TPab));
         dsrLink := completed
