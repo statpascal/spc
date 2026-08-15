@@ -144,9 +144,7 @@ function dsrLink (var pab: TPab; pabVdpAddr: integer): boolean;
             inc (cruAddr, $100)
         until (cruAddr = $2000) or completed;
         
-        limi2;
-        
-        vmbr (pab, pabVdpAddr, sizeof (TPab));
+        vmbr (pab, pabVdpAddr, sizeof (TPab)); // vmbr reactivates interrupts if set by enableInterrupts 
         dsrLink := completed
     end;
 

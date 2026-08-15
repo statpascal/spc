@@ -364,29 +364,6 @@ procedure fillChar (var dest; count: integer; value: uint8);
         fillChar (dest, count, chr (value))
     end;
     
-function getKey: char;
-    var
-        keyboardMode: byte absolute $8374;
-        keyPressed: byte absolute $8375;
-        gplStatus: byte absolute $837c;
-        
-    procedure scanKey; assembler;
-           lwpi >83e0
-           bl @>000e
-           lwpi >8300
-    end;
-
-    begin
-        limi0;
-        keyboardMode := 4;
-        scanKey;
-        if gplStatus and $20 <> 0 then
-            getKey := chr (keyPressed)
-        else
-            getKey := InvalidKey;
-        limi2
-    end;
-
 // RNG
     
 var
@@ -961,6 +938,35 @@ procedure __str_int (n, length, precision: integer; s: PChar);
             move (p^, s^, succ (ord (p^)))
     end;
     
+function getKey: char;
+    var
+        keyboardMode: byte absolute $8374;
+        keyPressed: byte absolute $8375;
+        gplStatus: byte absolute $837c;
+        
+    procedure scanKey; assembler;
+           lwpi >83e0
+           bl @>000e
+           lwpi >8300
+    end;
+
+    begin
+        limi0;
+        keyboardMode := 4;
+        scanKey;
+        if gplStatus and $20 <> 0 then
+            getKey := chr (keyPressed)
+        else
+            getKey := InvalidKey;
+        limi2
+    end;
+
+function keypressed: boolean;
+    begin
+        keypressed := getKey <> InvalidKey
+    end;
+    
+(*
 function keypressed: boolean; assembler;
         limi 0
         clr r14
@@ -982,8 +988,9 @@ function keypressed: boolean; assembler;
     keypressed_2:
         mov *r10, r12
         movb r15, *r12
-//        limi 2
+//        limi 2	<- TODO if routine is used again
     end;
+*)
 
 procedure waitkey;
     begin

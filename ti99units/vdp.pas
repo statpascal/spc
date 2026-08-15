@@ -52,6 +52,7 @@ procedure outputString (p: PChar; outlen: integer);
 procedure outputLine;
 
 procedure enableScreenSaver (b: boolean);
+procedure enableInterrupts (b: boolean);
 
 // other low level routines
 
@@ -74,7 +75,17 @@ var
 const
     foreColor: TColor = black;
     backColor: TColor = cyan;
+    interruptsEnabled: boolean = true;
     
+procedure enableInterrupts (b: boolean);
+    begin
+        interruptsEnabled := b;
+        if b then
+            limi2
+        else
+            limi0
+    end;
+        
 procedure setVdpAddress (n: integer);
     begin
         vdpwa := chr (n and 255);
@@ -100,7 +111,10 @@ procedure vmbw (var src; dest, length: integer); assembler;
         movb *r12+, *r15
         dec r14
         jne vmbw_1
-//        limi 2
+        
+        movb @interruptsEnabled, r12
+        jeq vmbw_2
+        limi 2
         
     vmbw_2:
 end;
@@ -123,7 +137,10 @@ procedure vmbr (var dest; src, length: integer); assembler;
         movb *r15, *r12+
         dec r14
         jne vmbr_1
-//        limi 2
+        
+        movb @interruptsEnabled, r12
+        jeq vmbr_2
+        limi 2
         
     vmbr_2:
 end;
@@ -146,7 +163,10 @@ procedure vrbw (dest: integer; val: uint8; length: integer); assembler;
         movb r14, *r13
         dec r12
         jne vrbw_1
-//        limi 2
+        
+        movb @interruptsEnabled, r12
+        jeq vrbw_2
+        limi 2
         
     vrbw_2:
 end;
@@ -168,7 +188,7 @@ procedure loadCharSet (gromAddr, vdpAddr: integer);
                     vdpwd := gromrd;
                 vdpwd := #0
             end;
-//        limi2
+        limi2
     end;
     
 var
@@ -216,7 +236,7 @@ procedure setVdpReg (nr, val: uint8);
                     backColor := TColor (val and $0f)
                 end
         end;
-//        limi2
+        limi2
     end;
     
 function getVdpReg (nr: uint8): uint8;
@@ -471,8 +491,12 @@ procedure _rt_scroll_up (start, stop, len, inc1, inc2: integer) near; assembler;
         movb r12, *r15
         dec r8
         jne _rt_scroll_up_4
+
+        movb @interruptsEnabled, r12
+        jeq _rt_scroll_up_5
+        limi 2
         
-//        limi 2
+    _rt_scroll_up_5:
 end;
 
 procedure scroll;
@@ -515,7 +539,10 @@ procedure outputString (p: PChar; outlen: integer);
             movb *r13+, *r14
             dec r12
             jne __write_data_1
-//            limi 2
+            
+            movb @interruptsEnabled, r12
+            jeq __write_data_2
+            limi 2
             
         __write_data_2:
     end;
@@ -555,6 +582,7 @@ procedure enableScreenSaver (b: boolean);
         clrsc := ord (not b)
     end;
     
+    
 procedure setCRUBit (addr: integer; val: boolean); assembler;
         mov  *r10, r12
         mov  @2(r10), r13
@@ -566,7 +594,10 @@ procedure limi0; assembler;
 end;
 
 procedure limi2; assembler;
-//    limi 2
+        movb @interruptsEnabled, r12
+        jeq  limi2_done
+        limi 2
+    limi2_done
 end;
     
 begin
