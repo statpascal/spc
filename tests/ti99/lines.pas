@@ -48,6 +48,7 @@ begin
     q [1] := d;
     
     setVideoMode (BitmapMode);
+    setBackColor (black);
     
     count := 0;
     repeat

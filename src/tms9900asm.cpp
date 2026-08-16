@@ -93,7 +93,7 @@ const std::vector<T9900OpDescription> opDescription = {
     {T9900Op::data,      0, "data", T9900Format::F_None},
     {T9900Op::byte,      0, "byte", T9900Format::F_None},
     {T9900Op::text,      0, "text", T9900Format::F_None},
-    {T9900Op::text,      0, "bank", T9900Format::F_None},
+    {T9900Op::bank,      0, "bank", T9900Format::F_None},
     {T9900Op::end,       0, "end",  T9900Format::F_None}
 };
 

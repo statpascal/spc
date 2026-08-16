@@ -254,7 +254,11 @@ procedure initHeap (first, size: integer);
     end;        
     
 procedure halt; assembler;
-        blwp @0
+        li   r0, >04e0
+        li   r1, >6000	// clr @>6000
+        li   r2, >0420
+        clr  r3		// blwp @>0000
+        b    r0
 end;
 
 // 

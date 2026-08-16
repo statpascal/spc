@@ -1,0 +1,56 @@
+; Menu/bank switching header to put in bank 0 that combines multiple SP
+; programs
+
+	aorg	>6000
+	
+	data	>aa01		; standard header
+	data	>0200		; 2 programs
+	data	>0000		; power up list
+	data	proglist_0	; program list
+	data	>0000		; DSR list
+	data	>0000		; subprogram list
+	data	>0000		; ISR list
+
+proglist_0:
+	data	proglist_1
+	data	lines_start
+	byte	>05
+	text	'LINES'
+	even
+
+proglist_1:
+	data	>0000		; no next program
+	data	phoenix_start
+	byte	>0D
+	text	'PHOENIX CHESS'
+	even
+	
+lines_start:
+	lwpi	>8300
+	bl	@chain_prog
+	data	>6002		; bank 1
+	data	>6052		; start address
+
+phoenix_start:
+	lwpi	>8300
+	bl	@chain_prog
+	data	>6004		; bank 2
+	data	>6054		; start address
+
+chain_prog:
+	li	r0, >8320
+	mov	@clr_op, *r0+
+	mov	*r11+, *r0+
+	mov	@b_op, *r0+
+	mov	*r11, *r0
+
+	b	@>8320
+	
+
+clr_op:
+	clr	@0
+b_op:
+	b	@0
+
+	aorg	>7ffe		; force 8 KB binary
+	data	>0000

@@ -703,7 +703,7 @@ void T9900Generator::assignBank (TCodeGroup &codeGroup) {
         std::cout << "Code size of group starting with" << name << " exceeds bank size" << std::endl;
         exit (1);
     }
-    unsigned bank = 0;
+    unsigned bank = TConfig::startBank;
     while (bank <= maxBank && bankOffset [bank] + codeGroup.size > 0x7ffe)
         ++bank;
         
@@ -778,7 +778,7 @@ void T9900Generator::getAssemblerCode (std::vector<std::uint8_t> &opcodes, bool 
     std::sort (codeGroups.begin (), codeGroups.end (), [] (const TCodeGroup &a, const TCodeGroup &b) { return a.size > b.size; });
             
     if (TConfig::target == TConfig::TTarget::TI_BANKCART) {
-        maxBank = 0;
+        maxBank = TConfig::startBank;
         bankOffset [maxBank] = 0x6000;
         assignBank (sharedGroup);
         
@@ -2185,7 +2185,7 @@ void T9900Generator::generateCode (TProgram &program) {
 #ifdef NO_INT
     outputCode (T9900Op::limi, 0);
 #endif    
-    if (TConfig::target == TConfig::TTarget::TI_BANKCART)
+    if (TConfig::target == TConfig::TTarget::TI_BANKCART && !TConfig::startBank)
         outputCode (T9900Op::clr, T9900Operand (0x6000, T9900Operand::TAddressingMode::Memory), T9900Operand (), "activate bank 0");
 //    outputCode (T9900Op::b, makeLabelMemory ("__main_start"));
     
@@ -2315,8 +2315,17 @@ void T9900Generator::endRoutineBody (std::size_t level, TSymbolList &symbolList,
             outputCode (T9900Op::b, makeLabelMemory (farRet));
         else
             outputCode (T9900Op::b, T9900Operand (T9900Reg::r11, T9900Operand::TAddressingMode::RegInd));
-    } else
-        outputCode (T9900Op::blwp, T9900Operand (T9900Reg::r0, 0));
+    } else {
+        if (TConfig::target == TConfig::TTarget::TI_BANKCART) {
+            // active bank 0
+            outputCode (T9900Op::li, T9900Reg::r0, 0x04E0);
+            outputCode (T9900Op::li, T9900Reg::r1, 0x6000);	// CLR @>6000
+            outputCode (T9900Op::li, T9900Reg::r2, 0x0420);
+            outputCode (T9900Op::clr, T9900Reg::r3);		// BLWP @>0000
+            outputCode (T9900Op::b, T9900Reg::r0);
+        } else
+            outputCode (T9900Op::blwp, T9900Operand (T9900Reg::r0, 0));
+    }
 }
 
 TCodeGenerator::TParameterLocation T9900Generator::classifyType (const TType *type) {

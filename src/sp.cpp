@@ -6,6 +6,7 @@
 #include <filesystem>
 #include <iterator>
 #include <chrono>
+#include <boost/program_options.hpp>
 
 #include "compiler.hpp"
 #include "x64generator.hpp"
@@ -53,18 +54,53 @@ private:
 
 
 void compile9900 (int argc, char **argv) {
+    namespace po = boost::program_options;
+    bool buildCart = false, buildEA5 = false;
+    std::string inputFile, outputFile;
+    po::options_description desc ("StatPascal cross compiler for TMS9900 version " __DATE__ " " __TIME__);
+    desc.add_options ()
+        ("help", "Show help")
+        ("cart", po::bool_switch (&buildCart), "Build unbanked cartridge")
+        ("ea5",  po::bool_switch (&buildEA5), "Build EA5 program")
+        ("bank", po::value<std::uint16_t> (&sp::TConfig::startBank)->default_value (0), "First bank used in cart")
+        ("input-file,i", po::value<std::string> (&inputFile), "Input file")
+        ("output-file,o", po::value<std::string> (&outputFile)->default_value ("out.a99"), "Output file")
+    ;
+    po::positional_options_description p;
+    p.add ("input-file", -1);
+        
+    po::variables_map vm;
+    try {    
+        po::store (po::command_line_parser (argc, argv).options (desc).positional (p).run (), vm);
+        po::notify (vm);
+    }
+    catch (std::exception &e) {
+        std::cout << "Error parsing command line:: " << e.what () << std::endl
+                  << argv [0] << " --help for help" << std::endl;
+        exit (1);
+    }
+    
+    if (vm.count ("help")) {
+        std::cout << desc << std::endl;
+        exit (0);
+    }
+    if (!vm.count ("input-file")) {
+        std::cout << "sp: not input file" << std::endl;
+        exit (1);
+    }
+
     sp::TConfig::target = sp::TConfig::TTarget::TI_BANKCART;
-    if (haveParameter ("--cart", argc, argv))
+    if (buildCart)
         sp::TConfig::target = sp::TConfig::TTarget::TI_CART;
-    if (haveParameter ("--ea5", argc, argv))
+    if (buildEA5)
         sp::TConfig::target = sp::TConfig::TTarget::TI_EA5;
 
     sp::TRuntimeData runtimeData;
     sp::T9900Generator generator (runtimeData);
     sp::TCompiler compiler (generator);
     
-    compiler.setFilename (argv [1]);
-    std::filesystem::path file (argv [1]);
+    compiler.setFilename (inputFile);
+    std::filesystem::path file (inputFile);
     std::filesystem::path exepath = std::filesystem::read_symlink ("/proc/self/exe");
     compiler.setUnitSearchPathes ({".", file.parent_path ().string (), exepath.parent_path ().string () + "/../ti99units"});
     
@@ -75,7 +111,7 @@ void compile9900 (int argc, char **argv) {
     std::vector<std::uint8_t> opcodes;
     generator.getAssemblerCode (opcodes, true, listing);
     
-    std::ofstream f ("out.a99");
+    std::ofstream f (outputFile);
     std::copy (listing.begin (), listing.end (), std::ostream_iterator<std::string> (f, "\n"));
 }
 

@@ -13,7 +13,8 @@ SRC = compiler.cpp anymanager.cpp expression.cpp predefined.cpp constant.cpp \
       x64generator.cpp x64asm.cpp a64gen.cpp a64asm.cpp tms9900gen.cpp tms9900asm.cpp
 OBJ = $(patsubst %.cpp,$(OBJDIR)/%.o,$(SRC))
 
-LIBS = -ldl -lffi -lm -lstdc++ -lstdc++fs -pthread
+LIBS = -ldl -lffi -lm -lstdc++ -lstdc++fs -pthread -lboost_program_options
+
 CPPFLAGS = -g -std=c++20 -pthread -Wall -pedantic 
 # CPPFLAGS += -g -std=c++20 -O3 -fomit-frame-pointer -falign-functions=16 -march=native -funroll-loops 
 ifeq ($(CXX),clang++)
