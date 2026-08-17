@@ -12,6 +12,67 @@ Linux calling conventions on the above architectures so the generated code does
 As a toy project, a code generator for the TI99/4A (see next section) is in
 development.
 
+## Requirements
+
+A compiler with support for C++20 and (some) Boost libraries are required.
+On Debian and derived systems, the latter ones can be installed with
+
+    sudo apt install libboost-all-dev
+
+## Code generation for the TI99/4A
+
+This is work in progress.
+
+The compiler can produce an (optionally bank switched) ROM cartridge or an
+EA5 image for the TI99/4A.  The upper memory (24 KB) is used for global
+variables and stack frames (and also code starting at A000 for EA5),
+the lower memory (8 KB) as heap for dynamic allocations.
+
+Using the bank switching features of the FinalGROM 99, code sizes of up to
+1 MB are possible.
+
+There is no floating point yet and the runtime library is rather limited. 
+Dynamic memory management currently uses a *mark/release* style. Input is
+limited to a single variable in a *readln* call.
+
+To enable the TI99 mode, execute the makefile with the option *ti99=1*:
+
+```
+make clean
+make ti99=1
+```
+
+This will set the default unit search path of the compiler to the *ti99units* directory. The
+*system.pas* in this directory (which is included by default) contains the
+runtime library. The *tests/ti99* directory shows what is
+already working.
+
+Compiling a program in this mode produces the assembler source *out.a99*,
+which can be assembled with xas99, e.g.
+
+```
+user@host:~/src/statpascal> obj/sp tests/ti99/sieve.pas 
+user@host:~/src/statpascal> ~/ti99/xdt99/xas99.py -R -b -q out.a99 -o cart.bin
+user@host:~/src/statpascal> cat cart_b*.bin >cart.bin
+```
+
+For small programs, the bank switching overhead can be avoided by either
+producing a single bank cartridge (option *--cart*) or an EA5 image (option
+*--ea5*); yielding a performance increase of about 15% for typical
+programs.
+
+The scripts *runcart.sh*, *runbank.sh* and *runea5.sh* in the
+scripts directory show the invocation of the compiler, *xas99* assembler and
+start the *emul99* emulator.
+
+The following steps are planned:
+
+- a standard runtime library
+- floating point operations (probably IEEE-754 binary32)
+- internal assembler 
+
+## Vector Extensions
+
 A typical Statpascal implementation of the QuickSort algorithm looks like:
 
     program qsortvec;
@@ -93,58 +154,6 @@ The next steps will be:
 
 - refactoring/unifying the code generators
 - samples/docs for data exchange/callbacks with host applications
-
-## Code generation for the TI99/4A
-
-This is work in progress.
-
-The compiler can produce an (optionally bank switched) ROM cartridge or an
-EA5 image for the TI99/4A.  The upper memory (24 KB) is used for global
-variables and stack frames (and also code starting at A000 for EA5),
-the lower memory (8 KB) as heap for dynamic allocations.
-
-Using the bank switching features of the FinalGROM 99, code sizes of up to
-1 MB are possible.
-
-There is no floating point yet and the runtime library is rather limited. 
-Dynamic memory management currently uses a *mark/release* style. Input is
-limited to a single variable in a *readln* call.
-
-To enable the TI99 mode, execute the makefile with the option *ti99=1*:
-
-```
-make clean
-make ti99=1
-```
-
-This will set the default unit search path of the compiler to the *ti99units* directory. The
-*system.pas* in this directory (which is included by default) contains the
-runtime library. The *tests/ti99* directory shows what is
-already working.
-
-Compiling a program in this mode produces the assembler source *out.a99*,
-which can be assembled with xas99, e.g.
-
-```
-user@host:~/src/statpascal> obj/sp tests/ti99/sieve.pas 
-user@host:~/src/statpascal> ~/ti99/xdt99/xas99.py -R -b -q out.a99 -o cart.bin
-user@host:~/src/statpascal> cat cart_b*.bin >cart.bin
-```
-
-For small programs, the bank switching overhead can be avoided by either
-producing a single bank cartridge (option *--cart*) or an EA5 image (option
-*--ea5*); yielding a performance increase of about 15% for typical
-programs.
-
-The scripts *runcart.sh*, *runbank.sh* and *runea5.sh* in the
-scripts directory show the invocation of the compiler, *xas99* assembler and
-start the *emul99* emulator.
-
-The following steps are planned:
-
-- a standard runtime library
-- floating point operations (probably IEEE-754 binary32)
-- internal assembler 
 
 ## License
 
