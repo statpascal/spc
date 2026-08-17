@@ -13,6 +13,7 @@ struct TConfig {
 #ifdef CREATE_9900
     static const std::size_t alignment = 2;
     static std::uint16_t startBank;
+    static bool omitHeader;
 #else
     static const std::size_t alignment = std::min<std::size_t> (std::alignment_of<std::max_align_t> (), 8);
 #endif    

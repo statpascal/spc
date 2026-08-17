@@ -62,6 +62,7 @@ void compile9900 (int argc, char **argv) {
         ("help", "Show help")
         ("cart", po::bool_switch (&buildCart), "Build unbanked cartridge")
         ("ea5",  po::bool_switch (&buildEA5), "Build EA5 program")
+        ("no-header", po::bool_switch (&sp::TConfig::omitHeader), "Omit standard header")
         ("bank", po::value<std::uint16_t> (&sp::TConfig::startBank)->default_value (0), "First bank used in cart")
         ("input-file,i", po::value<std::string> (&inputFile), "Input file")
         ("output-file,o", po::value<std::string> (&outputFile)->default_value ("out.a99"), "Output file")

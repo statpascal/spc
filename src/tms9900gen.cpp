@@ -2112,26 +2112,27 @@ void T9900Generator::generateCode (TProgram &program) {
         outputComment (std::string ());
         outputCode (T9900Op::jmp, progstart);
     } else {
-        const std::string proglist = getNextLocalLabel ();
-        outputCode (T9900Op::aorg, 0x6000, e, "cartride address space");
-        outputComment (std::string ());
-        outputCode (T9900Op::data, 0xaa01, e, "standard header");
-        outputCode (T9900Op::data, 0x0100, e, "number of programs");
-        outputCode (T9900Op::data, 0x0000, e, "power up list");
-        outputCode (T9900Op::data, proglist, e, "program list");	
-        outputCode (T9900Op::data, 0x0000, e, "DSR list");
-        outputCode (T9900Op::data, 0x0000, e, "subprogram list");
-        outputCode (T9900Op::data, 0x0000, e, "ISR list");
+        if (!TConfig::omitHeader) {
+            const std::string proglist = getNextLocalLabel ();
+            outputCode (T9900Op::aorg, 0x6000, e, "cartride address space");
+            outputComment (std::string ());
+            outputCode (T9900Op::data, 0xaa01, e, "standard header");
+            outputCode (T9900Op::data, 0x0100, e, "number of programs");
+            outputCode (T9900Op::data, 0x0000, e, "power up list");
+            outputCode (T9900Op::data, proglist, e, "program list");	
+            outputCode (T9900Op::data, 0x0000, e, "DSR list");
+            outputCode (T9900Op::data, 0x0000, e, "subprogram list");
+            outputCode (T9900Op::data, 0x0000, e, "ISR list");
+            outputLabel (proglist);
+            outputCode (T9900Op::data, 0x0000, e, "no next program");
+            outputCode (T9900Op::data, progstart, e, "program address");
     
-        outputLabel (proglist);
-        outputCode (T9900Op::data, 0x0000, e, "no next program");
-        outputCode (T9900Op::data, progstart, e, "program address");
-    
-        std::string progname = program.getBlock ()->getSymbol ()->getName ();
-        std::transform (progname.begin (), progname.end (), progname.begin (), [] (char c) {return c == '_' ? ' ' : std::toupper (c);});
-        outputCode (T9900Op::byte, progname.length ());
-        outputCode (T9900Op::text, progname);
-        outputCode (T9900Op::even);
+            std::string progname = program.getBlock ()->getSymbol ()->getName ();
+            std::transform (progname.begin (), progname.end (), progname.begin (), [] (char c) {return c == '_' ? ' ' : std::toupper (c);});
+            outputCode (T9900Op::byte, progname.length ());
+            outputCode (T9900Op::text, progname);
+            outputCode (T9900Op::even);
+        }
         
         if (TConfig::target == TConfig::TTarget::TI_BANKCART) {
             outputComment (std::string ());
