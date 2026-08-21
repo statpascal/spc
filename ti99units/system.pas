@@ -433,7 +433,7 @@ function __read_line_console: string;
             if count and $ff = 1 then
                 begin
                     gotoxy (col + pos - 1, row);
-                    if odd (count shr 8) then write (' ') else write (#$1f)
+                    if odd (count shr 8) then write (' ') else write (#$7f)
                 end
         until ch = Enter;
 // !!!!        writeln

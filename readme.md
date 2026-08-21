@@ -45,9 +45,11 @@ make ti99=1
 This will set the default unit search path of the compiler to the *ti99units* directory. The
 *system.pas* in this directory (which is included by default) contains the
 runtime library. The *tests/ti99* directory shows what is
-already working.
+already working. Moreover, the cartridge version of Phoenix Chess
+(https://github.com/statpascal/phoenix-cart) is a larger project realized
+with StatPascal.
 
-Compiling a program in this mode produces the assembler source *out.a99*,
+Compiling a program in TI99 mode produces the assembler source *out.a99*,
 which can be assembled with xas99, e.g.
 
 ```
@@ -57,9 +59,21 @@ user@host:~/src/statpascal> cat cart_b*.bin >cart.bin
 ```
 
 For small programs, the bank switching overhead can be avoided by either
-producing a single bank cartridge (option *--cart*) or an EA5 image (option
-*--ea5*); yielding a performance increase of about 15% for typical
-programs.
+producing a single bank cartridge or an EA5 image; yielding a performance
+increase of about 15% for typical programs. The following tables shows the 
+options available on the command line
+
+Option      | Description
+-------------------------
+--cart      | create a non-banked cart (max 8 KB)
+--ea5       | create a EA5 image (starting at >A000)
+--no-header | omit the standard header (for a cart with a GROM header)
+--bank n    | start emitting code at bank n instead of 0 
+
+With the bank option it is possible to (manually) combine several programs in
+a single cartridge. Note that the assembler will produce empty banks for
+ones lower than the selected start number. An example GPL starter to produce
+a GROM is shown in ti99units/multiprog.gpl.
 
 The scripts *runcart.sh*, *runbank.sh* and *runea5.sh* in the
 scripts directory show the invocation of the compiler, *xas99* assembler and
@@ -71,9 +85,13 @@ The following steps are planned:
 - floating point operations (probably IEEE-754 binary32)
 - internal assembler 
 
+
 ## Vector Extensions
 
-A typical Statpascal implementation of the QuickSort algorithm looks like:
+The x64 and ARM64 version provide vector extensions; these are not supported
+for the TI99/4a.
+
+A typical vectorized implementation of the QuickSort algorithm looks like:
 
     program qsortvec;
 
