@@ -64,7 +64,7 @@ increase of about 15% for typical programs. The following tables shows the
 options available on the command line
 
 | Option      | Description |
-|-------------------------|
+|-------------|-----------|
 | --cart      | create a non-banked cart (max 8 KB) |
 | --ea5       | create a EA5 image (starting at >A000) |
 | --no-header | omit the standard header (for a cart with a GROM header) |
