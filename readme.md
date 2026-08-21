@@ -63,12 +63,12 @@ producing a single bank cartridge or an EA5 image; yielding a performance
 increase of about 15% for typical programs. The following tables shows the 
 options available on the command line
 
-Option      | Description
--------------------------
---cart      | create a non-banked cart (max 8 KB)
---ea5       | create a EA5 image (starting at >A000)
---no-header | omit the standard header (for a cart with a GROM header)
---bank n    | start emitting code at bank n instead of 0 
+| Option      | Description
+|-------------------------
+| --cart      | create a non-banked cart (max 8 KB)
+| --ea5       | create a EA5 image (starting at >A000)
+| --no-header | omit the standard header (for a cart with a GROM header)
+| --bank n    | start emitting code at bank n instead of 0 
 
 With the bank option it is possible to (manually) combine several programs in
 a single cartridge. Note that the assembler will produce empty banks for
