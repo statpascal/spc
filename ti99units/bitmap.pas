@@ -62,11 +62,6 @@ procedure plot (x, y: integer);
     
 procedure line (x0, y0, x1, y1: integer);
 
-    function sign (x: integer): integer;
-        begin
-            sign := ord (x > 0) - ord (x < 0)
-        end;
-
     procedure swap (var a, b: integer);
         var 
             h: integer;
@@ -92,7 +87,7 @@ procedure line (x0, y0, x1, y1: integer);
             end;
         dx := x1 - x0; 
         dy := abs (y1 - y0) shl 1;
-        sy := sign (y1 - y0); 
+        sy := ord (y1 > y0) - ord (y1 < y0);	// sign (y1 - y0); 
         d := dy - dx;
         inc (dx, dx);
 

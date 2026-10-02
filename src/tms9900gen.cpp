@@ -704,8 +704,13 @@ void T9900Generator::assignBank (TCodeGroup &codeGroup) {
         exit (1);
     }
     unsigned bank = TConfig::startBank;
-    while (bank <= maxBank && bankOffset [bank] + codeGroup.size > 0x7ffe)
-        ++bank;
+    if (TConfig::target != TConfig::TTarget::TI_EA5)
+        while (bank <= maxBank && bankOffset [bank] + codeGroup.size > 0x7ffe)
+            ++bank;
+    if (TConfig::target == TConfig::TTarget::TI_CART && bank) {
+        std::cout << "Code side exceeds 8 KB - bank switched cart suggested" << std::endl;
+        exit (1);
+    }
         
     if (bank > maxBank) {
         if (bank == totalBanks) {
@@ -722,7 +727,8 @@ void T9900Generator::assignBank (TCodeGroup &codeGroup) {
         proc->bank = bank;
         proc->address = codeGroup.address;
         codeGroup.address += proc->size;
-        proc->codeSequence.push_front (T9900Operation (T9900Op::bank, proc->address == 0x6000 ? -1 : bank, proc->address));
+        if (TConfig::target == TConfig::TTarget::TI_BANKCART) 
+            proc->codeSequence.push_front (T9900Operation (T9900Op::bank, proc->address == 0x6000 ? -1 : bank, proc->address));
         if (proc->symbol)
             bankMapping [getBankName (proc->symbol)] = bank;
     }
@@ -761,7 +767,7 @@ void T9900Generator::getAssemblerCode (std::vector<std::uint8_t> &opcodes, bool 
     std::map<std::size_t, std::vector<TCodeBlock *>> bankGroupMap;
     
     for (TCodeBlock &proc: subPrograms) {
-        if (proc.symbol->getBankNumber ())
+        if (TConfig::target == TConfig::TTarget::TI_BANKCART && proc.symbol->getBankNumber ())
             bankGroupMap [proc.symbol->getBankNumber ()].push_back (&proc);
         else {
             codeGroups.push_back (TCodeGroup {0, 0, {&proc}});
@@ -774,18 +780,19 @@ void T9900Generator::getAssemblerCode (std::vector<std::uint8_t> &opcodes, bool 
         calcLength (codeGroups.back ());
         length += codeGroups.back ().size;
     }
+
+    if (TConfig::target == TConfig::TTarget::TI_BANKCART)    
+        std::sort (codeGroups.begin (), codeGroups.end (), [] (const TCodeGroup &a, const TCodeGroup &b) { return a.size > b.size; });
+            
+    maxBank = TConfig::startBank;
+    bankOffset [maxBank] = TConfig::target == TConfig::TTarget::TI_EA5 ? 0xa000 : 0x6000;
+    assignBank (sharedGroup);
     
-    std::sort (codeGroups.begin (), codeGroups.end (), [] (const TCodeGroup &a, const TCodeGroup &b) { return a.size > b.size; });
-            
-    if (TConfig::target == TConfig::TTarget::TI_BANKCART) {
-        maxBank = TConfig::startBank;
-        bankOffset [maxBank] = 0x6000;
-        assignBank (sharedGroup);
+    assignBank (mainGroup);
+    for (TCodeGroup &group: codeGroups)
+        assignBank (group);
         
-        assignBank (mainGroup);
-        for (TCodeGroup &group: codeGroups)
-            assignBank (group);
-            
+    if (TConfig::target == TConfig::TTarget::TI_BANKCART) {
         // last word of each bank is filled with bank switching address (to be pushed in far calls)
         sharedCode.codeSequence.push_back (T9900Operation (T9900Op::comment, T9900Operand (), T9900Operand (),  std::string ("")));
         sharedCode.codeSequence.push_back (T9900Operation (T9900Op::comment, T9900Operand (), T9900Operand (),  std::string ("Bank ids at end of each page")));
