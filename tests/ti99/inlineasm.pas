@@ -14,8 +14,8 @@ var
 
 function add (a, b: integer): integer; assembler;
     mov  *r10, r12              // get pointer to return value
-    mov  @a, *r12
-    a    @b, *r12
+    mov  @a, *r12		// @a is @2(r10)
+    a    @b, *r12		// @b is @4(r10)
 end;
 
 procedure setC (a: integer); assembler;

@@ -12,18 +12,19 @@ namespace statpascal {
 struct TConfig {
 #ifdef CREATE_9900
     static const std::size_t alignment = 2;
-    static std::uint16_t startBank;
-    static bool omitHeader;
 #else
     static const std::size_t alignment = std::min<std::size_t> (std::alignment_of<std::max_align_t> (), 8);
-#endif    
+#endif
     static const std::size_t setwords = 4;
     static const std::size_t setLimit = setwords * 8 * sizeof (std::int64_t);
     static const std::string globalRuntimeDataPtr; //  = "__globalruntimedata";
     static const std::string binFileType; // = "__bin_file_type";
-    
+
+    static std::uint16_t startBank;
+    static bool omitHeader;
+
     enum class TTarget { X64, AARCH64, TI_EA5, TI_CART, TI_BANKCART };
-    static TTarget target;    
+    static TTarget target;
 };
 
 }

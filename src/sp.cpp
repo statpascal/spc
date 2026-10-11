@@ -37,16 +37,16 @@ std::int64_t getSystemMemory () {
 
 class TTimer {
 public:
-    TTimer (const std::string &msg): msg (msg) { 
-        t1 = std::chrono::high_resolution_clock::now (); 
+    TTimer (const std::string &msg): msg (msg) {
+        t1 = std::chrono::high_resolution_clock::now ();
     }
-    
-    ~TTimer () { 
-        t2 = std::chrono::high_resolution_clock::now (); 
+
+    ~TTimer () {
+        t2 = std::chrono::high_resolution_clock::now ();
         if (!msg.empty ())
-            std::cout << msg << "_ " << (std::chrono::duration_cast<std::chrono::duration<double>> (t2 - t1)).count () << " secs" << std::endl; 
+            std::cout << msg << "_ " << (std::chrono::duration_cast<std::chrono::duration<double>> (t2 - t1)).count () << " secs" << std::endl;
     }
-    
+
 private:
     const std::string msg;
     std::chrono::high_resolution_clock::time_point t1, t2;
@@ -69,9 +69,9 @@ void compile9900 (int argc, char **argv) {
     ;
     po::positional_options_description p;
     p.add ("input-file", -1);
-        
+
     po::variables_map vm;
-    try {    
+    try {
         po::store (po::command_line_parser (argc, argv).options (desc).positional (p).run (), vm);
         po::notify (vm);
     }
@@ -80,7 +80,7 @@ void compile9900 (int argc, char **argv) {
                   << argv [0] << " --help for help" << std::endl;
         exit (1);
     }
-    
+
     if (vm.count ("help")) {
         std::cout << desc << std::endl;
         exit (0);
@@ -99,19 +99,19 @@ void compile9900 (int argc, char **argv) {
     sp::TRuntimeData runtimeData;
     sp::T9900Generator generator (runtimeData);
     sp::TCompiler compiler (generator);
-    
+
     compiler.setFilename (inputFile);
     std::filesystem::path file (inputFile);
     std::filesystem::path exepath = std::filesystem::read_symlink ("/proc/self/exe");
     compiler.setUnitSearchPathes ({".", file.parent_path ().string (), exepath.parent_path ().string () + "/../ti99units"});
-    
+
     if (compiler.compile () == sp::TCompiler::TCompileResult::Error)
         exit (1);
-    
+
     std::vector<std::string> listing;
     std::vector<std::uint8_t> opcodes;
     generator.getAssemblerCode (opcodes, true, listing);
-    
+
     std::ofstream f (outputFile);
     std::copy (listing.begin (), listing.end (), std::ostream_iterator<std::string> (f, "\n"));
 }
@@ -121,17 +121,17 @@ void compile (int argc, char **argv) {
         sp::TConfig::target = sp::TConfig::TTarget::TI_EA5;
         compile9900 (argc, argv);
         return;
-#endif        
+#endif
 
     bool createListing = haveParameter ("--listing", argc, argv),
          showTimes = haveParameter ("--time", argc, argv);
-    
+
     sp::TRuntimeData runtimeData;
 //    printf ("Runtime is at %p\n", &runtimeData);
     runtimeData.appendArgv (argv [0]);
     for (int i = 2; i < argc; ++i)
         runtimeData.appendArgv (argv [i]);
-        
+
 #ifdef CREATE_X64
     sp::TConfig::target = sp::TConfig::TTarget::X64;
     sp::TX64Generator generator (runtimeData);
@@ -139,22 +139,22 @@ void compile (int argc, char **argv) {
     sp::TConfig::target = sp::TConfig::TTarget::AARCH64;
     createListing = true;	// asm source required
     sp::TA64Generator generator (runtimeData);
-#endif    
-    
+#endif
+
     sp::TCompiler compiler (generator);
     compiler.setFilename (argv [1]);
-    
+
     std::filesystem::path exepath = std::filesystem::read_symlink ("/proc/self/exe");
     compiler.setUnitSearchPathes ({".", exepath.parent_path ().string () + "/../units"});
-    
+
     {
         TTimer t (showTimes ? "Compile time" : "");
         compiler.compile ();
     }
-    
+
     std::vector<std::string> listing;
     std::vector<std::uint8_t> opcodes;
-    
+
     {
         TTimer t (showTimes ? "Assembly time" : "");
         generator.getAssemblerCode (opcodes, createListing, listing);
@@ -177,11 +177,11 @@ void compile (int argc, char **argv) {
     std::stringstream cmd;
     cmd << "as -EL out.asm -o out.o; ld -Ttext " << std::hex << start << " out.o -o out.link; objcopy -O binary out.link out.bin";
     system (cmd.str ().c_str ());
-    
+
     opcodes.reserve (std::filesystem::file_size ("out.bin"));
     std::ifstream f ("out.bin", std::ios::binary);
     opcodes.assign (std::istreambuf_iterator<char> (f), std::istreambuf_iterator<char> ());
-#endif    
+#endif
 
     void *p = mmap (nullptr, opcodes.size (), PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     memcpy (p, opcodes.data (), opcodes.size ());

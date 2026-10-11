@@ -49,6 +49,7 @@ begin
     
     setVideoMode (BitmapMode);
     setBackColor (black);
+    enableInterrupts (false);
     
     count := 0;
     repeat
