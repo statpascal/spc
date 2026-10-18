@@ -12,6 +12,7 @@ const
 var
     p, q: array [0..1] of TLineData;
     count: integer;
+    deleting: boolean;
 
 procedure drawLine (var p: TLineData);
     begin
@@ -52,17 +53,20 @@ begin
     enableInterrupts (false);
 
     count := 0;
+    deleting := false;
     repeat
         inc (count);
-        setForeColor (TColor (2 + (count div 10) mod 14));
+        if count > 50 then
+            deleting := true;
+        setCellColor (TColor (2 + (count div 10) mod 14), transparent);
+        setPlotForeground (true);
         drawline (p [0]);
         add (p [0], q [0]);
-        if count > 50 then
+        if deleting then
             begin
-                setForeColor (transparent);
+                setPlotForeground (false);
                 drawLine (p [1]);
                 add (p [1], q [1])
             end
     until keypressed
 end.
-

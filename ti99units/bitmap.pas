@@ -4,27 +4,32 @@ interface
 
 uses vdp;
 
-procedure setForeColor (color: TColor);
+procedure setCellColor (fore, back: TColor);
+procedure setPlotForeground (b: boolean);
 
 procedure plot (x, y: integer);
 procedure line (x0, y0, x1, y1: integer);
 
 implementation
 
-var
-    activeColor: uint8;
-
-procedure setForeColor (color: TColor);
-    begin
-        activeColor := ord (color) shl 4;
-    end;
-
 const
     invalid = -1;
     cachedChar: integer = invalid;
+    plotForeground: boolean = true;
 
 var
+    activeColor: uint8;
     cachePattern, cacheColor: array [0..7] of uint8;
+
+procedure setCellColor (fore, back: TColor);
+    begin
+        activeColor := ord (fore) shl 4 or ord (back)
+    end;
+
+procedure setPlotForeground (b: boolean);
+    begin
+        plotForeground := b
+    end;
 
 {$bank:on}
 
@@ -89,8 +94,7 @@ end;
 
 procedure plot_near (x, y: integer) near;
     var
-        offset: integer;
-        y07: integer;
+        offset, y07: integer;
     begin
         y07 := y and $07;
         offset := y and $f8 shl 5 + x and $f8;
@@ -99,17 +103,13 @@ procedure plot_near (x, y: integer) near;
                 if cachedChar <> invalid then
                     transferCache (addr (writeCache));
                 cachedChar := offset;
-//                vmbr (cachePattern, patternTable + offset, 8);
-//                vmbr (cacheColor, colorTable + offset, 8);
                 transferCache (addr (readCache))
             end;
-        if activeColor = 0 then
-            cachePattern [y07] := cachePattern [y07] and not ($80 shr (x and 7))
+        if plotForeGround then
+            cachePattern [y07] := cachePattern [y07] or $80 shr (x and 7)
         else
-            begin
-                cachePattern [y07] := cachePattern [y07] or $80 shr (x and 7);
-                cacheColor [y07] := activeColor
-            end
+            cachePattern [y07] := cachePattern [y07] and not ($80 shr (x and 7));
+        cacheColor [y07] := activeColor
     end;
 
 // Bresenham's line algorithm
