@@ -4,7 +4,7 @@ interface
 
 type
     TVideoMode = (TextMode, StandardMode, BitmapMode);
-    TColor = (transparent, black, mediumgreen, lightgreen, darkblue, lightblue, darkred,  cyan, 
+    TColor = (transparent, black, mediumgreen, lightgreen, darkblue, lightblue, darkred,  cyan,
               mediumred, lightred, darkyellow, lightyellow, darkgreen, magenta, gray, white);
 
 var
@@ -14,17 +14,17 @@ var
     vdpwa:  char absolute $8c02;
     gromwa: char absolute $9c02;
     gromrd: char absolute $9800;
-    
+
     imageTable, colorTable, patternTable,
     spriteAttributeTable, spritePatternTable: integer;
-    
+
 procedure vmbw (var src; dest, length: integer);	// video multiple byte write
 procedure vmbr (var dest; src, length: integer);	// video multiple byte read
 procedure vrbw (dest: integer; val: uint8; length: integer);		// video repeated byte write
 
 procedure pokeV (addr: integer; val: uint8);
 function peekV (addr: integer): uint8;
-    
+
 procedure setVideoMode (mode: TVideoMode);
 function getVideoMode: TVideoMode;
 
@@ -59,7 +59,7 @@ procedure enableInterrupts (b: boolean);
 procedure setCRUBit (addr: integer; val: boolean);
 procedure limi0;
 procedure limi2;
-procedure setVdpReg (nr, val: uint8);		
+procedure setVdpReg (nr, val: uint8);
 function getVdpReg (nr: uint8): uint8;	// returns cached value from setVdpReg
 
 
@@ -71,12 +71,12 @@ const
 var
     vdpWriteAddress, imageTableEnd: integer;
     videoMode: TVideoMode;
-    
+
 const
     foreColor: TColor = black;
     backColor: TColor = cyan;
     interruptsEnabled: boolean = true;
-    
+
 procedure enableInterrupts (b: boolean);
     begin
         interruptsEnabled := b;
@@ -85,17 +85,17 @@ procedure enableInterrupts (b: boolean);
         else
             limi0
     end;
-        
+
 procedure setVdpAddress (n: integer);
     begin
         vdpwa := chr (n and 255);
         vdpwa := chr (n shr 8)
     end;
-    
+
 procedure vmbw (var src; dest, length: integer); assembler;
         mov @length, r14
         jeq vmbw_2
-        
+
         limi 0
         mov @dest, r13
         ori r13, >4000
@@ -103,7 +103,7 @@ procedure vmbw (var src; dest, length: integer); assembler;
         movb r13, @vdpwa
         swpb r13
         movb r13, @vdpwa
-        
+
         mov @src, r12
         li r15, vdpwd
 
@@ -111,25 +111,25 @@ procedure vmbw (var src; dest, length: integer); assembler;
         movb *r12+, *r15
         dec r14
         jne vmbw_1
-        
+
         movb @interruptsEnabled, r12
         jeq vmbw_2
         limi 2
-        
+
     vmbw_2:
 end;
-    
+
 procedure vmbr (var dest; src, length: integer); assembler;
         mov @length, r14
         jeq vmbr_2
-        
+
         limi 0
         mov @src, r13
         swpb r13
         movb r13, @vdpwa
         swpb r13
         movb r13, @vdpwa
-        
+
         li r15, vdprd
         mov @dest, r12
 
@@ -137,18 +137,18 @@ procedure vmbr (var dest; src, length: integer); assembler;
         movb *r15, *r12+
         dec r14
         jne vmbr_1
-        
+
         movb @interruptsEnabled, r12
         jeq vmbr_2
         limi 2
-        
+
     vmbr_2:
 end;
 
 procedure vrbw (dest: integer; val: uint8; length: integer); assembler;
         mov @length, r12
         jeq vrbw_2
-        
+
         limi 0
         mov @dest, r13
         ori r13, >4000
@@ -156,44 +156,48 @@ procedure vrbw (dest: integer; val: uint8; length: integer); assembler;
         movb r13, @vdpwa
         swpb r13
         movb r13, @vdpwa
-        
+
         li r13, vdpwd
         movb @val, r14
     vrbw_1:
         movb r14, *r13
         dec r12
         jne vrbw_1
-        
+
         movb @interruptsEnabled, r12
         jeq vrbw_2
         limi 2
-        
+
     vrbw_2:
 end;
 
 procedure loadCharSet (gromAddr, vdpAddr: integer);
-    var 
+    var
         i, j: integer;
     begin
         limi0;
-        gromwa := chr (gromAddr shr 8); 
+        gromwa := chr (gromAddr shr 8);
         gromwa := chr (gromAddr and $ff);
         setVdpAddress (vdpAddr + 8 * 31 or WriteAddr);
         for i := 1 to 7 do
             vdpwd := #$3f;
         vdpwd := #0;
-        for i := 32 to 127 do
+        for i := 32 to 126 do
             begin
                 for j := 1 to 7 do
                     vdpwd := gromrd;
                 vdpwd := #0
             end;
+        // char 127 is cursor
+        for j := 1 to 7 do
+            vdpwd := #$ff;
+        vdpwd := #0;
         limi2
     end;
-    
+
 var
     vdpRegs: array [0..7] of uint8;
-    
+
 procedure setVdpReg (nr, val: uint8);
     var
         dummy: char;
@@ -238,33 +242,33 @@ procedure setVdpReg (nr, val: uint8);
         end;
         limi2
     end;
-    
+
 function getVdpReg (nr: uint8): uint8;
     begin
         if nr = 1 then
-            getVdpReg := memb [$83d4] 
+            getVdpReg := memb [$83d4]
         else
             getVdpReg := vdpRegs [nr]
     end;
-        
+
 procedure pokeV (addr: integer; val: uint8);
     begin
         vmbw (val, addr, 1)
     end;
-    
+
 function peekV (addr: integer): uint8;
     begin
         vmbr (result, addr, 1)
     end;
 
-procedure setVideoMode (mode: TVideoMode);    
+procedure setVideoMode (mode: TVideoMode);
     const
         vdpRegs: array [TVideoMode, 0..6] of uint8 = (
             ($00, $f0, $01, $00, $00, $00, $00),
             ($00, $e0, $00, $0e, $01, $06, $00),
             ($02, $e0, $06, $ff, $03, $78, $07)
         );
-        
+
     var
         i: integer;
         screen: array [0..255] of uint8;
@@ -303,17 +307,17 @@ procedure setVideoMode (mode: TVideoMode);
         for i := 0 to 1 do
             setVdpReg (i, vdpRegs [videoMode, i])
     end;
-    
+
 function getVideoMode: TVideoMode;
     begin
         getVideoMode := videoMode
     end;
-    
+
 procedure setBackColor (color: TColor);
     begin
         setVdpReg (7, ord (foreColor) shl 4 or ord (color))
     end;
-    
+
 procedure setTextColor (color: TColor);
     var
         i: integer;
@@ -323,7 +327,7 @@ procedure setTextColor (color: TColor);
             for i := 0 to 31 do
                 setColor (i, color, transparent)
     end;
-    
+
 procedure setColor (group: integer; fore, back: TColor);
     begin
         pokeV (colorTable + group and $1f, ord (fore) shl 4 or ord (back))
@@ -334,7 +338,7 @@ procedure showHChar (x, y, val, count: integer);
         gotoxy (x, y);
         vrbw (vdpWriteAddress, val, min (count, imageTableEnd - vdpWriteAddress))
     end;
-    
+
 procedure showVChar (x, y, val, count: integer);
     var
         i: integer;
@@ -350,7 +354,7 @@ procedure setCharPattern (ch: uint8; pattern: TCharPattern);
     var
         chardef: array [0..7] of uint8;
         i: integer;
-        
+
     function hexval (ch: char): integer;
         begin
             if ch in ['0'..'9'] then
@@ -362,14 +366,14 @@ procedure setCharPattern (ch: uint8; pattern: TCharPattern);
             else
                 hexval := 0
         end;
-        
+
     begin
         fillChar (pattern [succ (length (pattern))], pred (sizeof (pattern) - length (pattern)), 0);
         for i := 0 to 7 do
             chardef [i] := hexval (pattern [2 * i + 1]) * 16 + hexval (pattern [2 * i + 2]);
         vmbw (chardef, patternTable + 8 * ch, 8)
     end;
-        
+
 function getCharPattern (ch: uint8): TCharPattern;
     var
         chardef: array [0..7] of uint8;
@@ -391,7 +395,7 @@ procedure gotoxy (x, y: integer);
             offs := y shl 5;
         vdpWriteAddress := min (imageTable + abs (offs + x), pred (imageTableEnd))
     end;
-    
+
 function whereX: integer;
     begin
         if videoMode = StandardMode then
@@ -399,7 +403,7 @@ function whereX: integer;
         else
             whereX := (vdpWriteAddress - imageTable) mod 40
     end;
-    
+
 function whereY: integer;
     begin
         if videoMode = StandardMode then
@@ -407,7 +411,7 @@ function whereY: integer;
         else
             whereY := (vdpWriteAddress - imageTable) div 40
     end;
-    
+
 function screenWidth: integer;
     begin
         case videoMode of
@@ -419,7 +423,7 @@ function screenWidth: integer;
                 screenWidth := 256
         end
     end;
-    
+
 procedure clrscr;
     begin
         case videoMode of
@@ -430,17 +434,17 @@ procedure clrscr;
         end;
         gotoxy (0, 0)
     end;
-    
+
 
 {$bank:on}
 
-procedure _rt_scroll_up (start, stop, len, inc1, inc2: integer) near; assembler; 
+procedure _rt_scroll_up (start, stop, len, inc1, inc2: integer) near; assembler;
         mov @start, r0
         li r13, vdpwa
         li r14, vdprd
         li r15, vdpwd
         limi 0
-        
+
     _rt_scroll_up_1:
         swpb r0
         movb r0, *r13
@@ -448,7 +452,7 @@ procedure _rt_scroll_up (start, stop, len, inc1, inc2: integer) near; assembler;
         movb r0, *r13
         mov @len, r8
         li r12, >8320
-        
+
     _rt_scroll_up_2:
         movb *r14, *r12+
         dec r8			// deley before accessing next byte
@@ -468,7 +472,7 @@ procedure _rt_scroll_up (start, stop, len, inc1, inc2: integer) near; assembler;
 
         mov @len, r8
         li r12, >8320
-        
+
     _rt_scroll_up_3:
         movb *r12+, *r15
         dec r8
@@ -486,7 +490,7 @@ procedure _rt_scroll_up (start, stop, len, inc1, inc2: integer) near; assembler;
 
         mov @len, r8
         li r12, >2000
-        
+
     _rt_scroll_up_4:
         movb r12, *r15
         dec r8
@@ -495,7 +499,7 @@ procedure _rt_scroll_up (start, stop, len, inc1, inc2: integer) near; assembler;
         movb @interruptsEnabled, r12
         jeq _rt_scroll_up_5
         limi 2
-        
+
     _rt_scroll_up_5:
 end;
 
@@ -516,22 +520,22 @@ procedure scroll;
     end;
 
 {$bank:off}
-    
+
 procedure outputString (p: PChar; outlen: integer);
 
     procedure __write_data (p: pointer; length: integer); assembler;
             mov @length, r12
             jeq __write_data_2
-            
+
             limi 0
-            
+
             mov @vdpWriteAddress, r13
             ori r13, >4000
             swpb r13
             movb r13, @vdpwa
             swpb r13
             movb r13, @vdpwa
-            
+
             mov @p, r13
             li r14, vdpwd
             inc r13
@@ -539,14 +543,14 @@ procedure outputString (p: PChar; outlen: integer);
             movb *r13+, *r14
             dec r12
             jne __write_data_1
-            
+
             movb @interruptsEnabled, r12
             jeq __write_data_2
             limi 2
-            
+
         __write_data_2:
     end;
-    
+
     var
         len: integer;
 
@@ -562,8 +566,8 @@ procedure outputString (p: PChar; outlen: integer);
         __write_data (p, len);
         inc (vdpWriteAddress, len)
     end;
-    
-procedure outputLine;                
+
+procedure outputLine;
     begin
         case videoMode of
             TextMode:
@@ -574,15 +578,15 @@ procedure outputLine;
         while vdpWriteAddress >= imageTableEnd do
             scroll
     end;
-    
+
 procedure enableScreenSaver (b: boolean);
     var
         clrsc: integer absolute $83d6;
     begin
         clrsc := ord (not b)
     end;
-    
-    
+
+
 procedure setCRUBit (addr: integer; val: boolean); assembler;
         mov  *r10, r12
         mov  @2(r10), r13
@@ -599,7 +603,7 @@ procedure limi2; assembler;
         limi 2
     limi2_done
 end;
-    
+
 begin
     foreColor := black;
     setBackColor (cyan)

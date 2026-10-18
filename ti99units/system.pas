@@ -9,12 +9,12 @@ type
     shortint = int8;
     byte = uint8;
     integer = int16;
-    
+
     PChar = ^char;
     string1 = string [1];
     string2 = string [2];
     string4 = string [4];
-    
+
     TPab = record
         opcode, err_type: uint8;
         vdpaddr: integer;
@@ -29,20 +29,20 @@ type
         bufpos: integer;
         pab: TPab
     end;
-    
+
     __bin_file_type = file of void;
     text = file of void;
-    
+
 var
-    input, output: text;
+    input, output, console: text;
     memb: array [0..65535] of uint8 absolute $0000;
     memw: array [0..32767] of integer absolute $0000;
-    
+
 // Screen and keyboard access
-    
+
 const
     InvalidKey = #$ff;
-    
+
 function getKey: char;
 
 
@@ -110,7 +110,7 @@ const
     FilePastEOF = 5;
     FileDeviceError = 6;
     FileError = 7;
-    
+
     FileMaxOpen = 8;
     FileInvalidDsrName = 9;
     FileInvalidName = 10;
@@ -118,7 +118,7 @@ const
 
 var
    InOutRes: integer;
-   
+
 function IOResult: integer;
 
 // string handling
@@ -134,11 +134,11 @@ procedure __str_int (n, length, precision: integer; s: PChar);
 function __short_str_char (ch: char): string1;
 function __short_str_concat (a, b: PChar): string;
 function __short_str_equal (s, t: PChar): boolean;
-function __short_str_not_equal (s, t: PChar): boolean; 
-function __short_str_less_equal (s, t: PChar): boolean; 
-function __short_str_greater_equal (s, t: PChar): boolean; 
-function __short_str_less (s, t: PChar): boolean; 
-function __short_str_greater (s, t: PChar): boolean; 
+function __short_str_not_equal (s, t: PChar): boolean;
+function __short_str_less_equal (s, t: PChar): boolean;
+function __short_str_greater_equal (s, t: PChar): boolean;
+function __short_str_less (s, t: PChar): boolean;
+function __short_str_greater (s, t: PChar): boolean;
 
 function __copy_str_const (var s: string): string; external;
 
@@ -164,14 +164,14 @@ const
 type
     __generic_set_type = set of 0..255;
     __set_array = array [0..__set_words - 1] of integer;
-    
-function __set_add_val (val: integer; var s: __set_array): __generic_set_type; 
-function __set_add_range (minval, maxval: integer; var s: __set_array): __generic_set_type; 
+
+function __set_add_val (val: integer; var s: __set_array): __generic_set_type;
+function __set_add_range (minval, maxval: integer; var s: __set_array): __generic_set_type;
 
 function __copy_set_const (var s: __generic_set_type): __generic_set_type; external;
 
 function __in_set (v: integer; var s: __set_array): boolean; intrinsic;
-function __set_union (var s, t: __set_array): __generic_set_type; 
+function __set_union (var s, t: __set_array): __generic_set_type;
 function __set_intersection (var s, t: __set_array): __generic_set_type;
 function __set_diff (var s, t: __set_array): __generic_set_type;
 
@@ -201,7 +201,7 @@ type
         ret_bank, ret_addr, result_ptr, saved_r9, saved_r10: integer;
         saved_display: array [0..7] of integer
     end;
-    
+
 function setjmp (var s: jmp_buf): integer;
 procedure longjmp (var s: jmp_buf; value: integer);
 
@@ -214,7 +214,7 @@ uses vdp, dsr;
 const
     heapPtr: integer = $2000;
     heapMax: integer = $4000;
-    
+
 procedure __new (var p: pointer; count, size: integer);
     var
         n: integer;
@@ -225,34 +225,34 @@ procedure __new (var p: pointer; count, size: integer);
             p := nil;
             writeln ('OUT OF MEM')
         end
-        else 
+        else
             begin
                 p := pointer (heapPtr);
                 inc (heapPtr, n);
             end
     end;
-    
+
 procedure __dispose (p: pointer);
     begin
         // nothing yet
     end;
-    
+
 procedure mark (var p: pointer);
     begin
         p := pointer (heapPtr)
     end;
-    
+
 procedure release (p: pointer);
     begin
         heapPtr := integer (p)
     end;
-    
+
 procedure initHeap (first, size: integer);
     begin
         heapPtr := first;
         heapMax := first + size
-    end;        
-    
+    end;
+
 procedure halt; assembler;
         li   r0, >04e0
         li   r1, >6000	// clr @>6000
@@ -261,19 +261,19 @@ procedure halt; assembler;
         b    r0
 end;
 
-// 
+//
 
 procedure move (var src, dest; length: integer); assembler;
         mov @src, r12
         mov @dest, r13
         mov @length, r14
         jeq move_2
-        
-    move_1:    
+
+    move_1:
         movb *r12+, *r13+
         dec r14
         jne move_1
-        
+
     move_2:
 end;
 
@@ -282,12 +282,12 @@ procedure moveWord (var src, dest; length: integer); assembler;
         mov @dest, r13
         mov @length, r14
         jeq moveword_2
-        
-    moveword_1:    
+
+    moveword_1:
         mov *r12+, *r13+
         dec r14
         jne moveword_1
-        
+
     moveword_2:
 end;
 
@@ -297,26 +297,26 @@ function compareWord (var src, dest; length: integer): integer; assembler;
         mov  @dest, r13
         mov  @length, r14
         jeq  compareword_2
-        
+
     compareword_1:
         c    *r12+, *r13+
         jh   compareword_3
         jl   compareword_4
         dec  r14
         jne  compareword_1
-        
+
     compareword_2:
         clr  *r15
         jmp  compareword_5
-        
+
     compareword_3:
         li   r12, 1
         mov  r12, *r15
         jmp  compareword_5
-        
+
     compareword_4:
         seto *r15
-        
+
     compareword_5:
 end;
 
@@ -326,40 +326,40 @@ function compareByte (var src, dest; length: integer): integer; assembler;
         mov  @dest, r13
         mov  @length, r14
         jeq  comparebyte_2
-        
+
     comparebyte_1:
         cb   *r12+, *r13+
         jh   comparebyte_3
         jl   comparebyte_4
         dec  r14
         jne  comparebyte_1
-        
+
     comparebyte_2:
         clr  *r15
         jmp  comparebyte_5
-        
+
     comparebyte_3:
         li   r12, 1
         mov  r12, *r15
         jmp  comparebyte_5
-        
+
     comparebyte_4:
         seto *r15
-        
+
     comparebyte_5:
 end;
 
 procedure fillChar (var dest; count: integer; value: char); assembler;
         mov @count, r12
         jeq fillchar_2
-        
+
         mov @dest, r13
         movb @value, r14
     fillchar_1:
         movb r14, *r13+
         dec r12
         jne fillchar_1
-        
+
     fillchar_2:
 end;
 
@@ -367,9 +367,9 @@ procedure fillChar (var dest; count: integer; value: uint8);
     begin
         fillChar (dest, count, chr (value))
     end;
-    
+
 // RNG
-    
+
 var
     seed: integer absolute $83c0;
 
@@ -377,7 +377,7 @@ procedure randomize (n: integer);
     begin
         seed := n
     end;
-    
+
 function random (n: integer): integer; assembler;
         li   r12, 25385
         mpy  @seed, r12
@@ -386,9 +386,9 @@ function random (n: integer): integer; assembler;
         mpy  @n, r13
         mov  *r10, r12
         mov  r13, *r12
-end;        
+end;
 
-function __read_line_console: string;
+function __read_line_console (advanceLine: boolean): string;
     const
         FctnS = #136;
         Enter = #13;
@@ -436,7 +436,8 @@ function __read_line_console: string;
                     if odd (count shr 8) then write (' ') else write (#$7f)
                 end
         until ch = Enter;
-// !!!!        writeln
+        if advanceLine then
+            writeln
     end;
 
 procedure __write_lf (var f: text);
@@ -446,7 +447,7 @@ procedure __write_lf (var f: text);
         else
             __end_line (f)
     end;
-    
+
 procedure __write_int (var f: text; n, length, precision: integer);
     var
         buf: string;
@@ -454,7 +455,7 @@ procedure __write_int (var f: text; n, length, precision: integer);
         __str_int (n, length, -1, buf);
         __write_string (f, buf, length, -1);
     end;
-    
+
 procedure __write_char (var f: text; ch: char; length, precision: integer);
     var
         s: string [1];
@@ -466,14 +467,14 @@ procedure __write_char (var f: text; ch: char; length, precision: integer);
                 __write_string (f, s, length, -1)
             end
     end;
-    
+
 procedure __write_string (var f: text; p: PChar; length, precision: integer);
     var
         i, len, outlen: integer;
     begin
         len := ord (p^);
         outlen := max (len, length);
-        if f.fileidx = 0 then 
+        if f.fileidx = 0 then
             outputString (p, outlen)
         else
             begin
@@ -489,27 +490,27 @@ procedure __write_string (var f: text; p: PChar; length, precision: integer);
                     end;
             end
     end;
-    
+
 procedure __write_boolean (var f: text; b: boolean; length, precision: integer);
     begin
         if b then
             __write_string (f, 'true', length, -1)
         else
-            __write_string (f, 'false', length, -1) 
+            __write_string (f, 'false', length, -1)
     end;
-    
+
 // file handling
 
 const
     nFiles = 3;
     fileBufSize = 256;
-    
+
 type
     TFileDescriptor = record
         isOpen: boolean;
         pabAddr, bufAddr: integer
     end;
-    
+
 var
     vdpFree: integer absolute $8370;
     openFiles: array [1..nFiles] of TFileDescriptor;
@@ -519,9 +520,9 @@ function IOResult: integer;
         IOResult := InOutRes;
         InOutRes := 0
     end;
-    
+
 procedure reserveVdpBufs;
-    var 
+    var
         i, vdpaddr: integer;
     begin
         vdpaddr := vdpFree - 1;
@@ -535,12 +536,12 @@ procedure reserveVdpBufs;
                     pabAddr := succ (vdpaddr)
                 end
     end;
-        
+
 procedure __assign (var f; filename: string);
     begin
         __file_data (f).pab.name := filename
     end;
-    
+
 function execDsr (var f: __file_data): integer;
     begin
         if dsrLink (f.pab, openFiles [f.fileidx].pabAddr) then
@@ -548,7 +549,7 @@ function execDsr (var f: __file_data): integer;
         else
             execDsr := FileInvalidDsrName
     end;
-    
+
 procedure releaseFileBuffer (var f: __file_data);
     begin
         if f.fileidx > 0 then
@@ -565,7 +566,7 @@ procedure openFile (var f: __file_data; opcode, ftype, reclen: uint8; isTextFile
         f.fileidx := -1;
         f.bufpos := 0;
         fillChar (f.pab, 8, 0);
-        
+
         if f.pab.name = '' then
             if isTextFile then
                 f.fileidx := 0
@@ -600,27 +601,27 @@ procedure openFile (var f: __file_data; opcode, ftype, reclen: uint8; isTextFile
 procedure __rewrite_bin (var f; blocksize: integer);
     begin
         openFile (__file_data (f), PabOpen, PabOutput or PabInternal or PabFixed or PabRelative, blocksize, false)
-    end;                
-    
+    end;
+
 procedure __reset_bin (var f; blocksize: integer);
     begin
         openFile (__file_data (f), PabOpen, PabUpdate or PabInternal or PabFixed or PabRelative, blocksize, false)
-    end;                
-    
+    end;
+
 procedure __rewrite_text (var f: text);
     begin
         openFile (__file_data (f), PabOpen, PabOutput or PabDisplay or PabVariable, 254, true)
     end;
-    
+
 procedure __reset_text (var f: text);
     begin
         openFile (__file_data (f), PabOpen, PabInput or PabDisplay or PabVariable, 254, true)
     end;
-    
+
 procedure __write_bin_ign (var f; var data; blocks: integer);
     type
         arrtype = array [0..MaxInt] of uint8;
-    var 
+    var
         I: integer;
     begin
         __file_data (f).pab.opcode := PabWrite;
@@ -629,13 +630,13 @@ procedure __write_bin_ign (var f; var data; blocks: integer);
                 vmbw (arrtype (data) [i * __file_data (f).pab.reclen], __file_data (f).pab.vdpaddr, __file_data (f).pab.reclen);
                 InOutRes := execDsr (__file_data (f))
             end
-    end;        
-    
+    end;
+
 procedure __write_bin_typed (var f, data);
     begin
         __write_bin_ign (f, data, 1)
     end;
-    
+
 procedure __seek_bin (var f; pos: integer);
     begin
         if __file_data (f).fileidx > 0 then
@@ -645,7 +646,7 @@ procedure __seek_bin (var f; pos: integer);
 procedure __read_bin_ign (var f; var data; blocks: integer);
     type
         arrtype = array [0..MaxInt] of uint8;
-    var 
+    var
         I: integer;
     begin
         __file_data (f).pab.opcode := PabRead;
@@ -655,8 +656,8 @@ procedure __read_bin_ign (var f; var data; blocks: integer);
                 if InOutRes = FileNoError then
                     vmbr (arrtype (data) [i * __file_data (f).pab.reclen], __file_data (f).pab.vdpaddr, __file_data (f).pab.reclen)
             end
-    end;        
-    
+    end;
+
 procedure __read_bin_typed (var f, data);
     begin
         __read_bin_ign (f, data, 1)
@@ -665,7 +666,7 @@ procedure __read_bin_typed (var f, data);
 procedure __read_lf (var f: text);
     begin
     end;
-    
+
 function __read_int (var f: text): integer;
     var
         s: string;
@@ -684,9 +685,9 @@ function __read_int (var f: text): integer;
         if neg then
             result := -result
     end;
-    
+
 function  __read_char (var f: text): char;
-    var 
+    var
         s: string;
     begin
         s := __read_string (f);
@@ -695,12 +696,12 @@ function  __read_char (var f: text): char;
         else
             __read_char := #0
     end;
-    
+
 function __read_string (var f: text): string;
     begin
         __read_string := '';
         if f.fileidx = 0 then
-            __read_string := __read_line_console
+            __read_string := __read_line_console (addr (f) = addr (input))
         else if f.fileidx > 0 then
             begin
                 f.pab.opcode := PabRead;
@@ -713,8 +714,8 @@ function __read_string (var f: text): string;
             end
         else
             InOutRes := FileNotOpen
-    end;    
-    
+    end;
+
 procedure __close (var f);
     begin
         with __file_data (f) do
@@ -730,7 +731,7 @@ procedure __close (var f);
                         InOutRes := FileNotOpen
             end
     end;
-    
+
 procedure __erase (var f);
     begin
         if __file_data (f).fileidx > 0 then
@@ -741,7 +742,7 @@ procedure __erase (var f);
         else
             InOutRes := FileNotOpen
     end;
-    
+
 function __eof (var f): boolean;
     begin
         if __file_data (f).fileidx > 0 then
@@ -753,7 +754,7 @@ function __eof (var f): boolean;
         else
             InOutRes := FileNotOpen
     end;
-    
+
 function __eof_input: boolean;
     begin
         __eof_input := eof (input)
@@ -761,7 +762,7 @@ function __eof_input: boolean;
 
 procedure __end_line (var f: text);
     begin
-        if f.fileidx > 0 then    
+        if f.fileidx > 0 then
             begin
                 f.pab.opcode := PabWrite;
                 f.pab.numchar := f.bufpos;
@@ -772,7 +773,7 @@ procedure __end_line (var f: text);
             InOutRes := FileNotOpen
     end;
 
-    
+
 // string handling
 
 function __short_str_char (ch: char): string1;
@@ -789,7 +790,7 @@ function __short_str_concat (a, b: PChar): string;
     end;
 
 function strCompare (s, t: PChar): integer;
-    var 
+    var
         i: integer;
     begin
         for i := 1 to min (ord (s^), ord (t^)) do
@@ -800,42 +801,42 @@ function strCompare (s, t: PChar): integer;
                 end;
         strCompare := ord (s^) - ord (t^)
     end;
-    
+
 function __short_str_equal (s, t: PChar): boolean;
     begin
         __short_str_equal := strCompare (s, t) = 0
     end;
-    
-function __short_str_not_equal (s, t: PChar): boolean; 
+
+function __short_str_not_equal (s, t: PChar): boolean;
     begin
         __short_str_not_equal := strCompare (s, t) <> 0
     end;
-    
-function __short_str_less_equal (s, t: PChar): boolean; 
+
+function __short_str_less_equal (s, t: PChar): boolean;
     begin
         __short_str_less_equal := strCompare (s, t) <= 0
     end;
-    
-function __short_str_greater_equal (s, t: PChar): boolean; 
+
+function __short_str_greater_equal (s, t: PChar): boolean;
     begin
         __short_str_greater_equal := strCompare (s, t) >= 0
     end;
-    
-function __short_str_less (s, t: PChar): boolean; 
+
+function __short_str_less (s, t: PChar): boolean;
     begin
         __short_str_less := strCompare (s, t) < 0
     end;
-    
-function __short_str_greater (s, t: PChar): boolean; 
+
+function __short_str_greater (s, t: PChar): boolean;
     begin
         __short_str_greater := strCompare (s, t) > 0
     end;
-    
+
 function length (s: PChar): integer;
     begin
         length := ord (s^)
     end;
-    
+
 function pos (ch: char; s: PChar): integer;
     var
         i: integer;
@@ -848,7 +849,7 @@ function pos (ch: char; s: PChar): integer;
                 end;
         pos := 0
     end;
-    
+
 function copy (s: PChar; start, len: integer): string;
     begin
         if start <= ord (s^) then
@@ -861,7 +862,7 @@ function copy (s: PChar; start, len: integer): string;
         else
             result [0] := #0
     end;
-    
+
 function upcase (ch: char): char;
     begin
         if (ch >= 'a') and (ch <= 'z') then
@@ -869,10 +870,10 @@ function upcase (ch: char): char;
         else
             result := ch
     end;
-    
-const 
+
+const
     hex: string [16] = '0123456789ABCDEF';
-    
+
 function hexstr (n: integer): string4;
     var
         i: integer;
@@ -881,21 +882,21 @@ function hexstr (n: integer): string4;
             result [i] := hex [succ (n shr (16 - i shl 2) and $0f)];
         result [0] := #4
     end;
-    
+
 function hexstr2 (n: uint8): string2;
     begin
         result [0] := #2;
         result [1] := hex [succ (n shr 4)];
         result [2] := hex [succ (n and $0f)]
     end;
-    
+
 procedure __str_int (n, length, precision: integer; s: PChar);
 
     function outint (n: integer; neg: boolean; p: pointer): pointer; assembler;
             mov @p, r0
             mov @n, r14
             li r12, 10
-        
+
         outint1:
             clr r13
             div r12, r13
@@ -905,22 +906,22 @@ procedure __str_int (n, length, precision: integer; s: PChar);
             dec r0
             mov r13, r14
             jne outint1
-            
+
             movb @neg, r13
             jeq outint2
             li r13, >2d00
             movb r13, *r0
             dec r0
-            
+
         outint2:
             mov *r10, r12
             mov r0, *r12
     end;
-    
-    var 
+
+    var
         res: string [6];
         p: PChar;
-    
+
     begin
         if n = -32768 then
             begin
@@ -941,13 +942,13 @@ procedure __str_int (n, length, precision: integer; s: PChar);
         else
             move (p^, s^, succ (ord (p^)))
     end;
-    
+
 function getKey: char;
     var
         keyboardMode: byte absolute $8374;
         keyPressed: byte absolute $8375;
         gplStatus: byte absolute $837c;
-        
+
     procedure scanKey; assembler;
            lwpi >83e0
            bl @>000e
@@ -969,14 +970,14 @@ function keypressed: boolean;
     begin
         keypressed := getKey <> InvalidKey
     end;
-    
+
 (*
 function keypressed: boolean; assembler;
         limi 0
         clr r14
         clr r13
         li r15, >0100   // true
-        
+
     keypressed_1:
         li r12, >0024
         ldcr r13, 3
@@ -988,7 +989,7 @@ function keypressed: boolean; assembler;
         ci r13, >0600
         jne keypressed_1
         clr r15         // return false
-    
+
     keypressed_2:
         mov *r10, r12
         movb r15, *r12
@@ -1001,19 +1002,19 @@ procedure waitkey;
         repeat
         until keypressed
     end;
-    
+
 type
     PSet = ^__set_array;
     PPSet = ^PSet;
 
-function __set_add_val (val: integer; var s: __set_array): __generic_set_type; 
+function __set_add_val (val: integer; var s: __set_array): __generic_set_type;
     begin
         __set_array (result) := s;
         __set_array (result) [val shr 4] := __set_array (result) [val shr 4] or (1 shl (val and 15))
     end;
-        
 
-function __set_add_range (minval, maxval: integer; var s: __set_array): __generic_set_type; 
+
+function __set_add_range (minval, maxval: integer; var s: __set_array): __generic_set_type;
     var
         i: integer;
     begin
@@ -1022,14 +1023,14 @@ function __set_add_range (minval, maxval: integer; var s: __set_array): __generi
             __set_array (result) [i shr 4] := __set_array (result) [i shr 4] or (1 shl (i and 15))
     end;
 
-function __set_union (var s, t: __set_array): __generic_set_type; 
+function __set_union (var s, t: __set_array): __generic_set_type;
     var
         i: integer;
     begin
         for i := 0 to __set_words - 1 do
             __set_array (result) [i] := s [i] or t [i]
     end;
-    
+
 function __set_intersection (var s, t: __set_array): __generic_set_type;
     var
         i: integer;
@@ -1037,7 +1038,7 @@ function __set_intersection (var s, t: __set_array): __generic_set_type;
         for i := 0 to __set_words - 1 do
             __set_array (result) [i] := s [i] and t [i]
     end;
-    
+
 function __set_diff (var s, t: __set_array): __generic_set_type;
     var
         i: integer;
@@ -1050,17 +1051,17 @@ function __set_equal (var s, t: __set_array): boolean;
     begin
         __set_equal := compareWord (s, t, __set_words) = 0
     end;
-    
+
 function __set_not_equal (var s, t: __set_array): boolean;
     begin
         __set_not_equal := compareWord (s, t, __set_words) <> 0
     end;
-    
+
 function __set_sub (var s, t: __set_array): boolean;
     begin
         __set_sub := __set_super (t, s)
     end;
-    
+
 function __set_super (var s, t: __set_array): boolean;
     var
         i: integer;
@@ -1073,29 +1074,29 @@ function __set_super (var s, t: __set_array): boolean;
                 end;
         __set_super := true
     end;
-    
+
 function __set_sub_not_equal (var s, t: __set_array): boolean;
     begin
         __set_sub_not_equal := __set_sub (s, t) and not __set_equal (s, t)
     end;
-    
-function __set_super_not_equal (var s, t: __set_array): boolean; 
-    begin 
+
+function __set_super_not_equal (var s, t: __set_array): boolean;
+    begin
         __set_super_not_equal := __set_super (s, t) and not __set_equal (s, t)
     end;
-    
-    
+
+
 function setjmp (var s: jmp_buf): integer; assembler;
         mov  *r10, r12
         clr  *r12		// return 0
-        
+
         mov  @s, r12
         mov  @4(r10), *r12+	// ret_bank
         mov  r11, *r12+		// ret_addr
         mov  *r10, *r12+	// result_ptr
         mov  r9, *r12+		// saved_r9
         mov  r10, *r12+		// saved r10
-        
+
     setjmp_1:
         li   r13, >fff0		// start of display: TODO introduce constants
         mov  *r13+, *r12+
@@ -1110,14 +1111,14 @@ end;
 
 procedure longjmp (var s: jmp_buf; value: integer); assembler;
         mov  @s, r11
-        
+
         mov  *r11+, r12		// ret_bank
         mov  *r11+, r13		// ret_addr
         mov  *r11+, r15		// result_ptr
         mov  @value, *r15
         mov  *r11+, r9
         mov  *r11+, r10
-        
+
         li   r14, >fff0
         mov  *r11+, *r14+
         mov  *r11+, *r14+
@@ -1127,8 +1128,8 @@ procedure longjmp (var s: jmp_buf; value: integer); assembler;
         mov  *r11+, *r14+
         mov  *r11+, *r14+
         mov  *r11, *r14
-        
-{$ifdef ti99-banked}        
+
+{$ifdef ti99-banked}
         b    @__far_call_2	// bank:addr in R12:R13
 {$endif}
 {$ifdef ti99-plain}
@@ -1140,6 +1141,7 @@ end;
 begin
     output.fileidx := 0;
     input.fileidx := 0;
+    console.fileidx := 0;
     setVideoMode (TextMode);
     reserveVdpBufs;
     InOutRes := FileNoError
