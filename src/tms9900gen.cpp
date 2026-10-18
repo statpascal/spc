@@ -2213,7 +2213,8 @@ void T9900Generator::initStaticRoutinePtr (std::size_t addr, const TRoutineValue
 }
 
 void T9900Generator::resolvePascalSymbol (T9900Operand &operand, TSymbolList &symbols) {
-    if (operand.isValid () && operand.isLabel ())
+    if (operand.isValid () && operand.isLabel ()) {
+//        std::cout << "RES: " << operand.label << std::endl;
         if (TSymbol *s = symbols.searchSymbol (operand.label))
             if (s->checkSymbolFlag (TSymbol::Variable) || s->checkSymbolFlag (TSymbol::Parameter) || s->checkSymbolFlag (TSymbol::Absolute)) {
                 operand.label.clear ();
@@ -2228,7 +2229,7 @@ void T9900Generator::resolvePascalSymbol (T9900Operand &operand, TSymbolList &sy
                         operand.t = T9900Operand::TAddressingMode::Indexed;
                 }
             }
-
+    }
 }
 
 void T9900Generator::externalRoutine (TSymbol *s) {
@@ -2573,7 +2574,7 @@ T9900Reg T9900Generator::parseRegister (TCompilerImpl &compiler, TLexer &lexer) 
 
 T9900Operand T9900Generator::parseInteger (TCompilerImpl &compiler, TLexer &lexer, std::int64_t minval, std::int64_t maxval) {
     if (maxval == 0xffff && compiler.getToken () == TToken::Identifier) {
-        T9900Operand ret = lexer.getString ();
+        T9900Operand ret = lexer.getIdentifier ();
         compiler.getNextToken ();
         return ret;
     }

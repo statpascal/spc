@@ -5,19 +5,19 @@ uses bitmap;
 type
     TLineData = array [0..1, 0..1] of integer;
 
-const 
+const
     s: TLineData = ((10, 20), (180, 150));
     d: TLineData = ((5, -3), (4, 5));
-    
+
 var
     p, q: array [0..1] of TLineData;
     count: integer;
-    
+
 procedure drawLine (var p: TLineData);
     begin
         line (p [0, 0], p [0, 1], p [1, 0], p [1, 1])
-    end;    
-    
+    end;
+
 procedure add (var p, q: TLineData);
     const
         maxv: array [0..1] of integer = (255, 191);
@@ -39,18 +39,18 @@ procedure add (var p, q: TLineData);
                             q [i, j] := - q [i, j]
                         end
                 end
-    end;    
+    end;
 
 begin
     p [0] := s;
     p [1] := s;
     q [0] := d;
     q [1] := d;
-    
+
     setVideoMode (BitmapMode);
     setBackColor (black);
     enableInterrupts (false);
-    
+
     count := 0;
     repeat
         inc (count);

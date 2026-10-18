@@ -22,19 +22,72 @@ procedure setForeColor (color: TColor);
 const
     invalid = -1;
     cachedChar: integer = invalid;
-    
+
 var
     cachePattern, cacheColor: array [0..7] of uint8;
-    
-{$bank:on}    
-    
-procedure flushCache near;
-    begin
-        vmbw (cachePattern, patternTable + cachedChar, 8);
-        vmbw (cacheColor, colorTable + cachedChar, 8)
-    end;
 
-procedure plot (x, y: integer);
+{$bank:on}
+
+procedure writeCache near; assembler;
+        ori  r13, >4000
+        swpb r13
+        movb r13, @vdpwa
+        swpb r13
+        movb r13, @vdpwa
+
+        li   r13, vdpwd
+        movb *r14+, *r13
+        movb *r14+, *r13
+        movb *r14+, *r13
+        movb *r14+, *r13
+        movb *r14+, *r13
+        movb *r14+, *r13
+        movb *r14+, *r13
+        movb *r14, *r13
+end;
+
+procedure readCache near; assembler;
+        swpb r13
+        movb r13, @vdpwa
+        swpb r13
+        movb r13, @vdpwa
+
+        li   r13, vdprd
+        movb *r13, *r14+
+        movb *r13, *r14+
+        movb *r13, *r14+
+        movb *r13, *r14+
+        movb *r13, *r14+
+        movb *r13, *r14+
+        movb *r13, *r14+
+        movb *r13, *r14
+end;
+
+procedure transferCache (f: pointer) near; assembler;
+        mov  r11, r12
+        mov  @f, r15
+
+        limi 0
+
+        mov  @patternTable, r13
+        a    @cachedChar, r13
+        li   r14, cachePattern
+        bl   *r15
+
+        mov  @colorTable, r13
+        a    @cachedChar, r13
+        li   r14, cacheColor
+        bl   *r15
+
+        movb @interruptsEnabled, r13
+        jeq  transfercache_1
+        limi 2
+
+    transfercache_1:
+        mov  r12, r11
+end;
+
+procedure plot_near (x, y: integer) near;
     var
         offset: integer;
         y07: integer;
@@ -44,10 +97,11 @@ procedure plot (x, y: integer);
         if offset <> cachedChar then
             begin
                 if cachedChar <> invalid then
-                    flushCache;
+                    transferCache (addr (writeCache));
                 cachedChar := offset;
-                vmbr (cachePattern, patternTable + offset, 8);
-                vmbr (cacheColor, colorTable + offset, 8);
+//                vmbr (cachePattern, patternTable + offset, 8);
+//                vmbr (cacheColor, colorTable + offset, 8);
+                transferCache (addr (readCache))
             end;
         if activeColor = 0 then
             cachePattern [y07] := cachePattern [y07] and not ($80 shr (x and 7))
@@ -59,20 +113,20 @@ procedure plot (x, y: integer);
     end;
 
 // Bresenham's line algorithm
-    
+
 procedure line (x0, y0, x1, y1: integer);
 
     procedure swap (var a, b: integer);
-        var 
+        var
             h: integer;
         begin
             h := a; a := b; b := h
         end;
 
-    var 
+    var
         dx, dy, sy, d, x: integer;
         x_y : boolean;
-        
+
     begin
         x_y := abs (y1 - y0) > abs (x1 - x0);
         if x_y then
@@ -80,33 +134,38 @@ procedure line (x0, y0, x1, y1: integer);
                 swap (x0, y0);
                 swap (x1, y1)
             end;
-        if x1 < x0 then 
+        if x1 < x0 then
             begin
                 swap (x0, x1);
                 swap (y0, y1)
             end;
-        dx := x1 - x0; 
+        dx := x1 - x0;
         dy := abs (y1 - y0) shl 1;
-        sy := ord (y1 > y0) - ord (y1 < y0);	// sign (y1 - y0); 
+        sy := ord (y1 > y0) - ord (y1 < y0);	// sign (y1 - y0);
         d := dy - dx;
         inc (dx, dx);
 
-        for x := x0 to x1 do        
+        for x := x0 to x1 do
             begin
-                if x_y then 
-                    plot (y0, x) 
-                else 
-                    plot (x, y0);
-                if (d > 0) or (d = 0) and (sy > 0) then 
+                if x_y then
+                    plot_near (y0, x)
+                else
+                    plot_near (x, y0);
+                if (d > 0) or (d = 0) and (sy > 0) then
                     begin
                         inc (y0, sy);
                         dec (d, dx)
                     end;
                 inc (d, dy)
             end;
-        flushCache
+        transferCache (addr (writeCache))
     end;
-    
-{$bank:off}    
+
+procedure plot (x, y: integer);
+    begin
+        plot_near (x, y)
+    end;
+
+{$bank:off}
 
 end.

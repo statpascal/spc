@@ -52,7 +52,12 @@ procedure outputString (p: PChar; outlen: integer);
 procedure outputLine;
 
 procedure enableScreenSaver (b: boolean);
+
 procedure enableInterrupts (b: boolean);
+
+const
+    interruptsEnabled: boolean = true;	// read only
+
 
 // other low level routines
 
@@ -75,7 +80,7 @@ var
 const
     foreColor: TColor = black;
     backColor: TColor = cyan;
-    interruptsEnabled: boolean = true;
+
 
 procedure enableInterrupts (b: boolean);
     begin
