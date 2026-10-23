@@ -22,7 +22,6 @@ begin
     readln (console, s);
     writeln (s);
 
-
     while keypressed do;
     waitkey
 end.

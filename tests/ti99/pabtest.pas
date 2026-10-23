@@ -12,7 +12,7 @@ procedure test;
     begin
         with pab do begin
             opcode := PabOpen;
-            err_type := PabOutput or PabDisplay or PabVariable; 
+            err_type := PabOutput or PabDisplay or PabVariable;
             vdpaddr := bufVdpAddr;
             reclen := 80;
             numchar := 0;
@@ -20,7 +20,7 @@ procedure test;
             recnr := 0;
             name := 'DSK1.TEST01'
         end;
-            
+
         if not dsrLink (pab, pabVdpAddr) then
             begin
                 writeln ('Cannot find DSR for DSK1 - quitting');
@@ -29,9 +29,9 @@ procedure test;
         else
             writeln ('Success: ', pab.name , ' opened');
         writeln ('Status: ', pab.status);
-            
+
         // write some text
-        s := 'Test output to file';
+        s := 'Test output to this file';
         vmbw (s [1], bufVdpAddr, length (s));
         pab.opcode := PabWrite;
         pab.numchar := length (s);
@@ -42,13 +42,13 @@ procedure test;
         inc (pab.recnr);
         dsrLink (pab, pabVdpAddr);
         writeln ('Status: ', pab.status);
-        
+
         // close file
         pab.opcode := PabClose;
         dsrLink (pab, pabVdpAddr);
         writeln ('Status: ', pab.status)
     end;
-    
+
 begin
     test;
     waitkey

@@ -6,10 +6,10 @@ var
     i: integer;
 
 begin
-    setForeColor (white);
+    setCellColor (white, black);
     setBackColor (black);
     setVideoMode (BitmapMode);
-    
+
     for i := 1 to 20 do
         line (0, 9 * i, 255, (21 - i) * 9)
 end.

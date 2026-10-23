@@ -7,17 +7,17 @@ var
     f: array [1..nFiles] of text;
     i: integer;
     s: string;
-    
+
 begin
     for i := 1 to nFiles do
         begin
             str (i, s);
-            assign (f [i], 'DSK1.TEST' + s + '.TXT')
+            assign (f [i], 'DSK1.MANYFILE' + s)
         end;
     for i := 1 to nFiles do
         begin
             rewrite (f [i]);
-            writeln (f [i], 'This is file TEST', i, '.TXT');
+            writeln (f [i], 'This is file MANYFILE', i);
             close (f [i])
         end;
     for i := 1 to nFiles do
@@ -30,7 +30,6 @@ begin
                 end;
             close (f [i])
         end;
-        
+
     waitkey
-end.    
-    
+end.
