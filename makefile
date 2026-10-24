@@ -2,6 +2,7 @@ INCDIR = -Isrc
 VPATH = src
 OBJDIR = obj
 TARGET = obj/sp
+TARGET1 = obj/tiperf
 
 # CXX = afl-g++
 CXX = gcc
@@ -16,7 +17,9 @@ OBJ = $(patsubst %.cpp,$(OBJDIR)/%.o,$(SRC))
 LIBS = -ldl -lffi -lm -lstdc++ -lstdc++fs -pthread -lboost_program_options
 
 CPPFLAGS = -g -std=c++20 -pthread -Wall -pedantic 
-# CPPFLAGS += -g -std=c++20 -O3 -fomit-frame-pointer -falign-functions=16 -march=native -funroll-loops 
+# Add flags for optimized builds
+CPPFLAGS += -O3 -fomit-frame-pointer -falign-functions=16 -march=native -funroll-loops 
+
 ifeq ($(CXX),clang++)
     CPPFLAGS += -Wno-return-type-c-linkage -Wno-logical-op-parentheses
 else
@@ -33,16 +36,18 @@ LDFLAGS = -Wl,--export-dynamic
 
 .PHONY: directories tests 
 
-all: | directories $(TARGET)
+all: | directories $(TARGET) $(TARGET1)
 
 directories: $(OBJDIR)
-
 
 $(OBJDIR):
 	mkdir -p $(OBJDIR)
 	
 $(TARGET): $(OBJ)
 	$(CXX) -o $(TARGET) $(OBJ) $(LIBS) $(LDFLAGS)
+	
+$(TARGET1): tiperf.cpp
+	$(CXX) -o $(TARGET1) -O2 $< -lstdc++
 	
 $(OBJDIR)/%.o: %.cpp
 	$(CXX) -c $(INCDIR) $(CPPFLAGS) $< -o $@
@@ -55,6 +60,5 @@ tests:
 	@if [ ! -f tests/error.tmp ]; then printf "\nAll tests passed\n"; else printf "\nSome tests failed\n"; fi
 
 clean:
-	rm -f $(OBJDIR)/*.o
-	rm -f $(OBJDIR)/sp
+	rm -f $(OBJDIR)/*.o $(TARGET) $(TARGET1)
 	

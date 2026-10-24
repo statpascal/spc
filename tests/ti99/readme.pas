@@ -24,7 +24,7 @@ begin
     close (input);
 
     writeln;
-    writeln ('Now copying readme.md to TEXT.TXT');
+    writeln ('Now copying README to TEXTTXT');
 
     close (output);
     assign (output, 'DSK1.TESTTXT');

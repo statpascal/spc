@@ -758,11 +758,11 @@ void T9900Generator::getAssemblerCode (std::vector<std::uint8_t> &opcodes, bool 
 
     TCodeGroup sharedGroup {0, 0, {&sharedCode}};
     calcLength (sharedGroup);;
-    std::size_t length = sharedCode.size;
+//    std::size_t length = sharedCode.size;
 
     TCodeGroup mainGroup {0, 0, {&mainProgram}};
     calcLength (mainGroup);
-    length += mainGroup.size;
+//    length += mainGroup.size;
 
     std::map<std::size_t, std::vector<TCodeBlock *>> bankGroupMap;
 
@@ -772,13 +772,13 @@ void T9900Generator::getAssemblerCode (std::vector<std::uint8_t> &opcodes, bool 
         else {
             codeGroups.push_back (TCodeGroup {0, 0, {&proc}});
             calcLength (codeGroups.back ());
-            length += codeGroups.back ().size;
+//            length += codeGroups.back ().size;
         }
     }
     for (decltype (bankGroupMap)::value_type &it: bankGroupMap) {
         codeGroups.push_back (TCodeGroup {0, 0, it.second});
         calcLength (codeGroups.back ());
-        length += codeGroups.back ().size;
+//        length += codeGroups.back ().size;
     }
 
     if (TConfig::target == TConfig::TTarget::TI_BANKCART)
@@ -2592,7 +2592,7 @@ T9900Operand T9900Generator::parseInteger (TCompilerImpl &compiler, TLexer &lexe
 T9900Operand T9900Generator::parseGeneralAddress (TCompilerImpl &compiler, TLexer &lexer) {
     TToken t = compiler.getToken ();
     std::string label;
-    std::int64_t val;
+    std::int64_t val = 0;
     T9900Reg reg = T9900Reg::r0;
     switch (t) {
         case TToken::AddrOp:

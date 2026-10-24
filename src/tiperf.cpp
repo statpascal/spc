@@ -11,14 +11,14 @@
 struct TRoutineData {
     std::string name;
     std::uint64_t cycles;
-    
+
     TRoutineData (const std::string &name): name (name), cycles (0) {}
 };
 
 struct TKeyData {
     std::uint16_t addr;
     std::uint16_t bank;
-    
+
     TKeyData (std::uint16_t addr, std::uint16_t bank): addr (addr), bank (bank) {}
 };
 
@@ -69,7 +69,7 @@ void readPerformanceData (const std::string &fn) {
 void readMapData (const std::string &fn) {
     std::string s;
     std::ifstream f (fn);
-    do 
+    do
         std::getline (f, s);
     while (s != "; Bank Addr Length Name");
     while (!f.eof ()) {
@@ -79,11 +79,15 @@ void readMapData (const std::string &fn) {
 }
 
 int main (int argc, char **argv) {
+    if (argc != 3) {
+        std::cout << "Usage: tiperf asmfile perfdata" << std::endl;
+        return 1;
+    }
     readMapData (argv [1]);
     readPerformanceData (argv [2]);
-    
+
     std::sort (routineVec.begin (), routineVec.end (), [] (TRoutineData *a, TRoutineData *b) { return a->cycles > b->cycles; });
 
     for (TRoutineData *p: routineVec)
-        printf ("%12ld %4.1lf%% %s\n", p->cycles, 100.0 * static_cast<double> (p->cycles) / totalCycles, p->name.c_str ());    
+        printf ("%12ld %4.1lf%% %s\n", p->cycles, 100.0 * static_cast<double> (p->cycles) / totalCycles, p->name.c_str ());
 }

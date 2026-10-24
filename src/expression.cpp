@@ -52,13 +52,13 @@ bool TExpressionBase::createFunctionCall (TExpressionBase *&base, TBlock &block,
     if (base) {
         if (base->isRoutine ())
             static_cast<TRoutineValue *> (base)->resolveCall (std::vector<TExpressionBase *> (), block);
-        
+
         TType *t = base->getType ();
         while (t && t->isRoutine () && !(static_cast<TRoutineType *> (t)->getParameter ().size ())) {
             callCreated = true;
             base = block.getCompiler ().createMemoryPoolObject<TFunctionCall> (base, std::vector<TExpressionBase *> (), block, true);
             t = base->getType ();
-            if (!recursive) 
+            if (!recursive)
                 return true;
         }
     }
@@ -76,7 +76,7 @@ TFunctionCall *TExpressionBase::createRuntimeCall (const std::string &name, TTyp
             TRoutineType *rt = static_cast<TRoutineType *> (routine->getType ());
             rt->setReturnType (resultType);
             routine->setType (rt);
-        }            
+        }
     }
     TFunctionCall *expr = compiler.createMemoryPoolObject<TFunctionCall> (routine, std::move (args), block, checkParameter);
     if (resultType)
@@ -116,7 +116,7 @@ bool TExpressionBase::mergeConstants (TExpressionBase *&left, TExpressionBase *r
                 case TToken::Shl:
                     a <<= b; break;
                 case TToken::Shr:
-                    a >>= b; break; 
+                    a >>= b; break;
                 case TToken::Mod:
                      a %= b; break;
                 case TToken::And:
@@ -133,7 +133,7 @@ bool TExpressionBase::mergeConstants (TExpressionBase *&left, TExpressionBase *r
 
 bool TExpressionBase::evaluateConstant (TExpressionBase *&expr, TType *type, TToken operation, TBlock &block) {
     TExpressionBase *const exprIn = expr;
-    
+
     if (expr->isConstant ()) {
         const TSimpleConstant *constValue = static_cast<TConstantValue *> (expr)->getConstant ();
         if (operation == TToken::Sub) {
@@ -184,17 +184,17 @@ bool TExpressionBase::checkTypeConversion (TType *required, TExpressionBase *&ex
         return true;
     if (required == expr->getType ())
         return true;
-        
+
     if (required->isShortString () && expr->getType ()->isShortString ())
         return true;
-        
+
     if (required->isPointer () && expr->getType ()->isShortString ()) {
-#ifdef CREATE_9900        
+#ifdef CREATE_9900
         if (expr->isConstant ()) {
             const std::string s = static_cast<TConstantValue *> (expr)->getConstant ()->getString ();
             TType *stringType = compiler.createMemoryPoolObject<TShortStringType> (
                 compiler.createMemoryPoolObject<TSubrangeType> (std::string (), &stdType.Int64, 0, s.length ()));
-            if (TConfig::target == TConfig::TTarget::TI_BANKCART)                
+            if (TConfig::target == TConfig::TTarget::TI_BANKCART)
                 expr = createRuntimeCall ("__copy_str_const", stringType, {expr}, block, false);
             else
                 expr->setType (stringType);
@@ -203,7 +203,7 @@ bool TExpressionBase::checkTypeConversion (TType *required, TExpressionBase *&ex
 #endif
         return true;
     }
-        
+
     if (expr->getType () == &stdType.UnresOverload && expr->isRoutine () && required->isRoutine ())
         return static_cast<TRoutineValue *> (expr)->resolveConversion (static_cast<TRoutineType *> (required), block);
 
@@ -211,10 +211,10 @@ bool TExpressionBase::checkTypeConversion (TType *required, TExpressionBase *&ex
     if (required->isRoutine () && expr->getType ()->isRoutine () &&
         static_cast<TRoutineType *> (required)->matchesOverload (static_cast<TRoutineType *> (expr->getType ())))
             return true;
-            
+
     bool requiredSubrange = required->isSubrange (),
          exprSubrange = expr->getType ()->isSubrange ();
-         
+
     if (requiredSubrange) {
         if ((exprSubrange && required->getBaseType () != expr->getType ()->getBaseType ()) ||
             (!exprSubrange && !checkTypeConversion (required->getBaseType (), expr, block)))
@@ -226,15 +226,15 @@ bool TExpressionBase::checkTypeConversion (TType *required, TExpressionBase *&ex
         expr = compiler.createMemoryPoolObject<TTypeCast> (expr->getType ()->getBaseType (), expr);
         return checkTypeConversion (required, expr, block);
     }
-    
+
     if (required == &stdType.Single && checkTypeConversion (&stdType.Real, expr, block)) {
         expr = compiler.createMemoryPoolObject<TTypeCast> (required, expr);
         return true;
     }
 
-    if (createFunctionCall (expr, block, false)) 
+    if (createFunctionCall (expr, block, false))
         return checkTypeConversion (required, expr, block);
-    
+
     if (required == &stdType.Real && (expr->getType () == &stdType.Int64 || expr->getType () == &stdType.Single)) {
         if (expr->isConstant () && expr->getType () == &stdType.Int64)
             expr = createConstant<double> (static_cast<TConstantValue *> (expr)->getConstant ()->getInteger (), &stdType.Real, block);
@@ -247,16 +247,16 @@ bool TExpressionBase::checkTypeConversion (TType *required, TExpressionBase *&ex
         expr = createRuntimeCall ("__str_char", required, {expr}, block, false);
         return true;
     }
-    
+
     if (required->isShortString () && expr->getType () == &stdType.Char) {
         expr = createRuntimeCall ("__short_str_char", nullptr, {expr}, block, false);
         return true;
     }
-    
-    if (required->isPointer () && expr->getType ()->isPointer ()) 
+
+    if (required->isPointer () && expr->getType ()->isPointer ())
         return required == &stdType.GenericPointer || expr->getType () == &stdType.GenericPointer ||
                required->getBaseType () == expr->getType ()->getBaseType ();
-               
+
     if (required->isSet () && expr->getType ()->isSet ()) {
         TType *leftBase = static_cast<TSetType *> (required)->getBaseType (),
               *rightBase = static_cast<TSetType *> (expr->getType ())->getBaseType ();
@@ -268,22 +268,22 @@ bool TExpressionBase::checkTypeConversion (TType *required, TExpressionBase *&ex
             rightBase = rightBase->getBaseType ();
         return rightBase == leftBase;
     }
-               
+
     if (required->isVector ())
         return checkTypeConversionVector (required, expr, block);
-        
+
     // cast function to void; ignoring return type
     if (required == &stdType.Void && (expr->isFunctionCall () || (expr->isTypeCast () && static_cast<TTypeCast *> (expr)->getExpression ()->isFunctionCall ()))) {
         static_cast<TFunctionCall *> (expr)->ignoreReturnValue (true);
         return true;
     }
-    
+
     if (required->isPointer () && required->getBaseType () == &stdType.Char &&
         checkTypeConversion (&stdType.String, expr, block)) {
         expr = compiler.createMemoryPoolObject<TTypeCast> (required, expr);
         return true;
     }
-               
+
     return false;
 }
 
@@ -297,47 +297,47 @@ bool TExpressionBase::performTypeConversion (TType *required, TExpressionBase *&
 bool TExpressionBase::checkTypeConversionVector (TType *required, TExpressionBase *&expression, TBlock &block) {
     TCompilerImpl &compiler = block.getCompiler ();
     TVectorType *requiredVectorType = dynamic_cast<TVectorType *> (required);
-    
+
 //    if (expression->getType () == &stdType.GenericVector)
 //        return true;
 
 // TODO: lift non-scalars: better assignment to vec [0]
-    
+
     if (checkTypeConversion (requiredVectorType->getBaseType (), expression, block)) {
         // Flag: Scalar->Vector Lift ware sinnvoll
         TBaseGenerator &codeGenerator = static_cast<TBaseGenerator &> (compiler.getCodeGenerator ());
-        if (expression->getType ()->isVector () || expression->getType ()->isString ()) 
+        if (expression->getType ()->isVector () || expression->getType ()->isString ())
             expression = createRuntimeCall (expression->getType ()->isVector () ? "__make_vec_vec" : "__make_vec_str", required, {
-                createInt64Constant (codeGenerator.lookupAnyManager (expression->getType ()).runtimeIndex, block), 
-                createVariableAccess (TConfig::globalRuntimeDataPtr, block), 
-                expression}, 
+                createInt64Constant (codeGenerator.lookupAnyManager (expression->getType ()).runtimeIndex, block),
+                createVariableAccess (TConfig::globalRuntimeDataPtr, block),
+                expression},
                 block, false);
         else
-            expression = createRuntimeCall (expression->getType ()->isSingle () || expression->getType ()->isReal () ? "__make_vec_dbl" : "__make_vec_int", required, 
+            expression = createRuntimeCall (expression->getType ()->isSingle () || expression->getType ()->isReal () ? "__make_vec_dbl" : "__make_vec_int", required,
                 {createInt64Constant (expression->getType ()->getSize (), block), expression}, block, false);
         return true;
     }
-    
+
     if (expression->getType ()->isVector ()) {
         const TType *destBaseType = requiredVectorType->getBaseType (),
                     *srcBaseType = expression->getType ()->getBaseType ();
         const TStdType::TScalarTypeCode
             tcs = TStdType::getScalarTypeCode (srcBaseType),
             tcd = TStdType::getScalarTypeCode (destBaseType);
-                    
+
         if (destBaseType == srcBaseType) {
             // Flag: Nothing to do ware sinnvoll:
 //            expression = compiler.createMemoryPoolObject<TTypeCast> (requiredVectorType, expression);
             return true;
         }
-            
+
         if (destBaseType->isSubrange ())
             destBaseType = destBaseType->getBaseType ();
         if (srcBaseType->isSubrange ())
             srcBaseType = srcBaseType->getBaseType ();
-            
-        if (destBaseType == srcBaseType || 
-           ((destBaseType == &stdType.Real || destBaseType == &stdType.Single) && 
+
+        if (destBaseType == srcBaseType ||
+           ((destBaseType == &stdType.Real || destBaseType == &stdType.Single) &&
             (srcBaseType == &stdType.Int64 || srcBaseType == &stdType.Real || srcBaseType == &stdType.Single))) {
             expression = createRuntimeCall ("__vec_conv", requiredVectorType, {expression, createInt64Constant (tcs, block), createInt64Constant (tcd, block)}, block, false);
             return true;
@@ -369,7 +369,7 @@ TType *TExpressionBase::checkVectorOperatorTypes (TExpressionBase *&left, TExpre
     TCompilerImpl &compiler = block.getCompiler ();
     TType *leftBaseType = retrieveVectorAndBaseType (left, block),
           *rightBaseType = retrieveVectorAndBaseType (right, block);
-          
+
     switch (operation) {
         case TToken::And:
         case TToken::Or:
@@ -381,7 +381,7 @@ TType *TExpressionBase::checkVectorOperatorTypes (TExpressionBase *&left, TExpre
                     return &stdType.BooleanVector;
             }
             break;
-            
+
         case TToken::DivInt:
         case TToken::Mod:
         case TToken::Shl:
@@ -389,7 +389,7 @@ TType *TExpressionBase::checkVectorOperatorTypes (TExpressionBase *&left, TExpre
             if (leftBaseType == rightBaseType && leftBaseType == &stdType.Int64)
                 return &stdType.Int64Vector;
             break;
-            
+
         case TToken::Add:
         case TToken::Sub:
         case TToken::Mul:
@@ -400,11 +400,11 @@ TType *TExpressionBase::checkVectorOperatorTypes (TExpressionBase *&left, TExpre
             if ((leftBaseType == &stdType.Int64 || leftBaseType == &stdType.Real) && (rightBaseType == &stdType.Int64 || rightBaseType == &stdType.Real))
                 return &stdType.RealVector;
             break;
-            
+
         case TToken::Equal:
         case TToken::NotEqual:
-        case TToken::GreaterThan: 
-        case TToken::LessThan: 
+        case TToken::GreaterThan:
+        case TToken::LessThan:
         case TToken::GreaterEqual:
         case TToken::LessEqual:
             if (leftBaseType->isEnumerated () && leftBaseType == rightBaseType)
@@ -415,14 +415,14 @@ TType *TExpressionBase::checkVectorOperatorTypes (TExpressionBase *&left, TExpre
         default:
             break;
     }
-    
+
     compiler.errorMessage (TCompilerImpl::IncompatibleTypes, "Invalid types in expression");
     return nullptr;
 }
 
 TType *TExpressionBase::checkSetOperatorTypes (TExpressionBase *&left, TExpressionBase *&right, TToken operation, TBlock &block) {
     TCompilerImpl &compiler = block.getCompiler ();
-    
+
     TSetType *rightSetType = dynamic_cast<TSetType *> (right->getType ());
     TEnumeratedType *rightMemberType = rightSetType->getBaseType (),
                     *rightBaseType = (rightMemberType && rightMemberType->isSubrange ()) ?
@@ -437,7 +437,7 @@ TType *TExpressionBase::checkSetOperatorTypes (TExpressionBase *&left, TExpressi
             return nullptr;
         }
     }
-    
+
     if (left->getType ()->isSet ()) {
         TSetType *leftSetType = static_cast<TSetType *> (left->getType ());
         TEnumeratedType *leftMemberType = leftSetType->getBaseType (),
@@ -453,10 +453,10 @@ TType *TExpressionBase::checkSetOperatorTypes (TExpressionBase *&left, TExpressi
                         return leftSetType;
                     else if (!leftBaseType)
                         return rightSetType;
-                    else 
+                    else
                         return compiler.createMemoryPoolObject<TSetType> (
                             compiler.createMemoryPoolObject<TSubrangeType>
-                                (std::string (), leftBaseType, 
+                                (std::string (), leftBaseType,
                                  std::min (leftMemberType->getMinVal (), rightMemberType->getMinVal ()),
                                  std::max (leftMemberType->getMaxVal (), rightMemberType->getMaxVal ())));
                 case TToken::Equal:
@@ -467,9 +467,9 @@ TType *TExpressionBase::checkSetOperatorTypes (TExpressionBase *&left, TExpressi
                 case TToken::NotEqual:
                     return &stdType.Boolean;
                 default:
-                    compiler.errorMessage (TCompilerImpl::IncompatibleTypes, "Invalid set operation");            
+                    compiler.errorMessage (TCompilerImpl::IncompatibleTypes, "Invalid set operation");
             }
-    } else  
+    } else
         compiler.errorMessage (TCompilerImpl::IncompatibleTypes, "Invalid types used in set operator");
     return nullptr;
 }
@@ -478,22 +478,22 @@ TType *TExpressionBase::checkOperatorTypes (TExpressionBase *&left, TExpressionB
     TCompilerImpl &compiler = block.getCompiler ();
     if (!left || !right)
         return nullptr;
-        
+
     TType *ltype = convertBaseType (left, block),
           *rtype = convertBaseType (right, block);
     if (!ltype || !rtype)
         return nullptr;
-        
-#ifdef CREATE_9900        
+
+#ifdef CREATE_9900
     if (ltype == &stdType.Uint64 && rtype == &stdType.Uint64 && (operation == TToken::Or || operation == TToken::And || operation == TToken::Xor))
         return &stdType.Uint64;
-#endif        
+#endif
 
     if (ltype->isVector () || rtype->isVector ())
         return checkVectorOperatorTypes (left, right, operation, block);
     if (rtype->isSet ())
         return checkSetOperatorTypes (left, right, operation, block);
-        
+
     if (ltype == &stdType.Int64 && (rtype == &stdType.Real || operation == TToken::Div)) {
         left = block.getCompiler ().createMemoryPoolObject<TTypeCast> (&stdType.Real, left);
         ltype = &stdType.Real;
@@ -547,11 +547,11 @@ TType *TExpressionBase::checkOperatorTypes (TExpressionBase *&left, TExpressionB
             if (ltype == rtype && ltype == &stdType.Real)
                 return &stdType.Real;
             break;
-            
+
         case TToken::Equal:
         case TToken::NotEqual:
-        case TToken::GreaterThan: 
-        case TToken::LessThan: 
+        case TToken::GreaterThan:
+        case TToken::LessThan:
         case TToken::GreaterEqual:
         case TToken::LessEqual:
             if (ltype == rtype && (ltype->isEnumerated () || ltype->isReal () || ltype->isString ()))
@@ -585,7 +585,7 @@ void TExpressionBase::setType (TType *t) {
    basetype -> subrange
    long -> real
    type -> vector of type
-*/   
+*/
 
 TTypeCast::TTypeCast (TType *required, TExpressionBase *base):
   required (required), base (base) {
@@ -647,7 +647,7 @@ TExpressionBase *TExpression::parse (TBlock &block) {
         {TToken::LessThan,	"__uint64_less"},
         {TToken::GreaterThan,	"__uint64_greater"}
     };
-    
+
     TCompilerImpl &compiler = block.getCompiler ();
     TExpressionBase *left = TSimpleExpression::parse (block);
     TToken operation = block.getCompiler ().getToken ();
@@ -662,19 +662,19 @@ TExpressionBase *TExpression::parse (TBlock &block) {
 #ifdef CREATE_9900
                     if (right->isFunctionCall () && static_cast<TFunctionCall *> (right)->getFunction ()->isRoutine ()) {
                         TRoutineValue *routine = static_cast<TRoutineValue *> (static_cast<TFunctionCall *> (right)->getFunction ());
-                        if (routine->getSymbol ()->getName () == "__copy_set_const") 
+                        if (routine->getSymbol ()->getName () == "__copy_set_const")
                             right = static_cast<TFunctionCall *> (right)->getArguments () [0];
                     }
-#endif                
+#endif
                     left = createRuntimeCall ("__in_set", type, {compiler.createMemoryPoolObject<TTypeCast> (&stdType.Int64, left), right}, block, false);
                 } else if (left->getType ()->isSet ()) {
                     left = createRuntimeCall (setRuntimeFunc.at (operation), type, {left, right}, block, false);
                 } else if (left->getType () == &stdType.String)
                     left = createRuntimeCall (strRuntimeFunc.at (operation), type, {left, right}, block, true);
-#ifdef CREATE_9900                    
+#ifdef CREATE_9900
                 else if (left->getType () == &stdType.Uint64)
                     left = createRuntimeCall (uint64RuntimeFunc.at (operation), type, {left, right}, block, true);
-#endif                    
+#endif
                 else if (left->getType ()->isShortString ())
                     left = createRuntimeCall (shortStrRuntimeFunc.at (operation), type, {left, right}, block, true);
                 else if (left->getType ()->isVector ()) {
@@ -699,7 +699,7 @@ TExpressionBase *TPrefixedExpression::generate (TExpressionBase *base_para, TTok
     TCompilerImpl &compiler = block.getCompiler ();
     TType *type = TExpressionBase::convertBaseType (base_para, block);
     bool typeOK = false;
-    
+
     switch (operation) {
         case TToken::Sub:
             typeOK = type == &stdType.Int64 || type == &stdType.Real;
@@ -707,9 +707,9 @@ TExpressionBase *TPrefixedExpression::generate (TExpressionBase *base_para, TTok
         case TToken::Not:
             typeOK = type == &stdType.Int64 || type == &stdType.Boolean;
 #ifdef CREATE_9900
-            if (type == &stdType.Uint64) 
+            if (type == &stdType.Uint64)
                 return createRuntimeCall ("__uint64_not", &stdType.Uint64, {base_para}, block, false);
-#endif            
+#endif
             break;
         default:
             break;
@@ -741,16 +741,16 @@ TExpressionBase *TSimpleExpression::parse (TBlock &block) {
         {TToken::Or,	"__vec_or"},
         {TToken::Xor,	"__vec_xor"}
     };
-    
+
     TCompilerImpl &compiler = block.getCompiler ();
-    
-    compiler.checkToken (TToken::Add);	// skip + if present    
+
+    compiler.checkToken (TToken::Add);	// skip + if present
     bool signPresent = compiler.checkToken (TToken::Sub);
     TExpressionBase *left = TTerm::parse (block);
-    if (signPresent && left) 
+    if (signPresent && left)
         if (!evaluateConstant (left, left->getType (), TToken::Sub, block))
             left = TPrefixedExpression::generate (left, TToken::Sub, block);
-    
+
     while (compiler.getToken () == TToken::Add || compiler.getToken () == TToken::Sub || compiler.getToken () == TToken::Or || compiler.getToken () == TToken::Xor) {
         TToken operation = compiler.getToken ();
         compiler.getNextToken ();
@@ -764,7 +764,7 @@ TExpressionBase *TSimpleExpression::parse (TBlock &block) {
                         tca = TStdType::getScalarTypeCode (static_cast<TVectorType *> (left->getType ())->getBaseType ()),
                         tcb = TStdType::getScalarTypeCode (static_cast<TVectorType *> (right->getType ())->getBaseType ());
                     left = createRuntimeCall (vecRuntimeFunc.at (operation), type, {left, right, createInt64Constant (tca, block), createInt64Constant (tcb, block)}, block, false);
-                } else if (type->isString ()) 
+                } else if (type->isString ())
                     left = createRuntimeCall ("__str_concat", type, {left, right}, block, false);
                 else if (type->isShortString ())
                     left = createRuntimeCall ("__short_str_concat", nullptr, {left, right}, block, false);
@@ -775,7 +775,7 @@ TExpressionBase *TSimpleExpression::parse (TBlock &block) {
                     else if (type == &stdType.Uint64 && operation == TToken::Xor)
                         left = createRuntimeCall ("__uint64_xor", &stdType.Uint64, {left, right}, block, false);
                     else
-#endif                
+#endif
                         left = compiler.createMemoryPoolObject<TSimpleExpression> (left, right, operation, type);
                 }
             }
@@ -803,9 +803,9 @@ TExpressionBase *TTerm::parse (TBlock &block) {
         {TToken::Shr,		"__vec_shr"},
         {TToken::And,		"__vec_and"}
     };
-    
+
     TCompilerImpl &compiler = block.getCompiler ();
-    
+
     TExpressionBase *left = TFactor::parse (block);
     TToken operation = compiler.getToken ();
     while (operation == TToken::Mul || operation == TToken::Div || operation == TToken::DivInt || operation == TToken::Shl || operation == TToken::Shr ||
@@ -821,11 +821,11 @@ TExpressionBase *TTerm::parse (TBlock &block) {
                         tca = TStdType::getScalarTypeCode (static_cast<TVectorType *> (left->getType ())->getBaseType ()),
                         tcb = TStdType::getScalarTypeCode (static_cast<TVectorType *> (right->getType ())->getBaseType ());
                     left = createRuntimeCall (vecRuntimeFunc.at (operation), type, {left, right, createInt64Constant (tca, block), createInt64Constant (tcb, block)}, block, false);
-                } else if (!mergeConstants (left, right, type, operation, block))
+                } else if (!mergeConstants (left, right, type, operation, block)) {
 #ifdef CREATE_9900
                     if (type == &stdType.Uint64 && operation == TToken::And) {
                         std::string s = "__uint64_and";
-                        if (right->isFunctionCall ()) 
+                        if (right->isFunctionCall ())
                             if (TRoutineValue *routine = dynamic_cast<TRoutineValue *> (static_cast<TFunctionCall *> (right)->getFunction ()))
                                 if (routine->getSymbol ()->getName () == "__uint64_not") {
                                     s = "__uint64_and_not";
@@ -833,8 +833,9 @@ TExpressionBase *TTerm::parse (TBlock &block) {
                                 }
                         left = createRuntimeCall (s, &stdType.Uint64, {left, right}, block, false);
                     } else
-#endif                
+#endif
                         left = compiler.createMemoryPoolObject<TTerm> (left, right, operation, type);
+                }
             }
         operation = compiler.getToken ();
     }
@@ -848,7 +849,7 @@ void TTerm::acceptCodeGenerator (TCodeGenerator &codeGenerator) {
 
 TExpressionBase *TFactor::parse (TBlock &block) {
     TCompilerImpl &compiler = block.getCompiler ();
-    
+
     TExpressionBase *expr = nullptr;
     const TToken token = compiler.getToken ();
     if (token == TToken::Not) {
@@ -861,11 +862,11 @@ TExpressionBase *TFactor::parse (TBlock &block) {
     else if (token == TToken::IntegerConst || token == TToken::RealConst || token == TToken::CharConst || token == TToken::StringConst || token == TToken::SizeOf) {
         expr = compiler.createMemoryPoolObject<TConstantValue> (block.parseConstantLiteral ());
         if (token == TToken::StringConst) {
-#ifdef CREATE_9900        
+#ifdef CREATE_9900
             expr = createRuntimeCall ("__copy_str_const", &stdType.ShortString, {expr}, block, false);
-#else            
+#else
             expr = createRuntimeCall ("__str_make", nullptr, {expr, TExpressionBase::createVariableAccess (TConfig::globalRuntimeDataPtr, block)}, block, false);
-#endif            
+#endif
         }
     } else if (compiler.checkToken (TToken::BracketOpen)) {
         expr = TExpression::parse (block);
@@ -874,7 +875,7 @@ TExpressionBase *TFactor::parse (TBlock &block) {
         expr = parseSetExpression (block);
     else if (compiler.checkToken (TToken::AddrOp)) {
         expr = parseAddressOperator (block);
-    } else 
+    } else
         compiler.errorMessage (TCompilerImpl::SyntaxError, "Missing part in expression");
     return expr;
 }
@@ -882,28 +883,28 @@ TExpressionBase *TFactor::parse (TBlock &block) {
 TExpressionBase *TFactor::parseIdentifier (TBlock &block) {
     TLexer &lexer = block.getLexer ();
     TCompilerImpl &compiler = block.getCompiler ();
-    
+
     const std::string identifier = lexer.getIdentifier ();
     compiler.getNextToken ();
-    
+
     TExpressionBase *expr = block.searchActiveRecords (identifier);
     if (!expr) {
         if (TSymbol *symbol = block.getSymbols ().searchSymbol (identifier))
             if (symbol->checkSymbolFlag (TSymbol::Constant)) {
                 expr = compiler.createMemoryPoolObject<TConstantValue> (symbol);
                 if (symbol->getType ()->isSet ()) {
-#ifdef CREATE_9900              
+#ifdef CREATE_9900
                     if (TConfig::target == TConfig::TTarget::TI_BANKCART)
                         expr = createRuntimeCall ("__copy_set_const", symbol->getType (), {expr}, block, false);
 #endif
                 } else if (symbol->getType () == &stdType.String) {
-#ifndef CREATE_9900                
+#ifndef CREATE_9900
                     expr = createRuntimeCall ( "__str_make", symbol->getType (), {expr, TExpressionBase::createVariableAccess (TConfig::globalRuntimeDataPtr, block)}, block, false);
 #endif
                 } else if (symbol->getType ()->isShortString ()) {
 #ifdef CREATE_9900
                     expr = createRuntimeCall ("__copy_str_const", symbol->getType (), {expr}, block, false);
-#endif                
+#endif
                 }
             } else if (symbol->checkSymbolFlag (TSymbol::Routine))
                 expr = compiler.createMemoryPoolObject<TRoutineValue> (identifier, block);
@@ -919,8 +920,8 @@ TExpressionBase *TFactor::parseIdentifier (TBlock &block) {
             expr = TPredefinedRoutine::parse (identifier, block);
     }
 
-    bool done = false;    
-    while (!done) 
+    bool done = false;
+    while (!done)
         if (compiler.checkToken (TToken::SquareBracketOpen))
             expr = parseIndex (expr, block);
         else if (compiler.checkToken (TToken::Point))
@@ -929,9 +930,9 @@ TExpressionBase *TFactor::parseIdentifier (TBlock &block) {
             expr = parsePointerDereference (expr, block);
         else if (compiler.checkToken (TToken::BracketOpen))
             expr = parseFunctionCall (expr, block);
-        else 
+        else
             done = true;
-            
+
     if (expr && (expr->isLValue ()))
 //                ||  (expr->isFunctionCall () && static_cast<TFunctionCall *> (expr)->getFunctionReturnTemp ())))
         expr = compiler.createMemoryPoolObject<TLValueDereference> (expr);
@@ -940,7 +941,7 @@ TExpressionBase *TFactor::parseIdentifier (TBlock &block) {
 
 TExpressionBase *TFactor::parseTypeConversion (TSymbol *symbol, TBlock &block) {
     TCompilerImpl &compiler = block.getCompiler ();
-    
+
     compiler.checkToken (TToken::BracketOpen, "'(' expected in type cast");
     TExpressionBase *expr = TExpression::parse (block);
     compiler.checkToken (TToken::BracketClose, "')' expected in type case");
@@ -958,7 +959,7 @@ TExpressionBase *TFactor::parseTypeConversion (TSymbol *symbol, TBlock &block) {
 
 TExpressionBase *TFactor::parseFunctionCall (TExpressionBase *function, TBlock &block) {
     TCompilerImpl &compiler = block.getCompiler ();
-    
+
     std::vector<TExpressionBase *> args;
     bool success = true;
     if (!compiler.checkToken (TToken::BracketClose)) {
@@ -971,18 +972,18 @@ TExpressionBase *TFactor::parseFunctionCall (TExpressionBase *function, TBlock &
         compiler.checkToken (TToken::BracketClose, "Function call missing closing ')'");
     }
 
-    if (function) {        
-    
+    if (function) {
+
         if (function->isRoutine () && function->getType () == &stdType.UnresOverload)
             static_cast<TRoutineValue *> (function)->resolveCall (args, block);
-        
+
         TType *type = function->getType ();
         if (!type->isRoutine ())
             compiler.errorMessage (TCompilerImpl::IncompatibleTypes, "Calling non-subroutine");
         else if (success) {
-        
+
         // !!!! TODO: Das auch fuer parameterluse Funktionen ? Deref in TFunctionCall-Konstruktor !?
-        
+
             if (function->isLValue ())
                 function = compiler.createMemoryPoolObject<TLValueDereference> (function);
             return compiler.createMemoryPoolObject<TFunctionCall> (function, std::move (args), block, true);
@@ -993,19 +994,19 @@ TExpressionBase *TFactor::parseFunctionCall (TExpressionBase *function, TBlock &
 
 TExpressionBase *TFactor::parseIndex (TExpressionBase *base, TBlock &block) {
     TCompilerImpl &compiler = block.getCompiler ();
-    
+
     createFunctionCall (base, block, true);
     do {
         TExpressionBase *index = TExpression::parse (block);
         if (base && index) {
             convertBaseType (base, block);
-            TType *baseType = base->getType (), 
-                  *requiredIndexType = nullptr, 
+            TType *baseType = base->getType (),
+                  *requiredIndexType = nullptr,
                   *resultType = nullptr;
             if (baseType->isVector ()) {
                 TType *indexType = convertBaseType (index, block);
                 if (indexType == &stdType.Int64) {
-                    if (base->isLValue ()) 
+                    if (base->isLValue ())
                         base = compiler.createMemoryPoolObject<TVectorIndex> (base, index, baseType->getBaseType (), TVectorIndex::TIndexKind::Int, block);
                     else {
                         compiler.errorMessage (TCompilerImpl::IncompatibleTypes, "L-Value required to apply integer index to vector");
@@ -1023,7 +1024,7 @@ TExpressionBase *TFactor::parseIndex (TExpressionBase *base, TBlock &block) {
                         base = nullptr;
                     }
                 }
-            } else {     
+            } else {
                 if (baseType->isArray ()) {
                     requiredIndexType = static_cast<TArrayType *> (baseType)->getIndexType ();
                     resultType = baseType->getBaseType ();
@@ -1051,23 +1052,23 @@ TExpressionBase *TFactor::parseIndex (TExpressionBase *base, TBlock &block) {
 TExpressionBase *TFactor::parseRecordComponent (TExpressionBase *base, TBlock &block) {
     TLexer &lexer = block.getLexer ();
     TCompilerImpl &compiler = block.getCompiler ();
-    
+
     if (compiler.getToken () != TToken::Identifier) {
         compiler.errorMessage (TCompilerImpl::IdentifierExpected);
         return nullptr;
     }
-    
+
     createFunctionCall (base, block, true);
     const std::string component = lexer.getIdentifier ();
     compiler.getNextToken ();
     if (base)
         if (TType *type = base->getType ()) {
-            if (type->isRecord ()) 
+            if (type->isRecord ())
                 if (const TSymbol *symbol = static_cast<TRecordType *> (type)->searchComponent (component))
                     return compiler.createMemoryPoolObject<TRecordComponent> (base, component, symbol);
-                else 
+                else
                     compiler.errorMessage (TCompilerImpl::IncompatibleTypes, component + " is not a component of the record");
-            else 
+            else
                 compiler.errorMessage (TCompilerImpl::IncompatibleTypes, "Applying selection to non-record type");
         }
     return nullptr;
@@ -1092,55 +1093,55 @@ TExpressionBase *TFactor::parseSetExpression (TBlock &block) {
     TEnumeratedType *baseType = nullptr;
     std::vector<TExpressionBase *> values;
     std::vector<std::pair<TExpressionBase *, TExpressionBase *>> valuePairs;
-    
+
     bool firstExpression = true;
     if (!compiler.checkToken (TToken::SquareBracketClose)) {
         do {
             TExpressionBase *expr1 = TExpression::parse (block), *expr2 = nullptr;
             if (compiler.checkToken (TToken::Points))
                 expr2 = TExpression::parse (block);
-            if (expr1) 
+            if (expr1)
                 convertBaseType (expr1, block);
             if (expr2)
                 convertBaseType (expr2, block);
-                
+
             if (firstExpression) {
                 if (expr1) {
                     TType *type = expr1->getType ();
                     if (!type->isEnumerated ())
                         compiler.errorMessage (TCompilerImpl::InvalidType, "Need enumerated type to construct set, but got '" + type->getName () + "'");
-                    else                        
+                    else
                         baseType = static_cast<TEnumeratedType *> (type);
                 }
                 firstExpression = false;
             }
-            
+
             if (baseType && expr1) {
                 if (expr1->getType () != baseType)
                     compiler.errorMessage (TCompilerImpl::InvalidType, "Cannot include value of type '" + expr1->getType ()->getName () + "' in set of type '" + baseType->getName () + "'");
                 if (expr2 && expr2->getType () != baseType)
                     compiler.errorMessage (TCompilerImpl::InvalidType, "Cannot include value of type '" + expr2->getType ()->getName () + "' in set of type '" + baseType->getName () + "'");
-                if (expr2) 
+                if (expr2)
                     valuePairs.push_back ({expr1, expr2});
                 else
                     values.push_back (expr1);
             }
         } while (compiler.checkToken (TToken::Comma));
-        compiler.checkToken (TToken::SquareBracketClose, "']' expected to end set constructor");          
+        compiler.checkToken (TToken::SquareBracketClose, "']' expected to end set constructor");
     }
 
     TType *resultType = compiler.createMemoryPoolObject<TSetType> (baseType);
     TSimpleConstant *constPart = compiler.createMemoryPoolObject<TSimpleConstant> ();
     constPart->setType (resultType);
-    
+
     TExpressionBase *setConstructor = compiler.createMemoryPoolObject<TConstantValue> (constPart);
-#ifdef CREATE_9900  
+#ifdef CREATE_9900
     setConstructor =  createRuntimeCall ("__copy_set_const", resultType, {setConstructor}, block, false);
-#endif    
-    for (TExpressionBase *val: values) 
+#endif
+    for (TExpressionBase *val: values)
         if (val->isConstant ())
             constPart->addSetValue (static_cast<TConstantValue *> (val)->getConstant ()->getInteger ());
-        else 
+        else
             setConstructor = createRuntimeCall ("__set_add_val", nullptr, {compiler.createMemoryPoolObject<TTypeCast> (&stdType.Int64, val), setConstructor}, block, false);
     for (const std::pair<TExpressionBase *, TExpressionBase *> &val: valuePairs)
         if (val.first->isConstant () && val.second->isConstant ())
@@ -1153,7 +1154,7 @@ TExpressionBase *TFactor::parseSetExpression (TBlock &block) {
 
 TExpressionBase *TFactor::parseAddressOperator (TBlock &block) {
     TCompilerImpl &compiler = block.getCompiler ();
-    
+
     TExpressionBase *expr = TFactor::parse (block);
     if (expr) {
         TType *type = expr->getType ();
@@ -1164,7 +1165,7 @@ TExpressionBase *TFactor::parseAddressOperator (TBlock &block) {
                     expr = static_cast<TLValueDereference *> (expr)->getLValue ();
                     if (expr->isSymbol ())
                         static_cast<TVariable *> (expr)->getSymbol ()->setAliased ();
-                } else 
+                } else
                     compiler.errorMessage (TCompilerImpl::VariableExpected, "L-value required for address operator '@'");
             }
         }
@@ -1176,14 +1177,14 @@ TExpressionBase *TFactor::parseAddressOperator (TBlock &block) {
 TFunctionCall::TFunctionCall (TExpressionBase *function, std::vector<TExpressionBase *> &&args_para, TBlock &block, bool checkParameter):
   function (function), args (std::move (args_para)), ignoreReturn (false), returnSymbol (nullptr), returnStorage (nullptr) {
     TCompilerImpl &compiler = block.getCompiler ();
-    
+
     TRoutineType *routineType = static_cast<TRoutineType *> (function->getType ());
     TType *returnType = routineType->getReturnType ();
     setType (returnType);
-    
-    if (checkParameter) {    
-        if (routineType->getParameter ().size () != args.size ()) 
-            compiler.errorMessage (TCompilerImpl::IncompatibleTypes, "Number of arguments does not match declaration (expected " + 
+
+    if (checkParameter) {
+        if (routineType->getParameter ().size () != args.size ())
+            compiler.errorMessage (TCompilerImpl::IncompatibleTypes, "Number of arguments does not match declaration (expected " +
                     std::to_string (routineType->getParameter ().size ()) + " but got " + std::to_string (args.size ()) + ")");
         else {
             std::vector<TExpressionBase *>::iterator it = args.begin ();
@@ -1195,7 +1196,7 @@ TFunctionCall::TFunctionCall (TExpressionBase *function, std::vector<TExpression
                         formalParameterType = formalParameterType->getBaseType ();
                         if (formalParameterType != (*it)->getType () && formalParameterType != &stdType.GenericVar && !(formalParameterType == &stdType.GenericPointer && (*it)->getType ()->isPointer ()))
                             compiler.errorMessage (TCompilerImpl::IncompatibleTypes, "Expected reference of type '" + formalParameterType->getName () + "' for formal parameter " + parameter->getName () + ", but got '" + (*it)->getType ()->getName () + "'");
-                    } else 
+                    } else
                         compiler.errorMessage (TCompilerImpl::IdentifierExpected, "L-value required for reference parameter");
                 } else
                     performTypeConversion (formalParameterType, *it, block);
@@ -1243,7 +1244,7 @@ TVariable::TVariable (TSymbol *symbol, TBlock &block):
 bool TVariable::isLValue () const {
     return true;
 }
- 
+
 bool TVariable::isSymbol () const {
     return true;
 }
@@ -1291,7 +1292,7 @@ void TLValueDereference::acceptCodeGenerator (TCodeGenerator &codeGenerator) {
 
 TArrayIndex::TArrayIndex (TExpressionBase *base, TExpressionBase *index, TType *type):
   base (base), index (index) {
-    setType (type);    
+    setType (type);
 }
 
 bool TArrayIndex::isLValue () const {
@@ -1307,7 +1308,7 @@ TRecordComponent::TRecordComponent (TExpressionBase *base, const std::string &co
   base (base), component (component) {
     setType (symbol->getType ());
 }
- 
+
 bool TRecordComponent::isLValue () const {
     return true;
 }
@@ -1336,10 +1337,10 @@ TConstantValue::TConstantValue (const TSimpleConstant *constant):
     TType *type = constant->getType ();
 #ifdef CREATE_9900
     setType (type == &stdType.String ? &stdType.ShortString : type);
-#else    
+#else
     // TODO: check constant string expressions on x64!!!!
     setType (type == &stdType.String ? &stdType.Int64 : type);
-#endif    
+#endif
 }
 
 TConstantValue::TConstantValue (TSymbol *symbol):
@@ -1347,9 +1348,9 @@ TConstantValue::TConstantValue (TSymbol *symbol):
     TType *type = symbol->getType ();
 #ifdef CREATE_9900
     setType (type == &stdType.String ? &stdType.ShortString : type);
-#else    
+#else
     setType (type);
-#endif    
+#endif
 }
 
 bool TConstantValue::isConstant () const {
@@ -1365,7 +1366,7 @@ TRoutineValue::TRoutineValue (const std::string &identifier, TBlock &block):
   symbol (nullptr) {
     TCompilerImpl &compiler = block.getCompiler ();
     symbolOverloads = block.getSymbols ().searchSymbols (identifier);
-    
+
     if (symbolOverloads.empty ()) {
         compiler.errorMessage (TCompilerImpl::IdentifierNotFound, "Identifier '" + identifier + "' not found in subroutine call");
         setType (&stdType.Void);
@@ -1398,7 +1399,7 @@ void TRoutineValue::resolveCall (std::vector<TExpressionBase *> args, TBlock &bl
                 if (formalParameterType->isReference ()) {
                     formalParameterType = formalParameterType->getBaseType ();
                     if (!(*it)->isLValueDereference () ||
-                        (formalParameterType != &stdType.GenericVar && 
+                        (formalParameterType != &stdType.GenericVar &&
                          formalParameterType != (*it)->getType ()))
                         success = false;
                 } else if (!checkTypeConversion (formalParameterType, *it, block))
@@ -1410,7 +1411,7 @@ void TRoutineValue::resolveCall (std::vector<TExpressionBase *> args, TBlock &bl
             resolveOverload (s, block);
             return;
         }
-    }        
+    }
 }
 
 bool TRoutineValue::resolveConversion (const TRoutineType *required, TBlock &block) {

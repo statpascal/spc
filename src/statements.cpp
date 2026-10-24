@@ -11,7 +11,7 @@ namespace statpascal {
 TStatement *TStatement::parse (TBlock &declarations) {
     TCompilerImpl &compiler = declarations.getCompiler ();
     TLexer &lexer = compiler.getLexer ();
-    
+
     if (compiler.checkToken (TToken::Begin))
         return compiler.createMemoryPoolObject<TStatementSequence> (declarations);
     if (compiler.checkToken (TToken::If))
@@ -55,7 +55,7 @@ TSymbol *TStatement::createCaseLabel (TBlock &declarations) {
 
 std::vector<TStatement *> TStatement::parseStatementSequence (TBlock &declarations, TToken endToken) {
     TCompilerImpl &compiler = declarations.getCompiler ();
-    
+
     std::vector<TStatement *> statements;
     bool goon;
     do {
@@ -115,16 +115,16 @@ void TRoutineCall::acceptCodeGenerator (TCodeGenerator &codeGenerator) {
 TStatement *TSimpleStatement::parse (TBlock &declarations) {
     TCompilerImpl &compiler = declarations.getCompiler ();
     TLexer &lexer = compiler.getLexer ();
-    
+
     declarations.getSymbols ().beginNewTempBlock ();
     const std::string identifier = lexer.getIdentifier ();
     TExpressionBase *left = TExpression::parse (declarations),
                     *right = nullptr;
-                    
+
     if (compiler.checkToken (TToken::Define))
         right = TExpression::parse (declarations);
-        
-    if (left) 
+
+    if (left)
         if (right) {	// Assignment
             if (left->isLValueDereference ()) {
                 left = static_cast<TLValueDereference *> (left)->getLValue ();
@@ -134,12 +134,12 @@ TStatement *TSimpleStatement::parse (TBlock &declarations) {
                 else if (!left->isVectorIndex ()) {	// handled as function call
                     TExpressionBase::performTypeConversion (left->getType (), right, declarations);
                     if (right->isFunctionCall () && (
-                            left->getType () == right->getType () || 
-                            left->getType ()->isVector () || 
+                            left->getType () == right->getType () ||
+                            left->getType ()->isVector () ||
                             (left->getType ()->isSet () && right->getType ()->isSet ()) ||
                             (left->getType ()->isShortString () && right->getType ()->isShortString () && left->getType ()->getSize () >= right->getType ()->getSize ())
                         )
-                        && static_cast<TFunctionCall *> (right)->getReturnStorage () 
+                        && static_cast<TFunctionCall *> (right)->getReturnStorage ()
                         // TODO: evil hack for TMS9900 to get uint64 operations inlined
                         && (left->getType () == &stdType.Uint64 || !compiler.getCodeGenerator ().isFunctionCallInlined (*static_cast<TFunctionCall *> (right)))) {
                         static_cast<TFunctionCall *> (right)->setReturnStorage (left, declarations);
@@ -186,7 +186,7 @@ TIfStatement::TIfStatement (TExpressionBase *condition, TStatement *statement):
 
 void TIfStatement::parse (TBlock &declarations) {
     TCompilerImpl &compiler = declarations.getCompiler ();
-    
+
     declarations.getSymbols ().beginNewTempBlock ();
     condition = TExpression::parse (declarations);
     if (condition && !TExpressionBase::checkTypeConversion (&stdType.Boolean, condition, declarations))
@@ -232,12 +232,12 @@ TStatement *TRepeatStatement::parse (TBlock &declarations) {
     TCompilerImpl &compiler = declarations.getCompiler ();
     TSymbol *label = createLocalLabel (declarations);
     std::vector<TStatement *> statements = parseStatementSequence (declarations, TToken::Until);
-    
+
     declarations.getSymbols ().beginNewTempBlock ();
     TExpressionBase *condition;
     if (declarations.getCompiler ().checkToken (TToken::Until) && (condition = TExpression::parse (declarations))) {
         TExpressionBase::performTypeConversion (&stdType.Boolean, condition, declarations);
-        statements.push_back (compiler.createMemoryPoolObject<TGotoStatement> (label, 
+        statements.push_back (compiler.createMemoryPoolObject<TGotoStatement> (label,
             TPrefixedExpression::generate (condition, TToken::Not, declarations)));
         return compiler.createMemoryPoolObject<TLabeledStatement> (
             label, compiler.createMemoryPoolObject<TStatementSequence> (std::move (statements)));
@@ -251,7 +251,7 @@ TStatement *TWhileStatement::parse (TBlock &declarations) {
     TSymbol *l1 = createLocalLabel (declarations),
             *l2 = createLocalLabel (declarations);
     std::vector<TStatement *> statements;
-    
+
     declarations.getSymbols ().beginNewTempBlock ();
     TExpressionBase *condition = TExpression::parse (declarations);
     if (condition) {
@@ -281,14 +281,14 @@ void TCaseStatement::acceptCodeGenerator (TCodeGenerator &codeGenerator) {
 
 void TCaseStatement::parse (TBlock &declarations) {
     TCompilerImpl &compiler = declarations.getCompiler ();
-    
+
     declarations.getSymbols ().beginNewTempBlock ();
     expression = TExpression::parse (declarations);
     const TType *type = expression ? TExpressionBase::convertBaseType (expression, declarations) : nullptr;
     if (type && !type->isEnumerated ())
         compiler.errorMessage (TCompilerImpl::InvalidType, "Ordinal type expected in 'case'-statement: '" + type->getName () + "' is invalid");
     compiler.checkToken (TToken::Of, "'of' expected in 'case'-statement");
-        
+
     bool parseCase = true;
     minLabel = std::numeric_limits<std::int64_t>::max ();
     maxLabel = std::numeric_limits<std::int64_t>::min ();
@@ -303,7 +303,7 @@ void TCaseStatement::parse (TBlock &declarations) {
                 compiler.errorMessage (TCompilerImpl::InvalidType, "Type of case label does not match");
             else {
                 const std::int64_t aval = a->getInteger (), bval = b->getInteger ();
-                for (const TSortedEntry &e: sortedLabels) 
+                for (const TSortedEntry &e: sortedLabels)
                     if ((aval >= e.label.a && aval <= e.label.b) ||
                         (bval >= e.label.a && bval <= e.label.b)) {
                         compiler.errorMessage (TCompilerImpl::DuplicateCase, "Duplicate case label");
@@ -320,25 +320,25 @@ void TCaseStatement::parse (TBlock &declarations) {
         caseList.push_back (TCase {std::move (labels), TStatement::parse (declarations), jumpLabel});
         parseCase = compiler.checkToken (TToken::Semicolon) && !(compiler.getToken () == TToken::Else || compiler.getToken () == TToken::End);
     }
-    
+
     if (compiler.checkToken (TToken::Else))
         defaultStatement = compiler.createMemoryPoolObject<TStatementSequence> (declarations);
-    else 
+    else
         compiler.checkToken (TToken::End, "'end' expected in 'case'-statement");
-}    
+}
 
 
 TStatement *TForStatement::parse (TBlock &declarations) {
     TCompilerImpl &compiler = declarations.getCompiler ();
     TSymbol *controlVariable;
-    bool isIncrement, isBeginConst, isEndConst;
+    bool isIncrement = false, isBeginConst = false, isEndConst = false;
     std::int64_t beginValue = 0, endValue = 0;
-    
+
     if (!(controlVariable = declarations.checkVariable ()))
         compiler.getNextToken ();
     // TODO: Check if control variable is local
     compiler.checkToken (TToken::Define, "':=' required in 'for'-statement");
-    
+
     declarations.getSymbols ().beginNewTempBlock ();
     TExpressionBase *begin = TExpression::parse (declarations);
     if (compiler.checkToken (TToken::To))
@@ -358,19 +358,19 @@ TStatement *TForStatement::parse (TBlock &declarations) {
             TExpressionBase::performTypeConversion (controlType, begin, declarations);
         }
         if (end) {
-            if ((isEndConst = end->isConstant ())) 
+            if ((isEndConst = end->isConstant ()))
                 endValue = static_cast<TConstantValue *> (end)->getConstant ()->getInteger ();
             TExpressionBase::performTypeConversion (controlType, end, declarations);
         }
     }
     compiler.checkToken (TToken::Do, "'do' expected in 'for'-loop");
     TStatement *bodyStatement = TStatement::parse (declarations);
-    
+
     if (compiler.getErrorFlag () || (isEndConst && isBeginConst && ((endValue < beginValue && isIncrement) || (endValue > beginValue && !isIncrement))))
         return compiler.createMemoryPoolObject<TEmptyStatement> ();
-  
-//   Collides with range check in PCODE - disable for initial assignment  
-        
+
+//   Collides with range check in PCODE - disable for initial assignment
+
 //    if (isBeginConst && isEndConst)
 //        begin = TExpressionBase::createConstant (isIncrement ? beginValue - 1 : beginValue + 1, begin->getType (), declarations);
 
@@ -379,7 +379,7 @@ TStatement *TForStatement::parse (TBlock &declarations) {
     TExpressionBase *controlVariableLValue = compiler.createMemoryPoolObject<TVariable> (controlVariable, declarations);
     TExpressionBase *controlVariableAccess = compiler.createMemoryPoolObject<TLValueDereference> (controlVariableLValue);
     statements.push_back (compiler.createMemoryPoolObject<TAssignment> (controlVariableLValue, begin));
-    
+
     if (!end->isConstant ()) {
 //    if (!isEndConst) {
         TSymbol *endTemp = declarations.getSymbols ().addVariable ("$" + controlVariable->getName (), controlVariable->getType ()).symbol;
@@ -387,12 +387,12 @@ TStatement *TForStatement::parse (TBlock &declarations) {
         statements.push_back (compiler.createMemoryPoolObject<TAssignment> (endVar, end));
         end = compiler.createMemoryPoolObject<TLValueDereference> (endVar);
     }
-    
+
     TSymbol *beginLabel = createLocalLabel (declarations),
             *bodyLabel = createLocalLabel (declarations),
             *endLabel = createLocalLabel (declarations);
     if (!(isBeginConst && isEndConst))
-        statements.push_back (compiler.createMemoryPoolObject<TGotoStatement> (endLabel, 
+        statements.push_back (compiler.createMemoryPoolObject<TGotoStatement> (endLabel,
             compiler.createMemoryPoolObject<TExpression> (controlVariableAccess, end, isIncrement ? TToken::GreaterThan : TToken::LessThan, &stdType.Boolean)));
 //    if (!(isBeginConst && isEndConst))
         statements.push_back (compiler.createMemoryPoolObject<TGotoStatement> (bodyLabel));
@@ -401,16 +401,16 @@ TStatement *TForStatement::parse (TBlock &declarations) {
         beginLabel, compiler.createMemoryPoolObject<TRoutineCall> (
             compiler.createMemoryPoolObject<TPredefinedRoutine> (isIncrement ? TPredefinedRoutine::Inc : TPredefinedRoutine::Dec, controlVariable->getType (), std::move (args)))));
     statements.push_back (compiler.createMemoryPoolObject<TLabeledStatement> (bodyLabel, bodyStatement));
-    statements.push_back (compiler.createMemoryPoolObject<TGotoStatement> (beginLabel, 
+    statements.push_back (compiler.createMemoryPoolObject<TGotoStatement> (beginLabel,
         compiler.createMemoryPoolObject<TExpression> (controlVariableAccess, end, TToken::NotEqual, &stdType.Boolean)));
     statements.push_back (compiler.createMemoryPoolObject<TLabeledStatement> (endLabel,
         compiler.createMemoryPoolObject<TEmptyStatement> ()));
-        
+
     return compiler.createMemoryPoolObject<TStatementSequence> (std::move (statements));
 }
 
 
-TGotoStatement::TGotoStatement (TBlock &declarations): 
+TGotoStatement::TGotoStatement (TBlock &declarations):
   TGotoStatement (nullptr) {
     parse (declarations);
 }
@@ -422,7 +422,7 @@ TGotoStatement::TGotoStatement (TSymbol *label, TExpressionBase *condition):
 void TGotoStatement::parse (TBlock &declarations) {
     TCompilerImpl &compiler = declarations.getCompiler ();
     TLexer &lexer = compiler.getLexer ();
-    
+
     if (compiler.getToken () == TToken::Identifier || compiler.getToken () == TToken::IntegerConst) {
         std::string s = (compiler.getToken () == TToken::Identifier) ? lexer.getIdentifier () : std::to_string (lexer.getInteger ());
         compiler.getNextToken ();
@@ -449,7 +449,7 @@ TWithStatement::TWithStatement (TBlock &declarations):
 
 void TWithStatement::parse (TBlock &declarations) {
     TCompilerImpl &compiler = declarations.getCompiler ();
-        
+
     std::size_t count = 0;
     do {
         declarations.getSymbols ().beginNewTempBlock ();
