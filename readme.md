@@ -79,6 +79,38 @@ The scripts *runcart.sh*, *runbank.sh* and *runea5.sh* in the
 scripts directory show the invocation of the compiler, *xas99* assembler and
 start the *emul99* emulator.
 
+### Profiling
+
+To profile a program, compile it and run it in emul99 with the `perfdata`
+option. 
+
+```
+scripts/runcart tests/ti99/lines.pas perfdata=emul99.pef
+```
+
+Upon exiting the emulator, it will write the file `emul99.perf` with an
+execution and cycle count for each processor instructin that was executed.
+Using tiperf, this data can be combined with the mapping in the generated
+assembler file (`out.a99` in this example) to generate a table listing the
+top level functions:
+
+```
+obj/tiperf out.a99 emul99.perf
+```
+
+which gives
+
+```
+    72045414 58.0% plot_near_9
+    25297668 20.4% line_8
+     7339800  5.9% writecache
+     7166544  5.8% transfercache
+     6529792  5.3% readcache
+     ,,,
+```
+
+### Future Development
+
 The following steps are planned:
 
 - a standard runtime library
